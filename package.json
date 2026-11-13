@@ -1,0 +1,17 @@
+{
+  "name": "standin",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.0.7",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.base.json --noEmit",
+    "standin": "tsx packages/cli/src/bin.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.0",
+    "vitest": "^4.1.0"
+  }
+}
