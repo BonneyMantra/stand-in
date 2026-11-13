@@ -170,8 +170,8 @@ export class TripHandler {
     if (!this.registry || process.env.STANDIN_NO_REPORT === "1") return;
     try {
       const w = makeAccount(this.cfg, requireAccount(this.cfg, "watcher"), loadDevKey(this.cfg, "watcher").secret_key);
-      const deposit = BigInt(process.env.STANDIN_REPORT_DEPOSIT_YOCTO ?? "100000000000000000000000"); // 0.1 NEAR for OutLayer; refunded by registry if unused
-      const res = await callMethod(w, this.registry, "report", { tx_hash: tx.hash, decoy_account_id: this.decoy }, { deposit, waitUntil: "INCLUDED" });
+      const deposit = BigInt(process.env.STANDIN_REPORT_DEPOSIT_YOCTO ?? "50000000000000000000000"); // 0.05 NEAR (registry min 0.01); OutLayer refunds the unused part
+      const res = await callMethod(w, this.registry, "report", { tx_hash: tx.hash, decoy_account_id: this.decoy, sender_id: this.decoy, admin_public_key: this.adminPk }, { deposit, waitUntil: "INCLUDED" });
       log.info(`registry.report submitted ${res.tx_hash}`);
       const prov = makeProvider(this.cfg);
       for (let i = 0; i < 90; i++) {
@@ -181,7 +181,7 @@ export class TripHandler {
           appendEvent("blocklist", {
             trip_tx_hash: tx.hash, account_id: attacker, evidence_tx: tx.hash, decoy_public_key: tx.public_key,
             attested_at: new Date().toISOString(),
-            blocklist: { tx_hash: res.tx_hash, outlayer_execution: v.outlayer_call_or_tx ?? v.outlayer_execution ?? "", attested: true },
+            blocklist: { tx_hash: res.tx_hash, outlayer_execution: res.tx_hash, attested: true },
           }, this.home);
           log.info(`blocklisted ${attacker}`);
           return;

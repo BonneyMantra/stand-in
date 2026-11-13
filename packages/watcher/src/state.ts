@@ -63,7 +63,8 @@ export async function buildState(cfg: NetworkConfig, home?: string) {
   const blocklist = chainBlocklist.length
     ? chainBlocklist.map((e: any) => ({
         account_id: s(e.account_id ?? e.attacker_account), evidence_tx: s(e.evidence_tx ?? e.tx_hash),
-        decoy_public_key: s(e.decoy_public_key), attested_at: s(e.attested_at),
+        decoy_public_key: s(e.decoy_public_key),
+        attested_at: e.attested_at_ns ? new Date(Number(BigInt(e.attested_at_ns.toString()) / 1_000_000n)).toISOString() : s(e.attested_at),
       }))
     : ledgerBlocklist;
   return {
