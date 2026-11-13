@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+SUBMISSION.local.md
+node_modules/
+target/
+dist/
+.DS_Store
+*.log
+.standin/
