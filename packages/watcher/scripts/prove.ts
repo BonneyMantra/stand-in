@@ -51,17 +51,18 @@ async function ensureFundsAndUnfrozen() {
 const results: any[] = [];
 for (let n = 1; n <= runs; n++) {
   out(`\n=== run ${n}/${runs} ===`);
-  await ensureFundsAndUnfrozen();
+  for (let i = 0; ; i++) { try { await ensureFundsAndUnfrozen(); break; } catch (e) { if (i > 8) throw e; out(`rate limited, retrying (${i})`); await new Promise((r) => setTimeout(r, 4000)); } }
   const home = path.join(root, ".sandbox", `w3-proof-${n}`);
   seed(home);
   const env = { ...process.env, STANDIN_HOME: path.join(home, ".standin"), STANDIN_POOL_SIZE: "4" };
   // restart the watcher so it follows this run's ledger
   try { const pid = Number(fs.readFileSync(path.join(env.STANDIN_HOME, "watcher.pid"), "utf8")); process.kill(pid); } catch { /* none */ }
-  cli(env, "dev", "up");
-  cli(env, "adopt", "--home", home);
+  const retry = (...a: string[]) => { for (let i = 0; ; i++) { try { return cli(env, ...a); } catch (e) { if (i > 4) throw e; out("retrying after failure"); Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5000); } } };
+  retry("dev", "up");
+  retry("adopt", "--home", home);
   const planted = fs.readdirSync(path.join(home, ".near-credentials/testnet")).find((f) => f.startsWith(decoy));
   if (!planted) throw new Error("no decoy credentials file after adopt");
-  const drained = cli(env, "attack", "drain", "--key", path.join(home, ".near-credentials/testnet", planted), "--reserve", "3");
+  const drained = retry("attack", "drain", "--key", path.join(home, ".near-credentials/testnet", planted), "--reserve", "3");
   const deadline = Date.now() + 90_000;
   let trip: any;
   while (Date.now() < deadline) {
