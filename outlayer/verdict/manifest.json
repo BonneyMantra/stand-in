@@ -1,0 +1,9 @@
+{
+  "display": {
+    "name": "Stand-in verdict"
+  },
+  "operations": ["verdict", "public_key"],
+  "signing_keys": [
+    {"path": "verdict", "type": "ed25519", "caller": "none"}
+  ]
+}

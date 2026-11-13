@@ -1,0 +1,26 @@
+[package]
+name = "standin-verdict"
+version = "0.1.0"
+edition = "2021"
+description = "Stand-in verdict: attests that a decoy NEAR key was used to drain a decoy account, and who received the funds"
+
+[lib]
+name = "standin_verdict"
+path = "src/lib.rs"
+
+[[bin]]
+name = "standin-verdict"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+hex = "0.4"
+wit-bindgen = "0.36"
+wasi-http-client = "0.2"
+
+[profile.release]
+opt-level = "z"
+lto = true
+strip = true
+codegen-units = 1
