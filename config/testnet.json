@@ -1,0 +1,16 @@
+{
+  "network": "testnet",
+  "rpc_url": "https://test.rpc.fastnear.com",
+  "rpc_fallback_url": "https://rpc.testnet.near.org",
+  "suffix": "5289",
+  "accounts": {
+    "agent": "si-agent-5289.testnet",
+    "project": "si-project-5289.testnet",
+    "decoy": "si-decoy-5289.testnet",
+    "watcher": "si-watch-5289.testnet",
+    "registry": "si-registry-5289.testnet",
+    "intents": "si-intents-5289.testnet",
+    "attacker": "si-attacker-5289.testnet"
+  },
+  "keys_dir_note": "private keys live in <repo>/.secrets/keys (gitignored)"
+}
