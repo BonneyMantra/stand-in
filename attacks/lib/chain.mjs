@@ -4,6 +4,19 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { REPO } from './sandbox.mjs';
 
+/** Retry on public-RPC rate limits (HTTP 429 / failover exhausted). */
+export async function retry(fn, tries = 6) {
+  let last;
+  for (let i = 0; i < tries; i++) {
+    try { return await fn(); } catch (e) {
+      last = e;
+      if (!/429|Exceeded \d+ providers|fetch failed|timeout/i.test(String(e.message))) throw e;
+      await new Promise((r) => setTimeout(r, 2000 * (i + 1)));
+    }
+  }
+  throw last;
+}
+
 let _core;
 export async function core() {
   if (!_core) _core = await import(path.join(REPO, 'packages/core/src/index.ts'));
@@ -26,7 +39,8 @@ export async function guardianState() {
 }
 
 /** Disposable "real" account for the Stand-in-OFF baseline: a subaccount of the agent account. */
-export async function createBaselineAccount(fundNear = '2') {
+export const createBaselineAccount = (fundNear = '2') => retry(() => createBaselineAccountOnce(fundNear));
+async function createBaselineAccountOnce(fundNear) {
   const { c, cfg } = await core();
   const agent = c.requireAccount(cfg, 'agent');
   const id = `bl${Date.now().toString(36)}.${agent}`;
@@ -51,7 +65,8 @@ export async function deleteBaselineAccount(b) {
 }
 
 /** After a freeze: unfreeze, then provision a fresh scoped function-call key and save it where hooks read it. */
-export async function resetAgent(standinHome) {
+export const resetAgent = (standinHome) => retry(() => resetAgentOnce(standinHome));
+async function resetAgentOnce(standinHome) {
   const { c, cfg } = await core();
   const agent = c.requireAccount(cfg, 'agent');
   const project = c.requireAccount(cfg, 'project');

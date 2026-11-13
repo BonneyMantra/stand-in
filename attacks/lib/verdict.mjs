@@ -23,6 +23,7 @@ export function evaluate(sb, { since, sessionIds, culprit, theftAt }) {
     exposure_events: exposures.length,
     exposure_detected: exposures.length > 0,
     exposure_locations: [...new Set(exposures.map((e) => e.location_kind))],
+    exposure_lead_ms: theftAt && exposures[0] ? Date.parse(theftAt) - Date.parse(exposures[0].at) : null,
     exposure_where: [...new Set(exposures.map((e) => e.where))],
     attributed_exact: !!exactExposure,
     attributed_session_via_exposure: exposures.some((e) => e.session_id === culprit?.session_id),

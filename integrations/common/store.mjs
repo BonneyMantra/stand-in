@@ -57,13 +57,15 @@ export function accountConfig() {
 export async function takeKey() {
   const repo = repoDir();
   if (repo && process.env.STANDIN_POOL !== 'local') {
-    try {
-      const core = await import(path.join(repo, 'packages/core/src/pool.ts'));
-      const k = await core.takeDecoy({ home: home() });
-      return { public_key: k.public_key, secret_key: k.secret_key, source: 'core' };
-    } catch (e) {
-      appendEvent('tool_call', { tool_name: 'standin', warning: `core pool unavailable, minting local key: ${e.message}`.slice(0, 200) });
+    let last;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        const core = await import(path.join(repo, 'packages/core/src/pool.ts'));
+        const k = await core.takeDecoy({ home: home() });
+        return { public_key: k.public_key, secret_key: k.secret_key, source: 'core' };
+      } catch (e) { last = e; await new Promise((r) => setTimeout(r, 2500)); } // e.g. admin-key nonce race with the background refill
     }
+    appendEvent('tool_call', { tool_name: 'standin', warning: `core pool unavailable after retries, minting a LOCAL (not on-chain) key: ${last.message}`.slice(0, 240) });
   }
   return { ...mintLocalKey(), source: 'local' };
 }

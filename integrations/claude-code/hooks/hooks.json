@@ -2,7 +2,7 @@
   "hooks": {
     "SessionStart": [
       { "matcher": "startup|resume|clear|compact",
-        "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/bin/standin-hook.mjs\" SessionStart" }] }
+        "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/bin/standin-hook.mjs\" SessionStart", "timeout": 120 }] }
     ],
     "UserPromptSubmit": [
       { "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/bin/standin-hook.mjs\" UserPromptSubmit" }] }

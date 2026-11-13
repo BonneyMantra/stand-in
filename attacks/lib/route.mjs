@@ -54,7 +54,7 @@ export async function runRoute(meta, attack, { mode = 'on', shared = {} } = {}) 
     if (out.noTheft) result = evaluate(sb, { since, sessionIds: ids, culprit: out.culprit });
     // Give the watcher time to see the tx and freeze.
     if (!out.noTheft && theftOk && chainOn()) {
-      for (let i = 0; i < 40; i++) {
+      for (let i = 0; i < Number(process.env.ATTACK_FREEZE_WAIT_S || 40); i++) {
         result = evaluate(sb, { since, sessionIds: ids, culprit: out.culprit, theftAt: theftOk.sent_at });
         if (result.blocks_to_freeze != null) break;
         await sleep(1000);
