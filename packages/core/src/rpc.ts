@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { Account, JsonRpcProvider, KeyPair, KeyPairSigner, actions } from "near-api-js";
+import { Account, FailoverRpcProvider, JsonRpcProvider, KeyPair, KeyPairSigner, actions } from "near-api-js";
 import { devKeysDir, requireAccount, type NetworkConfig, type Role } from "./config.ts";
 
 export { actions };
@@ -17,8 +17,13 @@ export function publicKeyOf(secret: string): string {
   return KeyPair.fromString(secret as `ed25519:${string}`).getPublicKey().toString();
 }
 
+/** Provider with failover across the configured RPC urls (fastnear free tier rate-limits at ~2 req/s). */
 export function makeProvider(cfg: NetworkConfig, archival = false): JsonRpcProvider {
-  return new JsonRpcProvider({ url: archival ? cfg.archivalRpcUrl : cfg.rpcUrl });
+  const urls = archival ? [cfg.archivalRpcUrl, "https://archival-rpc.testnet.near.org"] : [cfg.rpcUrl, ...cfg.rpcFallbackUrls];
+  const uniq = [...new Set(urls)];
+  const opts = { retries: 3, backoff: 1.5, wait: 400 } as any;
+  if (uniq.length === 1) return new JsonRpcProvider({ url: uniq[0]! }, opts);
+  return new FailoverRpcProvider(uniq.map((url) => new JsonRpcProvider({ url }, opts))) as unknown as JsonRpcProvider;
 }
 export function makeAccount(cfg: NetworkConfig, accountId: string, secretKey: string): Account {
   return new Account(accountId, makeProvider(cfg), KeyPairSigner.fromSecretKey(secretKey as `ed25519:${string}`));

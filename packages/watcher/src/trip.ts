@@ -3,7 +3,7 @@ import {
   type LedgerEvent, type NetworkConfig,
 } from "@standin/core";
 import { FastSender } from "./fastsend.ts";
-import type { SeenBlock, SeenTx } from "./stream.ts";
+import { resolveTx, type KeyChange, type SeenBlock, type SeenTx } from "./stream.ts";
 
 const log = logger("trip");
 
@@ -35,7 +35,7 @@ export class TripHandler {
   readonly decoy: string;
   readonly agent: string;
   readonly registry: string;
-  private lastActivity = Date.now();
+  private submittedAt = 0;
   constructor(private cfg: NetworkConfig, private home?: string) {
     this.decoy = requireAccount(cfg, "decoy");
     this.agent = requireAccount(cfg, "agent");
@@ -64,62 +64,75 @@ export class TripHandler {
     return makeProvider(this.cfg).callFunction({ contractId: this.agent, method: "get_state", args: {} } as any);
   }
 
-  /** Called for every block. Returns after the freeze has been *submitted* (not confirmed). */
+  /** Block follower path (neardata / RPC polling): full tx info is already known. */
   async onBlock(b: SeenBlock): Promise<void> {
     for (const tx of b.txs) {
-      if (tx.signer_id !== this.decoy || tx.public_key === this.adminPk || this.seen.has(tx.hash)) continue;
-      this.seen.add(tx.hash);
-      await this.handleTrip(tx, b);
+      if (tx.signer_id !== this.decoy || tx.public_key === this.adminPk) continue;
+      await this.handleTrip({ public_key: tx.public_key, height: b.height, tx, detectedAt: Date.now(), blockTimeMs: b.timestamp_ms, source: b.source });
     }
   }
 
-  private async handleTrip(tx: SeenTx, b: SeenBlock): Promise<void> {
-    const detectedAt = Date.now();
-    const blockAgeMs = detectedAt - b.timestamp_ms;
-    log.warn(`TRIP decoy key ${tx.public_key} signed tx ${tx.hash} in block ${b.height} (${b.source}); block age at detection ${blockAgeMs} ms`);
-    const planted = findPlanted(tx.public_key, this.home);
-    const attributed_to = {
-      session_id: planted?.session_id ?? "", agent: planted?.agent ?? "", path: planted?.path ?? "",
-      tool_name: "", tool_use_id: "",
-    };
-    // Find the exposure event that names a tool call for this key (set by W4 hooks).
-    const exp = readEvents({ type: "exposure", where: (e) => e.decoy_public_key === tx.public_key }, this.home).at(-1);
+  /** Key-change detector path: only the key and block hash are known; the freeze does not wait for the tx hash. */
+  async onKeyChange(c: KeyChange): Promise<void> {
+    if (c.public_key === this.adminPk) return;
+    await this.handleTrip({ public_key: c.public_key, blockHash: c.block_hash, txHash: c.tx_hash, detectedAt: c.detected_at, source: `rpc-changes-${c.finality}` });
+  }
+
+  adminKey(): string { return this.adminPk; }
+
+  private async handleTrip(t: {
+    public_key: string; height?: number; blockHash?: string; txHash?: string; tx?: SeenTx; detectedAt: number; blockTimeMs?: number; source: string;
+  }): Promise<void> {
+    const dedupe = t.tx?.hash ?? t.txHash ?? `${t.public_key}@${t.blockHash ?? t.height}`;
+    if (this.seen.has(dedupe)) return;
+    this.seen.add(dedupe);
+    log.warn(`TRIP decoy key ${t.public_key} used (${t.source})${t.tx ? ` tx ${t.tx.hash}` : ""}`);
+    // 1. freeze first, in parallel with everything else
+    const freezeP = this.freezeOnce(t.public_key, t.tx?.hash ?? t.txHash, t.tx ? attackerOf(t.tx) : "");
+    // 2. resolve block height / tx hash / attacker while the freeze is in flight
+    const height: number = t.height ?? (await makeProvider(this.cfg).viewBlock({ blockId: t.blockHash! } as any).then((b: any) => Number(b.header.height)));
+    const blockTime = t.blockTimeMs ?? (await makeProvider(this.cfg).viewBlock({ blockId: height } as any).then((b: any) => Number(BigInt(b.header.timestamp_nanosec) / 1_000_000n)).catch(() => 0));
+    const tx = t.tx ?? (await resolveTx(this.cfg, height, this.decoy, t.public_key, t.txHash));
+    const attacker = tx ? attackerOf(tx) : "";
+    const planted = findPlanted(t.public_key, this.home);
+    const attributed_to = { session_id: planted?.session_id ?? "", agent: planted?.agent ?? "", path: planted?.path ?? "", tool_name: "", tool_use_id: "" };
+    const exp = readEvents({ type: "exposure", where: (e) => e.decoy_public_key === t.public_key }, this.home).at(-1);
     if (exp) { attributed_to.tool_name = exp.tool_name ?? ""; attributed_to.tool_use_id = exp.tool_use_id ?? ""; }
-    const attacker = attackerOf(tx);
-    const trip: LedgerEvent = appendEvent("trip", {
-      tx_hash: tx.hash, block_height: b.height, decoy_public_key: tx.public_key, attacker_account: attacker, attributed_to,
-      detected_at_ms: detectedAt, block_age_ms_at_detection: blockAgeMs, stream: b.source,
+    const tripTx = tx?.hash ?? t.txHash ?? "";
+    appendEvent("trip", {
+      tx_hash: tripTx, block_height: height, decoy_public_key: t.public_key, attacker_account: attacker, attributed_to,
+      detected_at_ms: t.detectedAt, block_age_ms_at_detection: blockTime ? t.detectedAt - blockTime : undefined, stream: t.source,
     }, this.home);
 
-    const freeze = await this.freezeOnce(tx, attacker, b.height);
-    const blocks_after_trip = freeze.block_height - b.height;
+    const freeze = await freezeP;
+    const blocks_after_trip = freeze.block_height - height;
     const detail = await this.freezeDetail(freeze.tx_hash).catch(() => ({ deleted: [] as string[], intents: [] as string[], executed_height: 0 }));
     appendEvent("freeze", {
-      trip_tx_hash: tx.hash,
+      trip_tx_hash: tripTx,
       freeze: { tx_hash: freeze.tx_hash, block_height: freeze.block_height, blocks_after_trip, deleted_keys: detail.deleted, intents_keys_removed: detail.intents },
-      executed_block_height: detail.executed_height, executed_blocks_after_trip: detail.executed_height ? detail.executed_height - b.height : undefined,
-      detection_to_submit_ms: freeze.submitted_ms - detectedAt,
+      executed_block_height: detail.executed_height,
+      executed_blocks_after_trip: detail.executed_height ? detail.executed_height - height : undefined,
+      detection_to_submit_ms: freeze.submitted_ms - t.detectedAt,
     }, this.home);
-    log.info(`freeze ${freeze.tx_hash} included in block ${freeze.block_height}: ${blocks_after_trip} block(s) after trip`);
-    void trip;
-    void this.reportToRegistry(tx, attacker);
+    log.info(`freeze ${freeze.tx_hash} included in block ${freeze.block_height}: ${blocks_after_trip} block(s) after trip block ${height}; submit ${freeze.submitted_ms - t.detectedAt} ms after detection`);
+    if (tx) void this.reportToRegistry(tx, attacker);
   }
 
   /** Exactly one freeze tx per process (and none if already frozen on chain). */
-  private async freezeOnce(tx: SeenTx, attacker: string, tripHeight: number) {
-    const t0 = Date.now();
-    if (this.frozenAt) return { ...this.frozenAt, submitted_ms: t0 };
+  private async freezeOnce(publicKey: string, txHash: string | undefined, attacker: string) {
+    if (this.frozenAt) return { ...this.frozenAt, submitted_ms: Date.now() };
     if (!this.inflight) {
-      const reason = `decoy key ${tx.public_key} signed tx ${tx.hash} at block ${tripHeight}; value to ${attacker}`;
+      const reason = `decoy key ${publicKey} signed a transaction${txHash ? ` (${txHash})` : ""}; value to ${attacker || "unknown"}`;
       this.inflight = (async () => {
-        const hash = await this.sender.call(this.agent, "freeze", { reason, decoy_public_key: tx.public_key, tx_hash: tx.hash });
-        log.info(`freeze submitted ${hash} ${Date.now() - t0} ms after detection`);
+        const hash = await this.sender.call(this.agent, "freeze", { reason, decoy_public_key: publicKey, tx_hash: txHash ?? null });
+        this.submittedAt = Date.now();
+        log.info(`freeze submitted ${hash}`);
         return { tx_hash: hash, block_height: await this.inclusionHeight(hash) };
       })();
       this.inflight.then((r) => { this.frozenAt = r; }).catch(() => { this.inflight = null; });
     }
     const r = await this.inflight;
-    return { ...r, submitted_ms: t0 };
+    return { ...r, submitted_ms: this.submittedAt || Date.now() };
   }
 
   private async inclusionHeight(txHash: string): Promise<number> {
@@ -154,7 +167,7 @@ export class TripHandler {
 
   /** registry.report(tx_hash, decoy_account_id) signed by the watcher account; then poll check(attacker). */
   private async reportToRegistry(tx: SeenTx, attacker: string): Promise<void> {
-    if (!this.registry) return;
+    if (!this.registry || process.env.STANDIN_NO_REPORT === "1") return;
     try {
       const w = makeAccount(this.cfg, requireAccount(this.cfg, "watcher"), loadDevKey(this.cfg, "watcher").secret_key);
       const deposit = BigInt(process.env.STANDIN_REPORT_DEPOSIT_YOCTO ?? "100000000000000000000000"); // 0.1 NEAR for OutLayer; refunded by registry if unused
