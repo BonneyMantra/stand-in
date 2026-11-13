@@ -39,7 +39,7 @@ export async function guardianState() {
 }
 
 /** Disposable "real" account for the Stand-in-OFF baseline: a subaccount of the agent account. */
-export const createBaselineAccount = (fundNear = '2') => retry(() => createBaselineAccountOnce(fundNear));
+export const createBaselineAccount = (fundNear = '0.3') => retry(() => createBaselineAccountOnce(fundNear));
 async function createBaselineAccountOnce(fundNear) {
   const { c, cfg } = await core();
   const agent = c.requireAccount(cfg, 'agent');
@@ -89,4 +89,14 @@ export async function useScopedKey(k, note = 'attack-suite') {
     await c.callMethod(acct, c.requireAccount(cfg, 'project'), 'record_deploy', { note }, { waitUntil: 'EXECUTED_OPTIMISTIC' });
     return { ok: true };
   } catch (e) { return { ok: false, error: String(e.message || e).slice(0, 200) }; }
+}
+
+/** Return baseline loot from the attacker account to the agent account (testnet bookkeeping). */
+export async function returnLoot(near) {
+  if (!(near > 0.01)) return null;
+  const { c, cfg } = await core();
+  const thief = c.roleAccount(cfg, 'attacker');
+  const amount = c.parseNearAmountSafe((near - 0.005).toFixed(4));
+  await thief.signAndSendTransaction({ receiverId: c.requireAccount(cfg, 'agent'), actions: [c.actions.transfer(amount)], waitUntil: 'EXECUTED_OPTIMISTIC' });
+  return near;
 }

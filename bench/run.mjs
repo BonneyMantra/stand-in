@@ -8,7 +8,7 @@ import { spawn, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { REPO } from '../attacks/lib/sandbox.mjs';
 import { runRoute } from '../attacks/lib/route.mjs';
-import { core, balanceNear, guardianState, resetAgent, retry } from '../attacks/lib/chain.mjs';
+import { core, balanceNear, guardianState, resetAgent, retry, returnLoot } from '../attacks/lib/chain.mjs';
 import { summarize } from './summary.mjs';
 import { renderReadme } from './report.mjs';
 
@@ -21,20 +21,26 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const shared = path.join(REPO, '.sandbox', 'bench', '.standin');
 fs.mkdirSync(shared, { recursive: true });
 process.env.ATTACK_STANDIN_HOME = shared;
+process.env.STANDIN_WATCHER_PORT ||= '4327'; // not 4317: another session's watcher may own it and map keys from a different ledger
+if (!flag('--with-report')) process.env.STANDIN_NO_REPORT ||= '1'; // blocklist report costs testnet NEAR; owned by the registry worker
 process.env.STANDIN_HOME = shared;
 
 async function watcherUp() {
-  try { return (await fetch(`http://127.0.0.1:${process.env.STANDIN_WATCHER_PORT || 4317}/api/state`, { signal: AbortSignal.timeout(2000) })).ok; } catch { return false; }
+  try { return (await fetch(`http://127.0.0.1:${process.env.STANDIN_WATCHER_PORT}/api/state`, { signal: AbortSignal.timeout(2000) })).ok; } catch { return false; }
 }
 
 async function main() {
   const { c, cfg } = await core();
   const pre = { network: cfg.network, agent: c.requireAccount(cfg, 'agent'), decoy: c.requireAccount(cfg, 'decoy') };
+  // The watcher freezes once per process lifetime, so --start-watcher gives every ON route a fresh one.
+  const ownWatcher = flag('--start-watcher') && !(await watcherUp());
   let child;
-  if (flag('--start-watcher') && !(await watcherUp())) {
+  const startWatcher = async () => {
     child = spawn('node', ['--import', 'tsx', path.join(REPO, 'packages/watcher/src/main.ts')], { cwd: REPO, env: { ...process.env, STANDIN_HOME: shared }, stdio: ['ignore', 'ignore', 'ignore'] });
-    for (let i = 0; i < 30 && !(await watcherUp()); i++) await sleep(1000);
-  }
+    for (let i = 0; i < 40 && !(await watcherUp()); i++) await sleep(1000);
+  };
+  const stopWatcher = async () => { child?.kill(); child = null; await sleep(1500); };
+  if (ownWatcher) await startWatcher();
   pre.watcher_running = await watcherUp();
   const g = await guardianState();
   pre.guardian_deployed = !g?.error;
@@ -50,8 +56,9 @@ async function main() {
   for (const d of dirs) {
     const { meta, attack } = await import(path.join(REPO, 'attacks', d, 'route.mjs'));
     process.stderr.write(`== ${meta.id} ON\n`);
-    on.push(await runRoute(meta, attack, { mode: 'on', shared: { standinHome: shared } }));
     if (pre.guardian_deployed) await resetAgent(shared).catch((e) => process.stderr.write(`resetAgent failed: ${e.message}\n`));
+    if (ownWatcher) { await stopWatcher(); await startWatcher(); }
+    on.push(await runRoute(meta, attack, { mode: 'on', shared: { standinHome: shared } }));
     if (!flag('--no-baseline')) {
       process.stderr.write(`== ${meta.id} OFF\n`);
       off.push(await runRoute(meta, attack, { mode: 'off', shared: { standinHome: shared } }));
@@ -59,7 +66,9 @@ async function main() {
   }
   pre.agent_balance_near_after = await balanceNear(pre.agent);
   pre.decoy_balance_near_after = await balanceNear(pre.decoy);
-  child?.kill();
+  await stopWatcher();
+  const looted = +off.map((r) => r.baseline?.lost_near || 0).reduce((a, b) => a + b, 0).toFixed(4);
+  pre.baseline_loot_returned_near = await retry(() => returnLoot(looted)).catch(() => null);
   const versions = {};
   for (const [k, cmd] of [['claude', ['claude', '--version']], ['codex', ['codex', '--version']]]) {
     try { versions[k] = execFileSync(cmd[0], cmd.slice(1), { encoding: 'utf8' }).trim(); } catch { versions[k] = 'unavailable'; }

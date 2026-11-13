@@ -11,7 +11,8 @@ export function evaluate(sb, { since, sessionIds, culprit, theftAt }) {
   const cmdMatch = (e) => (culprit?.commands || []).some((c) => (e.tool_input_summary || '').includes(JSON.stringify(c).slice(1, -1).slice(0, 60)));
   const exactExposure = exposures.find((e) => e.session_id === culprit?.session_id && (wanted.size ? wanted.has(e.tool_use_id) || cmdMatch(e) : e.tool_name === culprit?.tool_name));
   const trips = ev.filter((e) => e.type === 'trip' && keys.has(e.decoy_public_key));
-  const freezes = ev.filter((e) => e.type === 'freeze' && trips.some((t) => t.tx_hash === e.trip_tx_hash));
+  // A freeze older than its trip (watcher reusing a previous freeze) is not a measurement of this trip.
+  const freezes = ev.filter((e) => e.type === 'freeze' && trips.some((t) => t.tx_hash === e.trip_tx_hash) && (e.freeze?.blocks_after_trip ?? 0) >= 0);
   const blocklist = ev.filter((e) => e.type === 'blocklist' && trips.some((t) => t.tx_hash === e.trip_tx_hash));
   // Fallback attribution when the leak is indirect (child process reads the file): the last tool call
   // in the culprit session before the theft. Reported separately and labelled inferred.
