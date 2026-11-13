@@ -1,0 +1,89 @@
+@import "tailwindcss";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+
+/* Stand-in theme. Derived from Gabriel's picks: Axiom (landing), Edge Infrastructure Dashboard
+   (framework), Agent Trace Waterfall (trip detail), RAG Analytics (benchmark numbers).
+   Near-black, monochrome, one alarm colour. Red means tripped/frozen only; green means safe. */
+@theme {
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, monospace;
+
+  --color-ink-950: #08080a;   /* page */
+  --color-ink-900: #0d0d10;   /* panels */
+  --color-ink-850: #121216;   /* raised */
+  --color-ink-800: #18181d;   /* hover / inputs */
+  --color-line: #1f1f25;      /* hairlines */
+  --color-line-strong: #2a2a32;
+  --color-fg: #ededf0;
+  --color-fg-muted: #9a9aa3;
+  --color-fg-faint: #5d5d66;
+
+  --color-trip: #ff4a3d;      /* tripped, frozen, attacker */
+  --color-trip-soft: #ff4a3d1f;
+  --color-warn: #f5a524;      /* counterparty warn */
+  --color-safe: #3ddc97;      /* healthy, allowed, attested */
+  --color-safe-soft: #3ddc971a;
+  --color-decoy: #8b8bff;     /* decoy keys, sessions */
+
+  --radius-panel: 10px;
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+:root {
+  color-scheme: dark;
+  --background: var(--color-ink-950);
+  --foreground: var(--color-fg);
+  --card: var(--color-ink-900);
+  --card-foreground: var(--color-fg);
+  --popover: var(--color-ink-850);
+  --popover-foreground: var(--color-fg);
+  --primary: var(--color-fg);
+  --primary-foreground: var(--color-ink-950);
+  --secondary: var(--color-ink-800);
+  --secondary-foreground: var(--color-fg);
+  --muted: var(--color-ink-800);
+  --muted-foreground: var(--color-fg-muted);
+  --accent: var(--color-ink-800);
+  --accent-foreground: var(--color-fg);
+  --destructive: var(--color-trip);
+  --border: var(--color-line);
+  --input: var(--color-line-strong);
+  --ring: var(--color-fg-faint);
+  --radius: 10px;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+
+html, body, #root { min-height: 100%; }
+body {
+  background: var(--color-ink-950);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "ss01", "cv11";
+}
+* { border-color: var(--color-line); }
+::selection { background: #ff4a3d40; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
