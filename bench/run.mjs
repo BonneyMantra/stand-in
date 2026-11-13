@@ -94,6 +94,8 @@ async function main() {
   pre.agent_balance_near_after = await retry(() => balanceNear(pre.agent)).catch(() => null);
   pre.decoy_balance_near_after = await retry(() => balanceNear(pre.decoy)).catch(() => null);
   await stopWatcher();
+  // Leave the shared agent account unfrozen with a provisioned agent key, whatever the run did.
+  if (pre.guardian_deployed) { await resetAgent(shared).then(() => { pre.agent_restored = true; }).catch((e) => { pre.agent_restored = false; pre.agent_restore_error = e.message.slice(0, 120); }); }
   const looted = +offNow.map((r) => r.baseline?.lost_near || 0).reduce((a, b) => a + b, 0).toFixed(4);
   pre.baseline_loot_near = looted; // stays in the attacker account: baseline accounts are the attacker's children
   const results = write(true);
