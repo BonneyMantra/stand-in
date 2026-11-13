@@ -13,21 +13,36 @@ export class FastSender {
   private timer?: NodeJS.Timeout;
   private signer: KeyPairSigner;
   private publicKey: string;
-  private provider;
+  private provider: ReturnType<typeof makeProvider>;
   constructor(private cfg: NetworkConfig, readonly accountId: string, secretKey: string) {
     this.signer = KeyPairSigner.fromSecretKey(secretKey as `ed25519:${string}`);
     this.publicKey = KeyPair.fromString(secretKey as `ed25519:${string}`).getPublicKey().toString();
     this.provider = makeProvider(cfg);
   }
 
-  async warm(): Promise<void> {
-    const [ak, blk] = await Promise.all([
-      this.provider.viewAccessKey({ accountId: this.accountId, publicKey: this.publicKey } as any) as Promise<any>,
-      this.provider.viewBlock({ finality: "final" } as any) as Promise<any>,
-    ]);
-    const n = BigInt(ak.nonce);
-    if (n > this.nonce) this.nonce = n;
-    this.blockHash = baseDecode(blk.header.hash);
+  /**
+   * Refresh nonce + block hash. Never throws: on a 429/5xx it backs off and rebuilds the provider
+   * (core's makeProvider rotates through the healthy endpoints), keeping the cached values meanwhile.
+   * Returns false if every attempt failed.
+   */
+  async warm(attempts = 4, baseDelayMs = 400): Promise<boolean> {
+    for (let i = 0; i < attempts; i++) {
+      try {
+        const [ak, blk] = await Promise.all([
+          this.provider.viewAccessKey({ accountId: this.accountId, publicKey: this.publicKey } as any) as Promise<any>,
+          this.provider.viewBlock({ finality: "final" } as any) as Promise<any>,
+        ]);
+        const n = BigInt(ak.nonce);
+        if (n > this.nonce) this.nonce = n;
+        this.blockHash = baseDecode(blk.header.hash);
+        return true;
+      } catch (e: any) {
+        log.warn(`warm attempt ${i + 1}/${attempts} failed: ${String(e?.message ?? e).slice(0, 120)}`);
+        this.provider = makeProvider(this.cfg); // rotate endpoint
+        if (i < attempts - 1) await new Promise((r) => setTimeout(r, baseDelayMs * 2 ** i));
+      }
+    }
+    return false;
   }
   start(everyMs = 5000): void {
     this.timer = setInterval(() => this.warm().catch((e) => log.warn(`warm failed: ${e.message}`)), everyMs);
@@ -39,7 +54,7 @@ export class FastSender {
 
   /** Sign and broadcast a function call; resolves with the tx hash as soon as RPC accepts it. */
   async call(contractId: string, methodName: string, args: object, gas = 100_000_000_000_000n, deposit = 0n): Promise<string> {
-    if (!this.blockHash) await this.warm();
+    if (!this.blockHash && !(await this.warm()) && !this.blockHash) throw new Error("fastsend: no recent block hash (RPC unavailable)");
     this.nonce += 1n;
     const tx = createTransaction(
       this.accountId, await this.signer.getPublicKey(), contractId, this.nonce,
