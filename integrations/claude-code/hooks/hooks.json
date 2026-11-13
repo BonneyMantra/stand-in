@@ -1,0 +1,19 @@
+{
+  "hooks": {
+    "SessionStart": [
+      { "matcher": "startup|resume|clear|compact",
+        "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/bin/standin-hook.mjs\" SessionStart" }] }
+    ],
+    "UserPromptSubmit": [
+      { "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/bin/standin-hook.mjs\" UserPromptSubmit" }] }
+    ],
+    "PreToolUse": [
+      { "matcher": ".*",
+        "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/bin/standin-hook.mjs\" PreToolUse" }] }
+    ],
+    "PostToolUse": [
+      { "matcher": ".*",
+        "hooks": [{ "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/bin/standin-hook.mjs\" PostToolUse" }] }
+    ]
+  }
+}

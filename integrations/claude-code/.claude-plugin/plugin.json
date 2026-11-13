@@ -1,0 +1,7 @@
+{
+  "name": "stand-in",
+  "version": "0.1.0",
+  "description": "Stand-in: plants a unique decoy NEAR key per agent session, blocks reads of the real-key store, and attributes any decoy leak to the exact session and tool call.",
+  "author": { "name": "Stand-in" },
+  "license": "MIT"
+}
