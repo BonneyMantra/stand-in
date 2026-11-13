@@ -70,9 +70,12 @@ export async function takeKey() {
 
 // sessions.json: { [session_id | launch_id]: { agent, cwd, decoys: [{kind, path, account_id, public_key, secret_key}] } }
 export const readSessions = () => readJson(sessionsFile(), {});
+export const secretHash = (secret) => crypto.createHash('sha256').update(String(secret).replace(/^ed25519:/, '')).digest('hex');
+// Secrets are never stored in hook state, only their hash: a `grep -r ed25519:` over the agent's
+// reachable disk finds decoys in the planted files, not a list of every session's keys.
 export function saveSession(id, rec) {
   const all = readSessions();
-  all[id] = rec;
+  all[id] = { ...rec, decoys: rec.decoys.map(({ secret_key, ...d }) => ({ ...d, secret_hash: secretHash(secret_key) })) };
   fs.mkdirSync(home(), { recursive: true });
   fs.writeFileSync(sessionsFile(), JSON.stringify(all, null, 2), { mode: 0o600 });
 }

@@ -4,8 +4,9 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { appendEvent, allDecoys, readSessions, renameSession, home, sessionsPath } from './store.mjs';
+import { appendEvent, allDecoys, readSessions, renameSession, home, sessionsPath, secretHash } from './store.mjs';
 import { prepare, announce } from './plant.mjs';
+import { takeKey, saveSession } from './store.mjs';
 
 const strip = (k) => String(k).replace(/^ed25519:/, '');
 
@@ -18,9 +19,15 @@ async function sessionStart(agent, i) {
     rec = await prepare(i.session_id, { agent, cwd: i.cwd, envFile: agent === 'claude-code' ? process.env.CLAUDE_ENV_FILE : '' });
     fresh = true;
   } else if (!fresh && agent === 'claude-code' && process.env.CLAUDE_ENV_FILE) {
-    // resume/compact: same session keeps its decoys; re-export them to the fresh env file.
-    const k = rec.decoys.find((d) => d.kind === 'session-env');
-    fs.appendFileSync(process.env.CLAUDE_ENV_FILE, `export NEAR_ACCOUNT_ID=${k.account_id}\nexport NEAR_PRIVATE_KEY=${k.secret_key}\nexport NEAR_ENV=${rec.network}\n`);
+    // resume/compact/clear: the old env-file secret is not kept, so re-issue the session-env decoy
+    // (files keep theirs) and record the new key as planted.
+    const old = rec.decoys.findIndex((d) => d.kind === 'session-env');
+    const k = await takeKey();
+    const d = { ...rec.decoys[old], ...k, kind: 'session-env', path: process.env.CLAUDE_ENV_FILE };
+    fs.appendFileSync(process.env.CLAUDE_ENV_FILE, `export NEAR_ACCOUNT_ID=${d.account_id}\nexport NEAR_PRIVATE_KEY=${d.secret_key}\nexport NEAR_ENV=${rec.network}\n`);
+    rec.decoys.push(d);
+    saveSession(i.session_id, rec);
+    appendEvent('decoy_planted', { account_id: d.account_id, public_key: d.public_key, kind: d.kind, path: d.path, agent, session_id: i.session_id, cwd: i.cwd, reissued_on: i.source });
   }
   if (fresh) announce(i.session_id, rec, i.source || 'startup');
   else appendEvent('session_started', { session_id: i.session_id, agent, cwd: i.cwd, decoy_public_key: rec.decoys[0].public_key, source: i.source, resumed: true });
@@ -45,16 +52,24 @@ export function denyReason(tool_input) {
   return hit ? `Stand-in: access to the real-key store is blocked (${hit.source}).` : null;
 }
 
+const TOKEN = /[1-9A-HJ-NP-Za-km-z]{40,100}/g;
+
 export function scan(text, decoys) {
   const hits = [];
-  for (const d of decoys) {
-    if (text.includes(strip(d.secret_key))) hits.push({ d, kind: 'private_key' });
-    else if (text.includes(strip(d.public_key))) hits.push({ d, kind: 'public_key' });
+  const byHash = new Map(decoys.map((d) => [d.secret_hash, d]));
+  const seen = new Set();
+  for (const t of String(text).match(TOKEN) || []) {
+    const d = byHash.get(secretHash(t));
+    if (d && !seen.has(d)) { seen.add(d); hits.push({ d, kind: 'private_key' }); }
   }
+  for (const d of decoys) if (!seen.has(d) && text.includes(strip(d.public_key))) hits.push({ d, kind: 'public_key' });
   return hits;
 }
 
-const redact = (s, decoys) => decoys.reduce((a, d) => a.split(strip(d.secret_key)).join('<decoy-secret>'), s);
+const redact = (s, decoys) => {
+  const hashes = new Set(decoys.map((d) => d.secret_hash));
+  return s.replace(TOKEN, (t) => (hashes.has(secretHash(t)) ? '<decoy-secret>' : t));
+};
 const summarize = (ti, decoys) => redact(JSON.stringify(ti ?? {}), decoys).slice(0, 400);
 
 function flag(agent, i, where, text, decoys, tool_name, tool_input) {
