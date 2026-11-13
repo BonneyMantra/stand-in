@@ -51,6 +51,24 @@
   --input: var(--color-line-strong);
   --ring: var(--color-fg-faint);
   --radius: 10px;
+  /* Added for the dashboard (shadcn Sidebar + ReUI Badge/Frame), mapped onto the Stand-in palette. */
+  --destructive-foreground: var(--color-trip);
+  --success: var(--color-safe);
+  --success-foreground: var(--color-safe);
+  --info: var(--color-decoy);
+  --info-foreground: var(--color-decoy);
+  --warning: var(--color-warn);
+  --warning-foreground: var(--color-warn);
+  --invert: var(--color-fg);
+  --invert-foreground: var(--color-ink-950);
+  --sidebar: var(--color-ink-950);
+  --sidebar-foreground: var(--color-fg-muted);
+  --sidebar-primary: var(--color-fg);
+  --sidebar-primary-foreground: var(--color-ink-950);
+  --sidebar-accent: var(--color-ink-850);
+  --sidebar-accent-foreground: var(--color-fg);
+  --sidebar-border: var(--color-line);
+  --sidebar-ring: var(--color-fg-faint);
 }
 
 @theme inline {
@@ -72,6 +90,23 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-invert-foreground: var(--invert-foreground);
+  --color-invert: var(--invert);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning: var(--warning);
+  --color-info-foreground: var(--info-foreground);
+  --color-info: var(--info);
+  --color-success-foreground: var(--success-foreground);
+  --color-success: var(--success);
+  --color-destructive-foreground: var(--destructive-foreground);
 }
 
 html, body, #root { min-height: 100%; }
@@ -87,3 +122,4 @@ body {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
