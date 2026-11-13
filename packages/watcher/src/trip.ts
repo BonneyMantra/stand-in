@@ -168,31 +168,39 @@ export class TripHandler {
     };
   }
 
-  /** registry.report(tx_hash, decoy_account_id) signed by the watcher account; then poll check(attacker). */
+  /**
+   * registry.report(...) signed by the watcher account (300 TGas: the OutLayer yield/resume needs it).
+   * The report tx only completes after OutLayer resumes it; if the worker times out the registry refuses and the
+   * reporter is refunded, so a failed final status is retried once (never while a report is still pending).
+   */
   private async reportToRegistry(tx: SeenTx, attacker: string): Promise<void> {
     if (!this.registry || process.env.STANDIN_NO_REPORT === "1") return;
-    try {
-      const w = makeAccount(this.cfg, requireAccount(this.cfg, "watcher"), loadDevKey(this.cfg, "watcher").secret_key);
-      const deposit = BigInt(process.env.STANDIN_REPORT_DEPOSIT_YOCTO ?? "50000000000000000000000"); // 0.05 NEAR (registry min 0.01); OutLayer refunds the unused part
-      const res = await callMethod(w, this.registry, "report", { tx_hash: tx.hash, decoy_account_id: this.decoy, sender_id: this.decoy, admin_public_key: this.adminPk }, { deposit, waitUntil: "INCLUDED" });
-      log.info(`registry.report submitted ${res.tx_hash}`);
-      const prov = makeProvider(this.cfg);
-      for (let i = 0; i < 90; i++) {
-        await new Promise((r) => setTimeout(r, 2000));
-        const v: any = await prov.callFunction({ contractId: this.registry, method: "check", args: { account_id: attacker } } as any).catch(() => null);
-        if (v?.verdict === "block") {
+    const w = makeAccount(this.cfg, requireAccount(this.cfg, "watcher"), loadDevKey(this.cfg, "watcher").secret_key);
+    const deposit = BigInt(process.env.STANDIN_REPORT_DEPOSIT_YOCTO ?? "50000000000000000000000"); // registry min 0.01 NEAR; unused part refunded
+    const args = { tx_hash: tx.hash, decoy_account_id: this.decoy, sender_id: this.decoy, admin_public_key: this.adminPk };
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const res = await callMethod(w, this.registry, "report", args, { deposit, gas: 300_000_000_000_000n, waitUntil: "INCLUDED" });
+        log.info(`registry.report submitted ${res.tx_hash} (attempt ${attempt})`);
+        let final: any = null;
+        for (let i = 0; i < 60 && !final; i++) {
+          await new Promise((r) => setTimeout(r, 3000));
+          final = await rpcRaw(this.cfg, "tx", { tx_hash: res.tx_hash, sender_account_id: requireAccount(this.cfg, "watcher"), wait_until: "FINAL" }).catch(() => null);
+        }
+        if (final && final.status && "SuccessValue" in final.status) {
+          const v: any = await makeProvider(this.cfg).callFunction({ contractId: this.registry, method: "check", args: { account_id: attacker } } as any).catch(() => null);
           appendEvent("blocklist", {
             trip_tx_hash: tx.hash, account_id: attacker, evidence_tx: tx.hash, decoy_public_key: tx.public_key,
-            attested_at: new Date().toISOString(),
+            attested_at: new Date().toISOString(), check: v,
             blocklist: { tx_hash: res.tx_hash, outlayer_execution: res.tx_hash, attested: true },
           }, this.home);
-          log.info(`blocklisted ${attacker}`);
+          log.info(`blocklisted ${attacker}: ${v?.verdict}`);
           return;
         }
+        log.warn(`report_refused or timed out (attempt ${attempt}): ${JSON.stringify(final?.status ?? "no final status").slice(0, 200)}`);
+      } catch (e) {
+        log.error(`registry report failed (attempt ${attempt}): ${(e as Error).message}`);
       }
-      log.warn("registry did not return block verdict within 180 s");
-    } catch (e) {
-      log.error(`registry report failed: ${(e as Error).message}`);
     }
   }
 }

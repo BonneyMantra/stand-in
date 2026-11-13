@@ -54,8 +54,11 @@ for (let n = 1; n <= runs; n++) {
   for (let i = 0; ; i++) { try { await ensureFundsAndUnfrozen(); break; } catch (e) { if (i > 8) throw e; out(`rate limited, retrying (${i})`); await new Promise((r) => setTimeout(r, 4000)); } }
   const home = path.join(root, ".sandbox", `w3-proof-${n}`);
   seed(home);
-  const env = { ...process.env, STANDIN_HOME: path.join(home, ".standin"), STANDIN_POOL_SIZE: "4" };
-  // restart the watcher so it follows this run's ledger
+  // OutLayer report only on run 1 (billed testnet execution)
+  const env: NodeJS.ProcessEnv = { ...process.env, STANDIN_HOME: path.join(home, ".standin"), STANDIN_POOL_SIZE: "4", STANDIN_NO_REPORT: n === 1 ? "" : "1" };
+  // restart the watcher so it follows this run's ledger (kill our own stale watcher on :4317 only)
+  try { for (const pid of spawnSync("lsof", ["-ti", "tcp:4317", "-sTCP:LISTEN"], { encoding: "utf8" }).stdout.split("\n").filter(Boolean)) { if (spawnSync("ps", ["-o", "command=", "-p", pid], { encoding: "utf8" }).stdout.includes("watcher/src/main.ts")) process.kill(Number(pid)); } } catch { /* none */ }
+  await new Promise((r) => setTimeout(r, 800));
   try { const pid = Number(fs.readFileSync(path.join(env.STANDIN_HOME, "watcher.pid"), "utf8")); process.kill(pid); } catch { /* none */ }
   const retry = (...a: string[]) => { for (let i = 0; ; i++) { try { return cli(env, ...a); } catch (e) { if (i > 4) throw e; out("retrying after failure"); Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5000); } } };
   retry("dev", "up");
@@ -70,6 +73,18 @@ for (let n = 1; n <= runs; n++) {
     trip = s?.trips?.at(-1);
     if (trip?.freeze?.tx_hash && trip.freeze.deleted_keys?.length) break;
     await new Promise((r) => setTimeout(r, 1000));
+  }
+  let bl: any;
+  if (n === 1) {
+    const until = Date.now() + 240_000;
+    while (Date.now() < until && !bl) {
+      const evs = fs.readFileSync(path.join(env.STANDIN_HOME!, "ledger.ndjson"), "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
+      bl = evs.filter((e) => e.type === "blocklist").at(-1);
+      if (!bl) await new Promise((r) => setTimeout(r, 3000));
+    }
+    const chk = await makeProvider(cfg).callFunction({ contractId: cfg.accounts.registry, method: "check", args: { account_id: trip?.attacker_account } } as any).catch((e: any) => String(e));
+    out(`registry: report tx ${bl?.blocklist?.tx_hash ?? "(none within 240s)"} check(${trip?.attacker_account}) = ${JSON.stringify(chk)}`);
+    if (bl?.blocklist?.tx_hash) out(`report ${explorerTx(cfg, bl.blocklist.tx_hash)}`);
   }
   const events = fs.readFileSync(path.join(env.STANDIN_HOME, "ledger.ndjson"), "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
   const fz = events.filter((e) => e.type === "freeze").at(-1);
