@@ -112,7 +112,7 @@ export class TripHandler {
     if (!this.inflight) {
       const reason = `decoy key ${tx.public_key} signed tx ${tx.hash} at block ${tripHeight}; value to ${attacker}`;
       this.inflight = (async () => {
-        const hash = await this.sender.call(this.agent, "freeze", { reason });
+        const hash = await this.sender.call(this.agent, "freeze", { reason, decoy_public_key: tx.public_key, tx_hash: tx.hash });
         log.info(`freeze submitted ${hash} ${Date.now() - t0} ms after detection`);
         return { tx_hash: hash, block_height: await this.inclusionHeight(hash) };
       })();
@@ -146,8 +146,8 @@ export class TripHandler {
       if (h > executed) executed = h;
     }
     return {
-      deleted: (st?.deleted_keys ?? log0?.deleted_keys ?? st?.agent_keys_removed ?? []) as string[],
-      intents: (log0?.intents_keys_removed ?? st?.intents_keys_removed ?? []) as string[],
+      deleted: (log0?.deleted_keys ?? []) as string[],
+      intents: (log0?.intents_keys_removed ?? []) as string[],
       executed_height: executed,
     };
   }

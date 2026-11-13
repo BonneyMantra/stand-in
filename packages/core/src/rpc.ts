@@ -92,3 +92,9 @@ export function assertSuccess(outcome: any): void {
 export function explorerTx(cfg: NetworkConfig, txHash: string): string {
   return `https://${cfg.network === "mainnet" ? "" : cfg.network + "."}nearblocks.io/txns/${txHash}`;
 }
+
+/** NEAR decimal string -> yocto bigint (no float math). */
+export function parseNearAmountSafe(near: string): bigint {
+  const [i, f = ""] = near.split(".");
+  return BigInt(i || "0") * 10n ** 24n + BigInt((f + "0".repeat(24)).slice(0, 24));
+}
