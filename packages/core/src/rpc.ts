@@ -21,7 +21,7 @@ export function publicKeyOf(secret: string): string {
 export function makeProvider(cfg: NetworkConfig, archival = false): JsonRpcProvider {
   const urls = archival ? [cfg.archivalRpcUrl, "https://archival-rpc.testnet.near.org"] : [cfg.rpcUrl, ...cfg.rpcFallbackUrls];
   const uniq = [...new Set(urls)];
-  const opts = { retries: 3, backoff: 1.5, wait: 400 } as any;
+  const opts = { retries: 6, backoff: 1.6, wait: 600 } as any;
   if (uniq.length === 1) return new JsonRpcProvider({ url: uniq[0]! }, opts);
   return new FailoverRpcProvider(uniq.map((url) => new JsonRpcProvider({ url }, opts))) as unknown as JsonRpcProvider;
 }
@@ -102,4 +102,21 @@ export function explorerTx(cfg: NetworkConfig, txHash: string): string {
 export function parseNearAmountSafe(near: string): bigint {
   const [i, f = ""] = near.split(".");
   return BigInt(i || "0") * 10n ** 24n + BigInt((f + "0".repeat(24)).slice(0, 24));
+}
+
+/** Raw JSON-RPC with failover across configured urls (for methods near-api-js does not wrap, e.g. EXPERIMENTAL_changes). */
+export async function rpcRaw(cfg: NetworkConfig, method: string, params: unknown, archival = false): Promise<any> {
+  const urls = archival ? [cfg.archivalRpcUrl] : [cfg.rpcUrl, ...cfg.rpcFallbackUrls];
+  let last: unknown;
+  for (const url of new Set(urls)) {
+    try {
+      const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }), signal: AbortSignal.timeout(6000) });
+      const j: any = await res.json();
+      if (j.error) throw new Error(JSON.stringify(j.error).slice(0, 200));
+      return j.result;
+    } catch (e) {
+      last = e;
+    }
+  }
+  throw last;
 }

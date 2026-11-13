@@ -73,7 +73,10 @@ for (let n = 1; n <= runs; n++) {
   const events = fs.readFileSync(path.join(env.STANDIN_HOME, "ledger.ndjson"), "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
   const fz = events.filter((e) => e.type === "freeze").at(-1);
   const st: any = await makeProvider(cfg).callFunction({ contractId: agent, method: "get_state", args: {} } as any);
+  const scoped = JSON.parse(fs.readFileSync(path.join(env.STANDIN_HOME, "agent-scoped-key.json"), "utf8"));
+  const scopedStillValid = await makeProvider(cfg).viewAccessKey({ accountId: agent, publicKey: scoped.public_key } as any).then(() => true, () => false);
   results.push({
+    scoped_key_still_valid: scopedStillValid, keys_deleted_block: fz?.executed_block_height,
     run: n, trip_tx: trip?.tx_hash, trip_block: trip?.block_height, freeze_tx: trip?.freeze?.tx_hash,
     freeze_block: trip?.freeze?.block_height, blocks_after_trip: trip?.freeze?.blocks_after_trip,
     executed_blocks_after_trip: fz?.executed_blocks_after_trip, detection_to_submit_ms: fz?.detection_to_submit_ms,

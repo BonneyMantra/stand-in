@@ -1,5 +1,5 @@
 import {
-  appendEvent, callMethod, findPlanted, loadDevKey, logger, makeAccount, makeProvider, readEvents, requireAccount,
+  appendEvent, callMethod, findPlanted, loadDevKey, logger, makeAccount, makeProvider, readEvents, requireAccount, rpcRaw,
   type LedgerEvent, type NetworkConfig,
 } from "@standin/core";
 import { FastSender } from "./fastsend.ts";
@@ -153,10 +153,13 @@ export class TripHandler {
     const r: any = await prov.viewTransactionStatusWithReceipts({ txHash, accountId: requireAccount(this.cfg, "watcher"), waitUntil: "FINAL" } as any);
     const st = await this.guardianState().catch(() => null);
     const log0 = st?.freeze_log?.at?.(-1) ?? {};
+    // Effective freeze = the block in which the DeleteKey receipt for an agent key was applied
+    // (state-change query on the agent account, a few blocks after inclusion).
     let executed = 0;
-    for (const o of r.receipts_outcome ?? []) {
-      const h = ((await prov.viewBlock({ blockId: o.block_hash } as any)) as any).header.height;
-      if (h > executed) executed = h;
+    const incl = ((await prov.viewBlock({ blockId: r.transaction_outcome.block_hash } as any)) as any).header.height as number;
+    for (let h = incl; h <= incl + 8 && !executed; h++) {
+      const ch: any = await rpcRaw(this.cfg, "EXPERIMENTAL_changes", { changes_type: "all_access_key_changes", account_ids: [this.agent], block_id: h }).catch(() => null);
+      if ((ch?.changes ?? []).some((c: any) => c.type === "access_key_deletion")) executed = h;
     }
     return {
       deleted: (log0?.deleted_keys ?? []) as string[],

@@ -58,7 +58,8 @@ export function loadNetworkConfig(file?: string): NetworkConfig {
     network: c.network,
     rpcUrl: process.env.STANDIN_RPC ?? c.rpc_url ?? c.rpcUrl ?? "https://rpc.testnet.fastnear.com",
     archivalRpcUrl: c.archival_rpc_url ?? c.archivalRpcUrl ?? "https://archival-rpc.testnet.fastnear.com",
-    rpcFallbackUrls: [c.rpc_fallback_url ?? "https://rpc.testnet.near.org", "https://rpc.testnet.fastnear.com"],
+    // rpc.testnet.near.org is deprecated and rate-limits hard; only use it when explicitly allowed
+    rpcFallbackUrls: ["https://rpc.testnet.fastnear.com", ...(process.env.STANDIN_ALLOW_DEPRECATED_RPC ? [c.rpc_fallback_url ?? "https://rpc.testnet.near.org"] : [])],
     neardataUrl: process.env.STANDIN_NEARDATA ?? "https://testnet.neardata.xyz",
     nearblocksUrl: "https://api-testnet.nearblocks.io",
     accounts,
