@@ -6,7 +6,7 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.base.json --noEmit",
-    "standin": "tsx packages/cli/src/bin.ts"
+    "standin": "node --import tsx packages/cli/src/bin.ts"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
