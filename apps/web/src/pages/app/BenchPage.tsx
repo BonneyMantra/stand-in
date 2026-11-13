@@ -80,8 +80,8 @@ export default function BenchPage() {
             <div><p className="text-xs text-fg-faint">On: leaks detected</p><p className="mt-1 font-mono text-2xl text-safe">{routes.filter((r) => r.detected).length} / {routes.length}</p></div>
           </div>
         ) : (
-          <EmptyState icon={Split} title="Baseline not run in this recording" className="py-6">
-            The Stand-in-off pass of the same routes has not been recorded yet. Nothing is shown until it runs.
+          <EmptyState icon={Split} title={data.recorded ? "Baseline not run in this recording" : "Baseline not in the live API"} className="py-6">
+            {data.recorded ? "The Stand-in-off pass of the same routes has not been recorded yet. Nothing is shown until it runs." : "Off-vs-on results live in bench/results.json; open the recorded run to compare."}
           </EmptyState>
         )}
       </Panel>

@@ -50,7 +50,7 @@ export function DecoyMap({ state }: { state: StandinState }) {
       actions={
         focus && (
           <button type="button" onClick={play} disabled={running} className="inline-flex h-6 items-center gap-1.5 rounded-md border border-line px-2 text-[11px] text-fg-muted outline-none hover:text-fg focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50">
-            <Play className="size-3" aria-hidden />Replay trip
+            <Play className="size-3" aria-hidden />Replay<span className="hidden sm:inline"> trip</span>
           </button>
         )
       }

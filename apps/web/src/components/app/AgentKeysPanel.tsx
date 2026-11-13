@@ -30,7 +30,7 @@ function Registry({ title, where, list }: { title: string; where: string; list: 
   return (
     <div className="min-w-0">
       <div className="flex items-baseline justify-between gap-2 border-b border-line px-3.5 py-2">
-        <h3 className="text-xs font-medium text-fg">{title}</h3>
+        <h3 className="shrink-0 text-xs font-medium whitespace-nowrap text-fg">{title}</h3>
         <span className="truncate font-mono text-[10.5px] text-fg-faint">{where}</span>
       </div>
       {list.length === 0 ? (
