@@ -6,3 +6,4 @@ export * from "./pool.ts";
 export * from "./plant.ts";
 export * from "./counterparty.ts";
 export * from "./scoped.ts";
+export * from "./health.ts";

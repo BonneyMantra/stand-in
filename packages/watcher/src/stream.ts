@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { logger, makeProvider, type NetworkConfig } from "@standin/core";
+import { logger, makeProvider, markFailure, markOk, orderedEndpoints, type NetworkConfig } from "@standin/core";
 
 const log = logger("stream");
 
@@ -135,9 +135,7 @@ export async function followKeyChanges(o: {
   cfg: NetworkConfig; accountId: string; ignoreKeys: string[]; onChange: (c: KeyChange) => void | Promise<void>;
   intervalMs?: number; signal?: AbortSignal;
 }): Promise<void> {
-  const urls = [...new Set([o.cfg.rpcUrl, ...o.cfg.rpcFallbackUrls])];
   const seen = new Set<string>();
-  let u = 0;
   let tick = 0;
   const interval = o.intervalMs ?? Number(process.env.STANDIN_POLL_MS ?? 300);
   const query = async (url: string, finality: "optimistic" | "final") => {
@@ -150,11 +148,12 @@ export async function followKeyChanges(o: {
     return j.result as { block_hash: string; changes: any[] };
   };
   while (!o.signal?.aborted) {
-    const url = urls[u % urls.length]!;
+    const url = orderedEndpoints(o.cfg)[0]!; // healthiest endpoint, rotating across healthy ones
     try {
       tick++;
       // optimistic every tick (~3 req/s); final every 6th tick is a safety net for a poll that lands between blocks
       const [opt, fin] = await Promise.all([query(url, "optimistic"), tick % 6 === 0 ? query(url, "final") : Promise.resolve({ block_hash: "", changes: [] as any[] })]);
+      markOk(url);
       const detected_at = Date.now();
       for (const [finality, r] of [["optimistic", opt], ["final", fin]] as const) {
         for (const ch of r.changes ?? []) {
@@ -169,7 +168,7 @@ export async function followKeyChanges(o: {
       }
       if (seen.size > 500) seen.clear();
     } catch (e) {
-      u++; // rotate to the next RPC url
+      markFailure(url); // cool this endpoint down; next tick picks another
       log.warn(`changes poll via ${url}: ${(e as Error).message}`);
       await sleep(150);
     }

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { Account, FailoverRpcProvider, JsonRpcProvider, KeyPair, KeyPairSigner, actions } from "near-api-js";
+import { orderedEndpoints, markFailure, markOk } from "./health.ts";
 import { devKeysDir, requireAccount, type NetworkConfig, type Role } from "./config.ts";
 
 export { actions };
@@ -19,7 +20,7 @@ export function publicKeyOf(secret: string): string {
 
 /** Provider with failover across the configured RPC urls (fastnear free tier rate-limits at ~2 req/s). */
 export function makeProvider(cfg: NetworkConfig, archival = false): JsonRpcProvider {
-  const urls = archival ? [cfg.archivalRpcUrl, "https://archival-rpc.testnet.near.org"] : [cfg.rpcUrl, ...cfg.rpcFallbackUrls];
+  const urls = archival ? [cfg.archivalRpcUrl, "https://archival-rpc.testnet.near.org"] : orderedEndpoints(cfg);
   const uniq = [...new Set(urls)];
   const opts = { retries: 6, backoff: 1.6, wait: 600 } as any;
   if (uniq.length === 1) return new JsonRpcProvider({ url: uniq[0]! }, opts);
@@ -106,13 +107,14 @@ export function parseNearAmountSafe(near: string): bigint {
 
 /** Raw JSON-RPC with failover across configured urls (for methods near-api-js does not wrap, e.g. EXPERIMENTAL_changes). */
 export async function rpcRaw(cfg: NetworkConfig, method: string, params: unknown, archival = false): Promise<any> {
-  const urls = archival ? [cfg.archivalRpcUrl] : [cfg.rpcUrl, ...cfg.rpcFallbackUrls];
+  const urls = archival ? [cfg.archivalRpcUrl] : orderedEndpoints(cfg);
   let last: unknown;
-  for (const url of new Set(urls)) {
+  for (const url of urls) {
     try {
       const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }), signal: AbortSignal.timeout(6000) });
       const j: any = await res.json();
-      if (j.error) throw new Error(JSON.stringify(j.error).slice(0, 200));
+      if (j.error) { if (/429|rate/i.test(JSON.stringify(j.error))) markFailure(url); throw new Error(JSON.stringify(j.error).slice(0, 200)); }
+      markOk(url);
       return j.result;
     } catch (e) {
       last = e;
