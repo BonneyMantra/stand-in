@@ -73,7 +73,7 @@ export function Hero() {
           className="mt-6 max-w-[58ch] text-[16px] leading-relaxed text-pretty text-fg-muted sm:text-[17px]"
         >
           Stand-in gives AI coding agents decoy NEAR keys. When one leaks and gets used, the real account freezes
-          on-chain within about two blocks, and the dashboard names the session and the tool call that leaked it.
+          on-chain within about three blocks (measured on testnet), and the dashboard names the session and the tool call that leaked it.
         </motion.p>
 
         <motion.div {...rise(0.16, 8)} className="mt-8 flex flex-wrap items-center gap-3">

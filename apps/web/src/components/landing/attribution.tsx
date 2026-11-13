@@ -15,7 +15,7 @@ const ROWS: Row[] = [
   { depth: 0, label: "on-chain", meta: "NEAR testnet", start: 44, end: 100, tone: "neutral" },
   { depth: 1, label: "Transfer", meta: "signed by decoy key", start: 46, end: 58, tone: "trip", note: "trip" },
   { depth: 1, label: "freeze", meta: "guardian · block +1", start: 60, end: 72, tone: "chain" },
-  { depth: 1, label: "DeleteKey", meta: "agent + intents keys · block +2", start: 72, end: 84, tone: "chain" },
+  { depth: 1, label: "DeleteKey", meta: "agent + intents keys · block +3", start: 72, end: 84, tone: "chain" },
   { depth: 1, label: "report", meta: "blocklist · TEE verdict", start: 86, end: 98, tone: "safe" },
 ];
 
@@ -31,7 +31,7 @@ const STATS = [
   { k: "Session", v: "s_4f2a" },
   { k: "Tool calls", v: "3" },
   { k: "Exposures", v: "2", trip: true },
-  { k: "Freeze", v: "block +2" },
+  { k: "Freeze", v: "block +3" },
 ];
 
 function Waterfall() {

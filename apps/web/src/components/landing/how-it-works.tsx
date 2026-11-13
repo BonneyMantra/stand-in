@@ -30,7 +30,7 @@ const STEPS: Step[] = [
   {
     verb: "Freeze",
     icon: Snowflake,
-    body: "Within about two blocks every agent key is deleted and removed from the NEAR Intents registry, so already-signed intents fail.",
+    body: "Within about three blocks every agent key is deleted and removed from the NEAR Intents registry, so already-signed intents fail.",
     mono: "PublicKeyNotExist",
     tone: "bg-trip",
   },

@@ -181,7 +181,7 @@ export function TripMap() {
                     className="absolute bottom-3 left-3 inline-flex items-center gap-2 rounded-md border border-trip/40 bg-ink-950/90 px-2.5 py-1.5 font-mono text-[11px] text-fg backdrop-blur sm:bottom-5 sm:left-5"
                   >
                     <i className="size-1.5 rounded-full bg-trip" />
-                    Frozen in 2 blocks
+                    Frozen in 3 blocks
                   </motion.div>
                 ) : null}
               </AnimatePresence>

@@ -41,7 +41,7 @@ export const TRIP_EVENTS: TripEvent[] = [
     tone: "fg",
   },
   {
-    at: "block +2",
+    at: "block +3",
     title: "Agent keys deleted",
     detail: "account keys + NEAR Intents keys",
     tone: "fg",
