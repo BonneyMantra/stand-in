@@ -33,7 +33,7 @@ export function loadDevKey(cfg: NetworkConfig, accountOrRole: string): Generated
   const id = (cfg.accounts as Record<string, string>)[accountOrRole] ?? accountOrRole;
   const dir = devKeysDir();
   const names = [id, accountOrRole].flatMap((n) => [`${n}.json`, `${n}.key`]);
-  for (const base of [dir, path.join(dir, cfg.network)]) {
+  for (const base of [dir, path.join(dir, "keys"), path.join(dir, cfg.network)]) {
     for (const n of names) {
       const f = path.join(base, n);
       if (!fs.existsSync(f)) continue;

@@ -1,0 +1,2 @@
+{ "name": "@standin/watcher", "version": "0.1.0", "type": "module", "main": "./src/index.ts",
+  "exports": { ".": "./src/index.ts" }, "dependencies": { "@standin/core": "workspace:*", "near-api-js": "^7.5.3", "zod": "^4.6.7" } }
