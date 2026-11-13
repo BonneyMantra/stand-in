@@ -5,13 +5,13 @@ import { createRequire } from 'node:module';
 import { REPO } from './sandbox.mjs';
 
 /** Retry on public-RPC rate limits (HTTP 429 / failover exhausted). */
-export async function retry(fn, tries = 6) {
+export async function retry(fn, tries = 10) {
   let last;
   for (let i = 0; i < tries; i++) {
     try { return await fn(); } catch (e) {
       last = e;
       if (!/429|Exceeded \d+ providers|fetch failed|timeout/i.test(String(e.message))) throw e;
-      await new Promise((r) => setTimeout(r, 2000 * (i + 1)));
+      await new Promise((r) => setTimeout(r, Math.min(15000, 2000 * (i + 1))));
     }
   }
   throw last;
@@ -42,10 +42,10 @@ export async function guardianState() {
 export const createBaselineAccount = (fundNear = '0.3') => retry(() => createBaselineAccountOnce(fundNear));
 async function createBaselineAccountOnce(fundNear) {
   const { c, cfg } = await core();
-  const agent = c.requireAccount(cfg, 'agent');
-  const id = `bl${Date.now().toString(36)}.${agent}`;
+  // Funded by the attacker account (it holds the testnet loot), so the guardian's agent account is never touched.
+  const id = `bl${Date.now().toString(36)}.${c.requireAccount(cfg, 'attacker')}`;
   const kp = c.generateKey();
-  const owner = c.roleAccount(cfg, 'agent');
+  const owner = c.roleAccount(cfg, 'attacker');
   const { KeyPair } = createRequire(path.join(REPO, 'packages/core/package.json'))('near-api-js');
   await owner.signAndSendTransaction({
     receiverId: id,
@@ -59,7 +59,7 @@ export async function deleteBaselineAccount(b) {
   const { c, cfg } = await core();
   try {
     const acct = c.makeAccount(cfg, b.account_id, b.secret_key);
-    await acct.signAndSendTransaction({ receiverId: b.account_id, actions: [c.actions.deleteAccount(c.requireAccount(cfg, 'agent'))], waitUntil: 'EXECUTED_OPTIMISTIC' });
+    await acct.signAndSendTransaction({ receiverId: b.account_id, actions: [c.actions.deleteAccount(c.requireAccount(cfg, 'attacker'))], waitUntil: 'EXECUTED_OPTIMISTIC' });
     return true;
   } catch { return false; }
 }
@@ -99,4 +99,17 @@ export async function returnLoot(near) {
   const amount = c.parseNearAmountSafe((near - 0.005).toFixed(4));
   await thief.signAndSendTransaction({ receiverId: c.requireAccount(cfg, 'agent'), actions: [c.actions.transfer(amount)], waitUntil: 'EXECUTED_OPTIMISTIC' });
   return near;
+}
+
+/** Block heights read from chain for a tx: inclusion block and the last receipt's execution block. */
+export async function txBlocks(txHash, signerId) {
+  const { c, cfg } = await core();
+  return retry(async () => {
+    const prov = c.makeProvider(cfg);
+    const r = await prov.viewTransactionStatus({ txHash, accountId: signerId, waitUntil: 'FINAL' });
+    const h = async (hash) => Number((await prov.viewBlock({ blockId: hash })).header.height);
+    const included = await h(r.transaction_outcome.block_hash);
+    const exec = await Promise.all((r.receipts_outcome || []).map((o) => h(o.block_hash)));
+    return { included, executed: exec.length ? Math.max(...exec) : included };
+  });
 }

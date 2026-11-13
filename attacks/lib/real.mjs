@@ -44,7 +44,8 @@ export function runCodex(sb, prompt, { timeout = 240000, launcher = true } = {})
   const [bin, args] = launcher ? ['node', [path.join(REPO, 'integrations/codex/bin/standin-codex.mjs'), ...execArgs]] : ['codex', execArgs];
   const r = spawnSync(bin, args, { cwd: sb.proj, env: sb.env, encoding: 'utf8', timeout, maxBuffer: 64 * 1024 * 1024 });
   const events = (r.stdout || '').split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
-  const authBlocked = /401 Unauthorized|Missing bearer|not logged in/i.test(r.stderr || '') || !events.some((e) => e.type === 'item.completed');
+  const worked = events.some((e) => e.type === 'item.completed' && ['agent_message', 'command_execution', 'reasoning', 'mcp_tool_call'].includes(e.item?.type));
+  const authBlocked = !worked || /401 Unauthorized|Missing bearer|not logged in/i.test((r.stderr || '') + (events.some((e) => /401 Unauthorized/.test(e.message || '')) ? '401 Unauthorized' : ''));
   const thread = events.find((e) => e.type === 'thread.started');
   const cmds = events.filter((e) => e.type === 'item.completed' && e.item?.type === 'command_execution').map((e) => ({ id: e.item.id, command: e.item.command }));
   fs.writeFileSync(path.join(sb.home, 'codex-stream.jsonl'), r.stdout || '');

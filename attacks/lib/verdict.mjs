@@ -2,7 +2,7 @@
 // attribution are read back from ledger events written by the hooks and the watcher.
 import { readLedger } from './sandbox.mjs';
 
-export function evaluate(sb, { since, sessionIds, culprit, theftAt }) {
+export function evaluate(sb, { since, sessionIds, culprit, theftAt, theftTx }) {
   const ev = readLedger(sb).filter((e) => e.at >= since);
   const planted = ev.filter((e) => e.type === 'decoy_planted' && sessionIds.includes(e.session_id));
   const keys = new Set(planted.map((e) => e.public_key));
@@ -10,7 +10,7 @@ export function evaluate(sb, { since, sessionIds, culprit, theftAt }) {
   const wanted = new Set(culprit?.tool_use_ids || (culprit?.tool_use_id ? [culprit.tool_use_id] : []));
   const cmdMatch = (e) => (culprit?.commands || []).some((c) => (e.tool_input_summary || '').includes(JSON.stringify(c).slice(1, -1).slice(0, 60)));
   const exactExposure = exposures.find((e) => e.session_id === culprit?.session_id && (wanted.size ? wanted.has(e.tool_use_id) || cmdMatch(e) : e.tool_name === culprit?.tool_name));
-  const trips = ev.filter((e) => e.type === 'trip' && keys.has(e.decoy_public_key));
+  const trips = ev.filter((e) => e.type === 'trip' && keys.has(e.decoy_public_key) && (!theftTx || e.tx_hash === theftTx)); // only the trip caused by THIS route's tx
   // A freeze older than its trip (watcher reusing a previous freeze) is not a measurement of this trip.
   const freezes = ev.filter((e) => e.type === 'freeze' && trips.some((t) => t.tx_hash === e.trip_tx_hash) && (e.freeze?.blocks_after_trip ?? 0) >= 0);
   const blocklist = ev.filter((e) => e.type === 'blocklist' && trips.some((t) => t.tx_hash === e.trip_tx_hash));

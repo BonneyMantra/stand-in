@@ -7,7 +7,7 @@ import { makeSandbox, REPO } from './sandbox.mjs';
 import { ScriptedAgent } from './scripted.mjs';
 import { startListener, drainWith } from './thief.mjs';
 import { evaluate } from './verdict.mjs';
-import { balanceNear, createBaselineAccount, deleteBaselineAccount } from './chain.mjs';
+import { balanceNear, createBaselineAccount, deleteBaselineAccount, core, txBlocks } from './chain.mjs';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const chainOn = () => process.env.STANDIN_CHAIN !== 'off';
@@ -20,7 +20,11 @@ export async function runRoute(meta, attack, { mode = 'on', shared = {} } = {}) 
   const sb = makeSandbox(`${meta.id}-${mode}`, { standinHome: shared.standinHome });
   let baseline = shared.baseline;
   let ownBaseline = false;
-  if (mode === 'off' && chainOn() && !baseline) { baseline = await createBaselineAccount(); ownBaseline = true; }
+  if (mode === 'off' && chainOn() && !baseline) {
+    try { baseline = await createBaselineAccount(); ownBaseline = true; } catch (e) {
+      return { route: meta.id, name: meta.name, kind: meta.kind, mode, status: 'baseline_setup_failed', agent_status: String(e.message).slice(0, 200), expected: meta.expected };
+    }
+  }
   if (mode === 'off') sb.baseline = baseline ? { ...baseline } : { account_id: 'baseline.testnet', secret_key: 'ed25519:' + '1'.repeat(88), public_key: 'ed25519:' + '2'.repeat(44) };
   const listener = await startListener((l) => log(`thief received ${l.bytes}B ${l.method} ${l.url} keys=${l.keys.length}`));
   const sessions = [];
@@ -55,11 +59,25 @@ export async function runRoute(meta, attack, { mode = 'on', shared = {} } = {}) 
     // Give the watcher time to see the tx and freeze.
     if (!out.noTheft && theftOk && chainOn()) {
       for (let i = 0; i < Number(process.env.ATTACK_FREEZE_WAIT_S || 40); i++) {
-        result = evaluate(sb, { since, sessionIds: ids, culprit: out.culprit, theftAt: theftOk.sent_at });
+        result = evaluate(sb, { since, sessionIds: ids, culprit: out.culprit, theftAt: theftOk.sent_at, theftTx: theftOk.tx_hash });
         if (result.blocks_to_freeze != null) break;
         await sleep(1000);
       }
     } else if (!out.noTheft) result = evaluate(sb, { since, sessionIds: ids, culprit: out.culprit, theftAt: theft[0]?.sent_at });
+  }
+  if (mode === 'on' && theftOk && result.freeze_tx) {
+    // Re-derive the metric from chain, not from the watcher's own numbers or clock.
+    try {
+      const { c, cfg } = await core();
+      const t = await txBlocks(theftOk.tx_hash, c.requireAccount(cfg, 'decoy'));
+      const f = await txBlocks(result.freeze_tx, c.requireAccount(cfg, 'watcher'));
+      result.blocks_to_freeze_watcher_reported = result.blocks_to_freeze;
+      result.chain = { trip_block: t.included, freeze_included_block: f.included, freeze_executed_block: f.executed };
+      const valid = f.included >= t.included;
+      result.blocks_to_freeze = valid ? f.included - t.included : null;
+      result.blocks_to_agent_key_removed = valid ? f.executed - t.included : null;
+      if (!valid) result.freeze_invalid = 'freeze block precedes trip block (stale freeze), not counted';
+    } catch (e) { result.chain_read_error = String(e.message).slice(0, 120); result.blocks_to_freeze = null; }
   }
   let afterFreeze = null;
   if (out.after && theftOk) afterFreeze = await out.after();
