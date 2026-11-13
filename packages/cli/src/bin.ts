@@ -17,7 +17,7 @@ const USAGE = `standin <command>
   status [--json]                        agent/decoy/trips from the watcher API
   freeze [reason]                        manual guardian freeze
   pay <receiver> <amount|method> [--args JSON] [--approve-warn]
-  attack drain --key FILE                scripted thief (demo): drain a planted decoy to the attacker account`;
+  attack drain --key FILE [--reserve NEAR]   scripted thief (demo): drain a planted decoy to the attacker account`;
 
 async function main(argv: string[]): Promise<number> {
   const [cmd, ...rest] = argv;
@@ -61,9 +61,9 @@ async function main(argv: string[]): Promise<number> {
     }
     case "attack": {
       if (rest[0] !== "drain") { out(USAGE); return 1; }
-      const { values } = parse(rest.slice(1), { key: { type: "string" } });
+      const { values } = parse(rest.slice(1), { key: { type: "string" }, reserve: { type: "string" } });
       if (!values.key) { err("attack drain needs --key FILE"); return 1; }
-      await attackDrain(values.key);
+      await attackDrain(values.key, values.reserve ?? "0.1");
       return 0;
     }
     default:
