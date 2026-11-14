@@ -37,6 +37,20 @@ function isState(x: unknown): x is StandinState {
   return Boolean(s && typeof s === "object" && s.agent && s.decoy && Array.isArray(s.trips) && Array.isArray(s.sessions));
 }
 
+/**
+ * Same rule as build-demo-state.mjs: a trip the watcher could not resolve to a tx hash, or whose freeze
+ * precedes it (a reused earlier freeze), cannot be shown or linked honestly, so it is left out.
+ */
+function clean(s: StandinState): StandinState {
+  const seen = new Set<string>();
+  const trips = s.trips.filter((t) => {
+    if (!t.tx_hash || seen.has(t.tx_hash)) return false;
+    seen.add(t.tx_hash);
+    return !t.freeze?.tx_hash || t.freeze.blocks_after_trip >= 0;
+  });
+  return trips.length === s.trips.length ? s : { ...s, trips };
+}
+
 async function getJson(url: string, ms: number): Promise<StandinState> {
   const ctl = new AbortController();
   const timer = window.setTimeout(() => ctl.abort(), ms);
@@ -45,7 +59,7 @@ async function getJson(url: string, ms: number): Promise<StandinState> {
     if (!res.ok) throw new Error(`${url} answered ${res.status}`);
     const body: unknown = await res.json();
     if (!isState(body)) throw new Error(`${url} did not return the watcher state schema`);
-    return body;
+    return clean(body);
   } finally {
     window.clearTimeout(timer);
   }

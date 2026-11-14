@@ -4,6 +4,7 @@ import { MetricStrip, type Metric } from "@/components/app/MetricStrip";
 import { DecoyMap } from "@/components/app/map/DecoyMap";
 import { TripFeed } from "@/components/app/TripFeed";
 import { AgentKeysPanel } from "@/components/app/AgentKeysPanel";
+import { ChainSigPanel } from "@/components/app/ChainSigPanel";
 import { PageHeader } from "@/components/app/common";
 
 export default function OverviewPage() {
@@ -32,7 +33,10 @@ export default function OverviewPage() {
         <DecoyMap state={data} />
         <div className="relative min-w-0"><TripFeed state={data} live={source === "live"} /></div>
       </div>
-      <AgentKeysPanel state={data} />
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <AgentKeysPanel state={data} />
+        <ChainSigPanel state={data} />
+      </div>
     </div>
   );
 }

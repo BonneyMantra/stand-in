@@ -1,23 +1,135 @@
 {
- "snapshot_at": "2026-11-13T19:25:47.177Z",
+ "snapshot_at": "2026-11-14T05:08:42.487Z",
  "network": "testnet",
+ "chainsig": {
+  "evm_address": "0x5ac75f605ff88b69195614f4256639f6acd31339",
+  "chain_id": 11155111,
+  "path": "standin-evm-1",
+  "last_sign": {
+   "tx_hash": "86J721R72GArAgs7CphqL3q5qc5WtRkuxNqFnrfjJDDU",
+   "at": "2026-11-14T05:04:34.478Z",
+   "ok": true
+  },
+  "blocked_after_freeze": {
+   "tx_hash": "7vj8xXr8WCVzEdd7gum5R5yu9D3zsVt8uXUvoBySSfLd",
+   "error": "HostGuestPanicError: frozen: sign_evm refused until unfreeze"
+  }
+ },
  "agent": {
   "account_id": "si-agent-5289.testnet",
   "frozen": false,
   "agent_keys": [
-   "ed25519:DGQoSJxRTwRs5nwu1hVKw3q2bNays9jqg9pQmtEcgypa",
-   "ed25519:EqX1GjavSjeAts7ZGVFikktW7wYuFcrRD4fjfYWebtbC"
+   "ed25519:AJ4GD6K9tewfPmrKdcwrTRy4WDfriWcAA1M4YKvvL6PG"
   ],
   "intents_keys": []
  },
  "decoy": {
   "account_id": "si-decoy-5289.testnet",
-  "balance_yocto": "4999896976000000000000000",
-  "keys": []
+  "balance_yocto": "3094619687087500000000000",
+  "keys": [
+   {
+    "public_key": "ed25519:7JXxtiddaycVeHpXcQV1385CopaZoXxdBGkkH3Za6UQN",
+    "planted": {
+     "kind": "near-credentials",
+     "path": "/private/tmp/claude-501/scratch/home/.near-credentials/testnet/si-decoy-5289.testnet.json",
+     "agent": "manual",
+     "session_id": "s-lat",
+     "cwd": "/x",
+     "at": "2026-11-13T18:46:34.811Z"
+    }
+   },
+   {
+    "public_key": "ed25519:GudnDWtMKfQnxk7gkaKAjf3jXby8Gy9JQqEBRARCyVN2",
+    "planted": {
+     "kind": "near-credentials",
+     "path": "/private/tmp/claude-501/scratch/home/.near-credentials/testnet/si-decoy-5289.testnet.json",
+     "agent": "manual",
+     "session_id": "s-lat",
+     "cwd": "/x",
+     "at": "2026-11-13T18:47:03.271Z"
+    }
+   }
+  ]
  },
  "sessions": [],
  "exposures": [],
- "trips": [],
+ "trips": [
+  {
+   "tx_hash": "",
+   "block_height": 277548628,
+   "decoy_public_key": "ed25519:CPPbdkJSJZtcQw7HSU4km9QHNFFZVsTd2YT7eMG8LBEd",
+   "attacker_account": "",
+   "attributed_to": {
+    "session_id": "",
+    "agent": "",
+    "tool_name": "",
+    "tool_use_id": "",
+    "path": ""
+   },
+   "freeze": {
+    "tx_hash": "GkMu8iUBmiTuFRzSxe11ba4zYvZvW7jexUExWeTdBei4",
+    "block_height": 277548631,
+    "blocks_after_trip": 3,
+    "deleted_keys": [],
+    "intents_keys_removed": []
+   },
+   "blocklist": {
+    "tx_hash": "",
+    "outlayer_execution": "",
+    "attested": false
+   }
+  },
+  {
+   "tx_hash": "",
+   "block_height": 277548628,
+   "decoy_public_key": "ed25519:CZySKpuw7nPRYcFkiZ7Acy8EepL3cGcEufmGASPNcQtM",
+   "attacker_account": "",
+   "attributed_to": {
+    "session_id": "",
+    "agent": "",
+    "tool_name": "",
+    "tool_use_id": "",
+    "path": ""
+   },
+   "freeze": {
+    "tx_hash": "GkMu8iUBmiTuFRzSxe11ba4zYvZvW7jexUExWeTdBei4",
+    "block_height": 277548631,
+    "blocks_after_trip": 3,
+    "deleted_keys": [],
+    "intents_keys_removed": []
+   },
+   "blocklist": {
+    "tx_hash": "",
+    "outlayer_execution": "",
+    "attested": false
+   }
+  },
+  {
+   "tx_hash": "8VbsWdYZibxKgXdMHVbQqoLienzq8z1tByEf8mHwGcaK",
+   "block_height": 277548776,
+   "decoy_public_key": "ed25519:GudnDWtMKfQnxk7gkaKAjf3jXby8Gy9JQqEBRARCyVN2",
+   "attacker_account": "si-attacker-5289.testnet",
+   "attributed_to": {
+    "session_id": "s-lat",
+    "agent": "manual",
+    "tool_name": "",
+    "tool_use_id": "",
+    "path": "/private/tmp/claude-501/scratch/home/.near-credentials/testnet/si-decoy-5289.testnet.json"
+   },
+   "freeze": {
+    "tx_hash": "6FVxN1oGvpMFhEEpthoMSutmgorXE7bVqSHxCVcY5fXT",
+    "block_height": 277548778,
+    "blocks_after_trip": 2,
+    "deleted_keys": [],
+    "intents_keys_removed": []
+   },
+   "blocklist": {
+    "tx_hash": "",
+    "outlayer_execution": "",
+    "attested": false
+   }
+  }
+ ],
  "blocklist": [
   {
    "account_id": "si-w2atk-25769.testnet",
@@ -27,9 +139,9 @@
   },
   {
    "account_id": "si-attacker-5289.testnet",
-   "evidence_tx": "4tUP8Fm3dEahZeNkqsyzubY5U4kKrcS18S7tnU5zYrGb",
-   "decoy_public_key": "ed25519:CaprWky1pGogLtBeid7us41pNEcaHNJkhuS55CLv9wGR",
-   "attested_at": "2026-11-13T19:19:46.223Z"
+   "evidence_tx": "68KXaCsncDdk8yJKZB5JpqksaDR1CUxKf3FbqGczyY2H",
+   "decoy_public_key": "ed25519:4Dy9tyjddwNfriM7qwzu5P9Hz2sQwyvUwLZ8yDQkHgYF",
+   "attested_at": "2026-11-13T20:28:37.960Z"
   }
  ],
  "bench": {

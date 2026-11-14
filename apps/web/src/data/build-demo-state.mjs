@@ -105,7 +105,9 @@ for (const b of benchTrips) {
   if (!b.attributed_to.path && !b.attributed_to.session_id) b.attributed_to = l.attributed_to;
   if (l.blocklist?.attested) b.blocklist = l.blocklist;
 }
-const trips = [...benchTrips, ...liveTrips];
+// Same rule as bench/: a freeze that precedes its trip is a reused earlier freeze, not this trip's, so the
+// trip is dropped (killed bench runs left such rows); rows without a trip tx hash are dropped too.
+const trips = [...benchTrips, ...liveTrips].filter((t) => t.tx_hash && (!t.freeze?.tx_hash || t.freeze.blocks_after_trip >= 0));
 for (const k of live?.decoy?.keys ?? []) if (!keys.some((x) => x.public_key === k.public_key)) keys.push(k);
 
 // Agent key state after the run: everything the freeze deleted is gone, the account is frozen.
@@ -134,6 +136,8 @@ const state = {
     routes: bench.summary?.routes_run ?? sumOn.length, detected: bench.summary?.detected ?? 0,
     attributed: bench.summary?.attributed_session ?? 0, median_blocks_to_freeze: bench.summary?.median_blocks_to_freeze ?? 0,
   },
+  // Chain Signatures proof (packages/chainsig prove run), as the live watcher served it.
+  ...(live?.chainsig ? { chainsig: live.chainsig } : {}),
   recorded: {
     recorded_at: started[0]?.at ?? bench.generated_at,
     source: `bench ledger + ${benchFile.startsWith(repo + "/") ? path.relative(repo, benchFile) : `bench results (${path.basename(benchFile)})`} (testnet)`,

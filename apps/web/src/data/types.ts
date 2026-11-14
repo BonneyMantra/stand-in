@@ -101,6 +101,14 @@ export interface BenchSummary {
   median_blocks_to_freeze: number;
 }
 
+export interface ChainSig {
+  evm_address: string;
+  chain_id: number;
+  path: string;
+  last_sign: { tx_hash: string; at: string; ok: boolean };
+  blocked_after_freeze: { tx_hash: string; error: string };
+}
+
 export interface StandinState {
   network: Network;
   agent: AgentState;
@@ -110,6 +118,8 @@ export interface StandinState {
   trips: Trip[];
   blocklist: BlocklistEntry[];
   bench: BenchSummary;
+  /** Optional: Chain Signatures proof (guardian.sign_evm through the NEAR MPC signer). */
+  chainsig?: ChainSig;
   /** Present only in public/demo-state.json (the recorded run), never in the live API. */
   recorded?: RecordedMeta;
 }
