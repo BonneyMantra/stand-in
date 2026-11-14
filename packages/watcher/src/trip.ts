@@ -3,6 +3,7 @@ import {
   type LedgerEvent, type NetworkConfig,
 } from "@standin/core";
 import { FastSender } from "./fastsend.ts";
+import { OwnerKeyFreezer } from "./ownerfreeze.ts";
 import { resolveTx, type KeyChange, type SeenBlock, type SeenTx } from "./stream.ts";
 
 const log = logger("trip");
@@ -27,7 +28,10 @@ export function attackerOf(tx: SeenTx): string {
 }
 
 export class TripHandler {
-  private sender: FastSender;
+  private sender?: FastSender;
+  /** mainnet: no guardian contract, the agent OWNER key freezes directly (see ownerfreeze.ts) */
+  private owner?: OwnerKeyFreezer;
+  private signerAccount: string;
   private seen = new Set<string>();
   private frozenAt: { tx_hash: string; block_height: number } | null = null;
   private inflight: Promise<{ tx_hash: string; block_height: number }> | null = null;
@@ -36,18 +40,34 @@ export class TripHandler {
   readonly agent: string;
   readonly registry: string;
   private submittedAt = 0;
+  private ownerExtra?: { intents_tx_hash: string; deleted_keys: string[]; intents_keys_removed: string[] };
   constructor(private cfg: NetworkConfig, private home?: string) {
     this.decoy = requireAccount(cfg, "decoy");
     this.agent = requireAccount(cfg, "agent");
     this.registry = cfg.accounts.registry ?? "";
     this.adminPk = loadDevKey(cfg, "decoy").public_key;
-    const w = loadDevKey(cfg, "watcher");
-    this.sender = new FastSender(cfg, requireAccount(cfg, "watcher"), w.secret_key);
+    if (cfg.network === "mainnet" || cfg.raw.freeze_mode === "owner-key") {
+      this.owner = new OwnerKeyFreezer(cfg, this.agent, requireAccount(cfg, "intents"), loadDevKey(cfg, "agent").secret_key);
+      this.signerAccount = this.agent;
+    } else {
+      const w = loadDevKey(cfg, "watcher");
+      this.sender = new FastSender(cfg, requireAccount(cfg, "watcher"), w.secret_key);
+      this.signerAccount = requireAccount(cfg, "watcher");
+    }
   }
 
   async init(): Promise<void> {
-    await this.sender.warm();
-    this.sender.start();
+    if (this.owner) {
+      const { alreadyFrozen } = await this.owner.init();
+      if (alreadyFrozen) {
+        const prior = readEvents({ type: "freeze" }, this.home).at(-1);
+        this.frozenAt = { tx_hash: prior?.freeze?.tx_hash ?? "", block_height: prior?.freeze?.block_height ?? 0 };
+        log.info("agent has no FC or intents keys on chain (already frozen); will record trips without re-freezing");
+      }
+      return;
+    }
+    await this.sender!.warm();
+    this.sender!.start();
     // Resume: never double-freeze if the agent is already frozen on chain.
     const st = await this.guardianState().catch(() => null);
     if (st?.frozen) {
@@ -57,8 +77,10 @@ export class TripHandler {
     }
   }
   stop(): void {
-    this.sender.stop();
+    this.sender?.stop();
+    this.owner?.stop();
   }
+  ownerKeys() { return this.owner?.keys(); }
 
   async guardianState(): Promise<any> {
     return makeProvider(this.cfg).callFunction({ contractId: this.agent, method: "get_state", args: {} } as any);
@@ -109,7 +131,7 @@ export class TripHandler {
     const detail = await this.freezeDetail(freeze.tx_hash).catch(() => ({ deleted: [] as string[], intents: [] as string[], executed_height: 0 }));
     appendEvent("freeze", {
       trip_tx_hash: tripTx,
-      freeze: { tx_hash: freeze.tx_hash, block_height: freeze.block_height, blocks_after_trip, deleted_keys: detail.deleted, intents_keys_removed: detail.intents },
+      freeze: { tx_hash: freeze.tx_hash, block_height: freeze.block_height, blocks_after_trip, deleted_keys: detail.deleted, intents_keys_removed: detail.intents, ...(this.ownerExtra ? { intents_tx_hash: this.ownerExtra.intents_tx_hash, mode: "owner-key" } : {}) },
       executed_block_height: detail.executed_height,
       executed_blocks_after_trip: detail.executed_height ? detail.executed_height - height : undefined,
       detection_to_submit_ms: freeze.submitted_ms - t.detectedAt,
@@ -124,7 +146,9 @@ export class TripHandler {
     if (!this.inflight) {
       const reason = `decoy key ${publicKey} signed a transaction${txHash ? ` (${txHash})` : ""}; value to ${attacker || "unknown"}`;
       this.inflight = (async () => {
-        const hash = await this.sender.call(this.agent, "freeze", { reason, decoy_public_key: publicKey, tx_hash: txHash ?? null });
+        const o = this.owner ? await this.owner.freeze() : null;
+        if (o) this.ownerExtra = o.extra;
+        const hash = o ? o.tx_hash : await this.sender!.call(this.agent, "freeze", { reason, decoy_public_key: publicKey, tx_hash: txHash ?? null });
         this.submittedAt = Date.now();
         log.info(`freeze submitted ${hash}`);
         return { tx_hash: hash, block_height: await this.inclusionHeight(hash) };
@@ -139,7 +163,7 @@ export class TripHandler {
     const prov = makeProvider(this.cfg);
     for (let i = 0; i < 60; i++) {
       try {
-        const r: any = await prov.viewTransactionStatus({ txHash, accountId: requireAccount(this.cfg, "watcher"), waitUntil: "INCLUDED" } as any);
+        const r: any = await prov.viewTransactionStatus({ txHash, accountId: this.signerAccount, waitUntil: "INCLUDED" } as any);
         const bh = r?.transaction_outcome?.block_hash;
         if (bh) return ((await prov.viewBlock({ blockId: bh } as any)) as any).header.height;
       } catch { /* not yet visible */ }
@@ -150,7 +174,11 @@ export class TripHandler {
 
   private async freezeDetail(txHash: string) {
     const prov = makeProvider(this.cfg);
-    const r: any = await prov.viewTransactionStatusWithReceipts({ txHash, accountId: requireAccount(this.cfg, "watcher"), waitUntil: "FINAL" } as any);
+    const r: any = await prov.viewTransactionStatusWithReceipts({ txHash, accountId: this.signerAccount, waitUntil: "FINAL" } as any);
+    if (this.owner && this.ownerExtra) {
+      const incl = ((await prov.viewBlock({ blockId: r.transaction_outcome.block_hash } as any)) as any).header.height as number;
+      return { deleted: this.ownerExtra.deleted_keys, intents: this.ownerExtra.intents_keys_removed, executed_height: await this.owner.executedHeight(incl) };
+    }
     const st = await this.guardianState().catch(() => null);
     const log0 = st?.freeze_log?.at?.(-1) ?? {};
     // Effective freeze = the block in which the DeleteKey receipt for an agent key was applied

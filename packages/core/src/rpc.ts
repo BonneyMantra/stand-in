@@ -20,7 +20,7 @@ export function publicKeyOf(secret: string): string {
 
 /** Provider with failover across the configured RPC urls (fastnear free tier rate-limits at ~2 req/s). */
 export function makeProvider(cfg: NetworkConfig, archival = false): JsonRpcProvider {
-  const urls = archival ? [cfg.archivalRpcUrl, "https://archival-rpc.testnet.near.org"] : orderedEndpoints(cfg);
+  const urls = archival ? [cfg.archivalRpcUrl, cfg.network === "mainnet" ? "https://archival-rpc.mainnet.near.org" : "https://archival-rpc.testnet.near.org"] : orderedEndpoints(cfg);
   const uniq = [...new Set(urls)];
   const opts = { retries: 6, backoff: 1.6, wait: 600 } as any;
   if (uniq.length === 1) return new JsonRpcProvider({ url: uniq[0]! }, opts);
@@ -113,7 +113,7 @@ export async function rpcRaw(cfg: NetworkConfig, method: string, params: unknown
     try {
       const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }), signal: AbortSignal.timeout(6000) });
       const j: any = await res.json();
-      if (j.error) { if (/429|rate/i.test(JSON.stringify(j.error))) markFailure(url); throw new Error(JSON.stringify(j.error).slice(0, 200)); }
+      if (j.error) { if (/429|rate/i.test(JSON.stringify(j.error))) markFailure(url); throw new Error(JSON.stringify(j.error).slice(0, 600)); }
       markOk(url);
       return j.result;
     } catch (e) {

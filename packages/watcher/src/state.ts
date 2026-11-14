@@ -1,4 +1,4 @@
-import { chainsigState, loadDevKey, makeProvider, readEvents, requireAccount, type LedgerEvent, type NetworkConfig } from "@standin/core";
+import { chainsigState, loadDevKey, makeProvider, readEvents, requireAccount, rpcRaw, type LedgerEvent, type NetworkConfig } from "@standin/core";
 
 const s = (v: unknown) => (v == null ? "" : String(v));
 
@@ -39,8 +39,18 @@ async function chainSnapshot(cfg: NetworkConfig) {
   const prov = makeProvider(cfg);
   const agent = requireAccount(cfg, "agent");
   const decoy = requireAccount(cfg, "decoy");
+  // mainnet has no guardian contract (owner-key mode): read the agent's FC keys and intents keys straight from chain
+  const ownerMode = cfg.network === "mainnet" || cfg.raw.freeze_mode === "owner-key";
+  const ownerState = async () => {
+    const [list, ik] = await Promise.all([
+      rpcRaw(cfg, "query", { request_type: "view_access_key_list", finality: "final", account_id: agent }),
+      prov.callFunction({ contractId: requireAccount(cfg, "intents"), method: "public_keys_of", args: { account_id: agent } } as any) as Promise<any>,
+    ]);
+    const fc = (list.keys as any[]).filter((k) => k.access_key?.permission !== "FullAccess").map((k) => k.public_key);
+    return { frozen: fc.length === 0 && (ik as string[]).length === 0, agent_keys: fc, intents_keys: ik };
+  };
   const [g, d, reg] = await Promise.all([
-    prov.callFunction({ contractId: agent, method: "get_state", args: {} } as any).catch(() => null) as Promise<any>,
+    (ownerMode ? ownerState() : prov.callFunction({ contractId: agent, method: "get_state", args: {} } as any)).catch(() => null) as Promise<any>,
     prov.viewAccount({ accountId: decoy } as any).catch(() => null) as Promise<any>,
     cfg.accounts.registry
       ? (prov.callFunction({ contractId: cfg.accounts.registry, method: "list", args: {} } as any).catch(() => null) as Promise<any>)

@@ -1,0 +1,13 @@
+{
+  "network": "mainnet",
+  "rpc_url": "https://rpc.mainnet.fastnear.com",
+  "freeze_mode": "owner-key",
+  "keys_dir_note": "private keys live in <repo>/.secrets/mainnet (gitignored); accounts are filled in by packages/mainnet/scripts/provision.ts",
+  "accounts": {
+    "agent": "standin-agent-5705.near",
+    "decoy": "standin-decoy-1701.near",
+    "attacker": "b320c619c4a15bacdf6302a58345800ee9c878f5d7a910fba7fb24791fe41728",
+    "intents": "intents.near",
+    "project": "wrap.near"
+  }
+}
