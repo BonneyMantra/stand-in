@@ -14,3 +14,8 @@ dist/
 # demo planning docs stay local (production notes)
 demo/*.md
 demo/*.json
+
+# film audio and VO output stays local
+demo/voiceover/
+demo/audio/
+demo/generated/
