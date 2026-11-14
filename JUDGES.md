@@ -33,6 +33,14 @@ enclave's attested signing address. No server of ours is involved.
 | 20 attack routes, real Claude Code and Codex included; 11 of 11 thefts frozen, median 3 blocks; Stand-in off lost 2.4016 NEAR | `bench/README.md`, `bench/results.json` |
 | Known npm malware denied before it runs (OSV); off-chain canary decoys reach the phone | `integrations/common/supplychain/README.md` |
 | Phone push with Freeze now / Ignore; unfreezing needs Touch ID | `packages/notify/README.md`, `packages/touchid/README.md` |
+| Owner console (wallet): freeze, unfreeze and the CLI's approve-agent-key link signed through NEAR Connect; five testnet txs read back on chain (test-only executor, no third-party wallet) | `docs/wallet-tests.md`, `/app/owner` |
+
+## Owner console (wallet)
+Open **https://stand-in-44e.pages.dev/app/owner** and press Connect wallet: NEAR Connect lists the testnet wallets
+(Meteor, Intear, Ledger, Nightly, NEAR CLI, Ethereum Wallets). Any testnet account shows its guardian state, or an
+honest "no guardian" explanation; Freeze and Unfreeze need a wallet holding the guarded account's full-access key.
+What we tested, and how (a test-only executor inside NEAR Connect's sandbox, not a third-party wallet), is in
+[`docs/wallet-tests.md`](docs/wallet-tests.md).
 
 ## 4. Run it locally
 See [README.md](README.md#run-it). `pnpm test` runs the TypeScript suite; contract tests run with `cargo test` in each

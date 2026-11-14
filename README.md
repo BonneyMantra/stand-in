@@ -77,6 +77,33 @@ agents and 12 scripted through the real hook entry point.
 cost); the watcher freezes with the owner key instead. Every mainnet transaction goes through a spend guard
 that refuses anything over its cap.
 
+## Owner console (wallet)
+
+`/app/owner` lets the owner sign the guardian's owner-only calls from their own NEAR wallet instead of the CLI.
+It uses [NEAR Connect](https://github.com/hot-dao/near-selector) (`@hot-labs/near-connect` 0.12.0, testnet): wallets
+run in NEAR Connect's sandboxed iframes and the page never holds a key. The guardian's owner is the account itself,
+so the connected wallet must hold that account's full-access key.
+
+- Connect, disconnect, session restore on reload; the header shows the account and wallet.
+- Reads `get_state` over testnet RPC: active, frozen, no contract, not a guardian, missing account, loading, RPC error, wrong network.
+- Freeze (reason up to 500 bytes) and Unfreeze, each one wallet-signed transaction from the account to itself, with
+  the explorer link and a fresh read of the state.
+- `standin unfreeze --wallet` prints an approval link
+  (`/app/owner?op=unfreeze&account=…&agent_key=…&receiver=…&methods=…&allowance=…`). The page validates every value
+  (zod: account grammar, ed25519 key, method names, allowance 1 yocto to 1 NEAR; 0 is refused because the guardian
+  reads it as unlimited), shows the decoded request, and offers one transaction: `unfreeze` (when frozen) then
+  `add_agent_key`. It signs only when the owner presses the button, then reads the key back with `view_access_key`.
+
+Wallets offered on testnet (NEAR Connect's manifest): Meteor, Intear, Ledger, Nightly, NEAR CLI, Ethereum Wallets.
+HOT, MyNearWallet, NEAR Mobile and OKX do not declare testnet in that manifest, so NEAR Connect hides them here.
+
+Tested: the full flow ran through NEAR Connect's own picker with a test-only debug-wallet executor that signs with a
+testnet key on 127.0.0.1 (five testnet transactions, every state above, 390/1024/1440 px), then the deployed page
+was checked headless without a wallet. No third-party wallet has been connected by us; that is a manual check.
+Evidence and tx links: [`docs/wallet-tests.md`](docs/wallet-tests.md).
+
+Not built: NEAR Auth / FastAuth sign-in and HOT Kit for EVM/Solana wallets (reasons in the evidence file).
+
 ## Run it
 
 Tested with Node 24 and pnpm 11; the contracts need Rust with `cargo-near`.
@@ -89,7 +116,7 @@ pnpm standin:claude --home .sandbox/me      # Claude Code plugin into an isolate
 pnpm standin:codex                          # Codex with decoys and hooks
 pnpm standin pay <account> <amount>         # counterparty check: allow / warn / block
 cd apps/web && pnpm exec vite               # dashboard and landing page on 127.0.0.1:4173
-pnpm test                                   # TypeScript tests (105)
+pnpm test                                   # TypeScript tests (114)
 ```
 
 The dashboard reads the live watcher; with no watcher it falls back to a recorded testnet run
