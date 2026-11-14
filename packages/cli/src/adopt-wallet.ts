@@ -144,7 +144,7 @@ export async function adoptWallet(o: AdoptWalletOpts): Promise<number> {
     saveAdoptPending(pending, home);
   }
   const dash = o.dashboard ?? process.env.STANDIN_DASHBOARD_URL ?? DEFAULT_DASHBOARD;
-  out(`Open this link and approve in your NEAR wallet (owner of ${pending.account_id}). One transaction deploys the guardian and registers the agent key; no owner key leaves your wallet:`);
+  out(`Open this link and approve in your NEAR wallet (owner of ${pending.account_id}). One transaction registers the agent key (and deploys the guardian first if the account has none); no owner key leaves your wallet:`);
   out(adoptUrl(dash, pending));
   out(`new agent key ${pending.public_key}  receiver ${pending.receiver_id}  methods ${pending.method_names.join(",") || "(any)"}  allowance ${pending.allowance} yoctoNEAR  watcher ${pending.watcher}`);
   out(`waiting up to ${timeout}s for the transaction...`);

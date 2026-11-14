@@ -54,7 +54,10 @@ describe("wallet outcomes and errors", () => {
   it("maps wallet rejection and a closed wallet", () => {
     expect(readableError(new Error("User rejected the request"))).toMatch(/rejected/);
     expect(readableError(new Error("Wallet closed"))).toMatch(/closed/);
-    expect(readableError(new Error("User closed the window before completing the action"))).toMatch(/window was closed.*Nothing was sent/);
+    // A closed window never claims "nothing was sent": the wallet may have broadcast first; the page then reads the chain.
+    const closed = readableError(new Error("User closed the window before completing the action"));
+    expect(closed).toMatch(/window closed before it reported a result/);
+    expect(closed).not.toMatch(/Nothing was sent/);
     expect(readableError("already frozen")).toBe("The guardian is already frozen.");
   });
 });

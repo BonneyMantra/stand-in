@@ -192,3 +192,33 @@ did not reach that window.open'd tab (`window.ethereum` undefined there). Inject
 provider (`scripts/wallet-test/eth-provider.init.js`: EIP-6963 announce, no key, signs nothing) appeared in AppKit as
 "Stand-in test EVM wallet INSTALLED", but selecting it made no provider request within 6 s. A browser extension with a
 MAIN-world content script would reach every tab; not tried in time.
+
+## 2026-11-15, 00:08–00:22 IST: a real Meteor Web wallet (no scripted signer)
+
+Wallet: Meteor Web, testnet account `bonneymantra.testnet` (created in Meteor for this project; funded with 2.4 test
+NEAR from `owner.si-project-5289.testnet`, tx `2nKzTy…2Z96`). It ran unlocked in a dedicated Chrome window that an
+agent drove over CDP; every signature was pressed in Meteor's own Approve screen; nothing was typed into Meteor.
+Page: local production build of commit `440e14f` (plus the fixes below) on `http://127.0.0.1:4402/app/owner`, live
+testnet. Every row was read back with `tx` (signer `bonneymantra.testnet`, no `Failure`).
+
+| Step | Through | Result | Tx |
+|---|---|---|---|
+| Connect | NEAR Connect → Meteor Wallet → Meteor Web | opened as a tab in the same window; Meteor asked only for address and balance (no function-call key) | — |
+| Protect this account | DeployContract + `new` | **refused by Meteor**: "Contract deployment blocked … Meteor blocks this for apps"; Approve disabled. Cancel → console: rejected, nothing sent | — |
+| Create a guarded agent account | `create_guardian` → `guard.si-project-5289.testnet`, 2.1392 NEAR | landed; `bonney-agent.guard.si-project-5289.testnet`, code hash `8mfwwJ9b…`, `get_state.owner` = `bonneymantra.testnet`, watcher `si-watch-5289.testnet`. Meteor then showed "Cannot read properties of undefined (reading 'name')" after broadcasting | [`49zdQj…kffrR`](https://testnet.nearblocks.io/txns/49zdQj2anx4PwcqEUkZgrsYJbwFLmEkGdNRSc71kffrR) |
+| Freeze | `freeze` on the guardian | landed; console read `frozen` | [`E52vki…KQvJ`](https://testnet.nearblocks.io/txns/E52vkimiQQ7gmoWkbwySJn9ZPVzX5KiNeURhbzgsKQvJ) |
+| Unfreeze | `unfreeze` | landed; `active` | [`8zbFPU…arQx`](https://testnet.nearblocks.io/txns/8zbFPUhRt1G4Gu2cpQxFvqLeZCrKDz4nejBbxxx6arQx) |
+| Agent key from the CLI | `standin adopt --wallet --account bonney-agent.guard… --owner bonneymantra.testnet` printed an `op=adopt` link; Meteor signed `add_agent_key` | landed; the CLI saw the key with the exact scope and exited 0; `view_access_key` = FunctionCall, receiver `si-project-5289.testnet`, `[record_deploy]`, 0.25 NEAR | [`BhLDs5…nsLW`](https://testnet.nearblocks.io/txns/BhLDs5CN4cNjzmm2dVDThDsR9qoYKrnfrrGLAxrbnsLW) |
+| Withdraw | `withdraw` 0.1 NEAR | landed | [`Cps9gN…vTbk`](https://testnet.nearblocks.io/txns/Cps9gNpKQadej6FjiFh8D6b6AucXaAESqnustWs8vTbk) |
+
+What the real wallet showed that the scripted one did not, and what changed:
+- **Meteor blocks DeployContract from apps**, so "Protect this account" cannot work with Meteor. The panel now says so
+  and points to the guarded agent account (one plain function call). Other wallets (Intear, Ledger, NEAR CLI) not tested.
+- **A closed wallet window is not proof that nothing was sent.** After `create_guardian` landed, Meteor reported an error
+  and its tab was closed; the console said "Nothing was sent", which was false. Now a missing result makes the page
+  read the chain (guardian listed, frozen flag, key present) and report "Landed … confirmed by reading the chain", and
+  it never says "nothing was sent" for a closed window.
+- **After a cancel, Meteor Connect can stall** ("Continue in Meteor Web", no tab opens, `window.open` never called).
+  Disconnect and connect again fixed it; the rejected-state message now says so.
+- Popup timing: the console calls `signAndSendTransaction` with no network wait between the tap and the call
+  (`OwnerPage.tsx` `run()`), and every Meteor sign tab in this run opened.

@@ -109,8 +109,13 @@ the same window (a one-line pnpm patch to near-connect drops the popup size from
 need a WalletConnect project id, which we do not have, so NEAR Connect hides them; HOT, MyNearWallet, NEAR Mobile and OKX
 do not declare testnet.
 
-Tested on testnet with a scripted wallet inside NEAR Connect's own picker. No third-party wallet has been connected by
-us; that is the owner's manual check. Covered: protect, freeze and unfreeze; an `op=adopt` link on a fresh account; the
+Tested with a real Meteor Web wallet (`bonneymantra.testnet`, every signature pressed in Meteor's own Approve screen):
+create a guarded agent account, freeze, unfreeze, an agent key from `standin adopt --wallet`'s link, and withdraw, each
+read back from chain. Meteor refuses contract deployment from any app, so "Protect this account" needs another wallet
+(Intear, Ledger and NEAR CLI are offered but not tested); the panel says so. A closed wallet window makes the page read
+the chain before it reports anything.
+
+Also tested with a scripted wallet inside NEAR Connect's own picker. Covered: protect, freeze and unfreeze; an `op=adopt` link on a fresh account; the
 factory route from create to withdraw; `standin adopt --wallet`, then a decoy theft that the watcher froze three blocks
 later; refusals (wrong account, bad link, foreign contract, watcher mismatch, low balance, 0x account). The deployed page
 passed the `window.open` check. Every transaction: [`docs/wallet-tests.md`](docs/wallet-tests.md).

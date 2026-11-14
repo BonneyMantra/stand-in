@@ -63,6 +63,10 @@ export function ProtectPanel({ accountId, lookup, busy, onDeploy }: {
           <span className="ml-1.5 font-mono text-fg">1. DeployContract</span>
           <span className="ml-1.5 font-mono text-fg">2. new</span>
         </p>
+        <p className="text-xs text-fg-muted" data-testid="protect-wallet-note">
+          Meteor refuses contract deployment from any app (tested 15 Nov: "Meteor blocks this for apps"). With Meteor, use
+          a guarded agent account below; it is one plain function call.
+        </p>
         <Button
           size="sm" variant="invert" className="w-full sm:w-auto" data-testid="protect-sign"
           disabled={busy || !ready} onClick={() => plan.status === "ready" && onDeploy(plan.code, { watcher: DEFAULT_WATCHER, intents_contract: DEFAULT_INTENTS })}

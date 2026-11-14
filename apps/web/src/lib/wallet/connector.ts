@@ -94,8 +94,9 @@ export function readableError(e: unknown): string {
   const raw = typeof e === "string" ? e : e instanceof Error ? e.message : (() => { try { return JSON.stringify(e); } catch { return String(e); } })();
   const text = raw ?? "";
   for (const [re, msg] of CONTRACT_MESSAGES) if (re.test(text)) return msg;
-  if (/wallet closed|closed the window|window (was )?closed/i.test(text)) return "The wallet window was closed before it answered. Nothing was sent.";
-  if (/reject|denied|declin|cancel/i.test(text)) return "The request was rejected in the wallet. Nothing was sent.";
+  // A closed window is not proof that nothing was sent: the wallet may have broadcast first (run() then reads the chain).
+  if (/wallet closed|closed the window|window (was )?closed/i.test(text)) return "The wallet window closed before it reported a result.";
+  if (/reject|denied|declin|cancel/i.test(text)) return "The request was rejected in the wallet. Nothing was sent. If the wallet does not open next time, disconnect and connect again.";
   if (/mainnet|network/i.test(text) && !/failed to fetch/i.test(text)) return "The wallet is on a different network. Switch it to testnet and try again.";
   if (/NotEnoughBalance|LackBalanceForState|balance/i.test(text)) return "The account does not have enough NEAR for gas.";
   if (/AccessKeyDoesNotExist|InvalidAccessKey|access key/i.test(text)) return "The wallet's key is not a full-access key on this account. Owner calls need one.";
