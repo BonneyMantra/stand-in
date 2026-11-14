@@ -223,3 +223,57 @@ What the real wallet showed that the scripted one did not, and what changed:
   Disconnect and connect again fixed it; the rejected-state message now says so.
 - Popup timing: the console calls `signAndSendTransaction` with no network wait between the tap and the call
   (`OwnerPage.tsx` `run()`), and every Meteor sign tab in this run opened.
+
+## 2026-11-15, 04:55–05:25 IST: the live root as a stranger (fresh accounts, fresh browser, fresh CLI homes)
+
+Page: `https://stand-in-44e.pages.dev/app/owner` (the deployed site, not a local build). Wallet: the scripted test wallet,
+added through NEAR Connect's own picker (its settings screen, "add your wallet for debug"), signing locally on 127.0.0.1.
+Chrome 157 blocks a public page's sandboxed iframe from reaching 127.0.0.1 (Local Network Access), so the headless test
+browser ran with `--disable-features=LocalNetworkAccessChecks`; a real wallet's executor talks to its own servers and is
+not affected. Accounts: `stranger-qa-1115a.testnet` and `stranger-qa-1115b.testnet`, each created by the testnet faucet
+helper with 10 NEAR. CLI runs used fresh `--home` directories. Every row was read back with `tx`, `get_state`,
+`view_access_key` or `view_account` from drpc.
+
+| Feature | What ran | Tx |
+|---|---|---|
+| op=adopt, no contract yet | `standin adopt --wallet --account stranger-qa-1115a.testnet --home <fresh>`; one tx DeployContract + `new` + `add_agent_key`; CLI exit 0, decoy planted | `382NcWdSiYGMoPmaY7ha5NGp2JWfGNmnqtW5guo9HY5c` |
+| Freeze (button) | key deleted, `frozen: true`, reason logged | `6yxiPiXSnPE5WatZWsx7G4gdNidz4j6GLdqiDSoW88pF` |
+| op=unfreeze | `standin unfreeze --wallet --home <same>`; one tx `unfreeze` + `add_agent_key`; CLI exit 0 | `BwbJnCfceb8GUfjvaZt1tzTU11wfGdsr9aNNnHnkLa5X` |
+| Factory, taken name | `create_guardian agent-2321`: receipt `AccountAlreadyExists`, deposit refunded (gas only) | `Anopy4iQQeWwADJyNjzHiUAaJ8FN6DRW87bT3y3PoWio` |
+| Factory create | `qa-agent-1115.guard.si-project-5289.testnet`, owner = stranger-qa-1115a, 0 access keys | `6mEMjdhCnzuvPgMBuUaPxWJseTL5NycTD4LeKi2n86Wv` |
+| Freeze / Unfreeze (factory guardian) | from the owner wallet | `74qffyxXoJvEBNtUxUikh5eXLcpAmhp4ZQMri8c4Rgs2`, `24s8wbv5poVMWzyXX6X75VDZzCyazhkBZNM14u6fQHta` |
+| Withdraw 0.1 NEAR | guardian 2.13924 → 2.03924 NEAR | `7NwToWCKb3JxcsRAb28bw6SsSsaiyncCcri283dg7vjJ` |
+| Protect this account | `stranger-qa-1115b.testnet`: DeployContract + `new`, code hash `7PbHKs…9ZuE` | `8LHwsYfhJwFcJHGHfhFg9pV3AASdR3ZNp9Go3dzcSfXB` |
+| Freeze / Unfreeze (protected account) | buttons | `CB2yqSFmVm9LwFTymzSahjhq3LiTSiqFLdw6Z9ZLxXoQ`, `5YiP3ZkEpBvL4ThBjiUm1jAsxup1a2dAmQMJPboD92KG` |
+
+After the fixes (commits `056bb4a`, `a326bb7`, `b7c9335`; deploy `06851563`), on the live root again:
+
+| Feature | What ran | Tx |
+|---|---|---|
+| op=adopt on an existing guardian, fresh `--home` | `add_agent_key` only; CLI exit 0 | `CMwCLSaPqJ8jWnMvSAjP6aBeY1tJ2vbV85wZqFvWKiBk` |
+| unfreeze --wallet, not frozen | CLI: "not frozen and agent key … still active; nothing to do", exit 0, no link | none |
+| Freeze, then op=unfreeze | `unfreeze --wallet --home <same>`; CLI exit 0 | `49ywejRHN2CRojACfjCVwKeCmM1hYdoPGZXTnRykuwJS`, `EYZLcVg87whaEx1eywipFHGptR1qeZ6KvYB1ToUWJV1o` |
+| op=adopt on the factory guardian (`--owner`), 390 px | `add_agent_key` signed by the owner | `3xBjt29ESbTCQaXdubsU3XS3AniPCFsxLPxVwq6tLAkW` |
+| Freeze, then op=unfreeze (factory guardian), 390 px | | `HHE8QzYeg89CFSBpgWhUFrVXHN6cd7tMpjWEZczQaiuK`, `9kHwCZSvAU38vgTEXPeqyMciUXzkhCfQgWXqH3jBTm2e` |
+| Withdraw 0.05 NEAR, 390 px | 2.03924 → 1.98924 NEAR; field cleared | `6nG9tVkjXzfaZd9j67zRH5VhAC2TzTZ8XqCWgbf5bPCM` |
+
+States seen on the live root: the picker (test wallet first, then Meteor, Intear, Ledger, Nightly, Ethereum Wallets, NEAR
+CLI), a closed picker (no error), a rejected sign-in, the wrong network (mainnet account), disconnect and reconnect, session
+restore on reload, loading skeletons, every RPC host aborted ("Every testnet RPC endpoint failed" + Try again, which
+recovers), a rejected freeze and a rejected Protect (nothing sent, chain unchanged), a mismatched adopt link (Switch
+account), malformed adopt and unfreeze links, an agent key whose receiver is the guardian itself (refused), a taken factory
+name (caught before signing), a withdraw above the balance and a non-number. 390, 768 and 1440 px: no horizontal scroll on
+every screen above. Browser console: no messages.
+
+Found and fixed: another account's selected guardian, deploy notice and log stayed on screen after switching accounts (the
+new account saw "Not this guardian's owner" and no Protect panel); a taken factory name was only discovered on chain and
+reported as raw `ActionError` JSON; withdraw showed "0 NEAR" when the balance read failed and no message for a non-number;
+alert text broke into one line per word group; below xl, Freeze sat under the factory form; the wallet chip said testnet
+for a mainnet account; `unfreeze --wallet` printed a link for an unfrozen guardian with a live key; `adopt --wallet`
+failed with a bare "no dev key" error in a checkout without the decoy account's key.
+
+Still open: a checkout without `.secrets/` (any stranger's clone) cannot finish `standin adopt --wallet`. The wallet
+transaction lands (`A6wYWTvWkmFDcVpR7zkV6agqi8pN6Rqq1EWxW8A6BfBy`, `add_agent_key` on `stranger-qa-1115b.testnet`, run
+with an empty `STANDIN_SECRETS`), then planting the decoy needs a new key on `si-decoy-5289.testnet`, which only the
+project holds; the CLI now says so and keeps the pending key for `--resume`. The watcher (`si-watch-5289.testnet`) is the
+project's too.
