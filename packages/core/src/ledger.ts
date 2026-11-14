@@ -4,7 +4,7 @@ import { z } from "zod";
 import { standinHome } from "./config.ts";
 
 export const EVENT_TYPES = [
-  "decoy_planted", "session_started", "tool_call", "exposure", "trip", "freeze", "blocklist", "bench",
+  "decoy_planted", "session_started", "tool_call", "exposure", "trip", "freeze", "blocklist", "bench", "incident_report",
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 

@@ -20,6 +20,13 @@ export function buildTrips(home?: string) {
   });
 }
 
+/** Latest `incident_report` ledger event per trip, in the optional top-level `incident_reports[]` shape. */
+function incidentReports(home?: string) {
+  const latest = new Map<string, LedgerEvent>();
+  for (const e of readEvents({ type: "incident_report" }, home)) latest.set(s(e.trip_tx_hash), e);
+  return [...latest.values()].map((e) => ({ trip_tx_hash: s(e.trip_tx_hash), at: e.at, model: s(e.model), report: e.report ?? {}, proof: e.proof ?? {} }));
+}
+
 function sessions(home?: string) {
   const calls = new Map<string, number>();
   for (const e of readEvents({ type: "tool_call" }, home)) calls.set(s(e.session_id), (calls.get(s(e.session_id)) ?? 0) + 1);
@@ -78,9 +85,11 @@ export async function buildState(cfg: NetworkConfig, home?: string) {
       }))
     : ledgerBlocklist;
   const chainsig = chainsigState(home);
+  const incident_reports = incidentReports(home);
   return {
     network: cfg.network,
     ...(chainsig ? { chainsig } : {}),
+    ...(incident_reports.length ? { incident_reports } : {}),
     agent: {
       account_id: requireAccount(cfg, "agent"), frozen: Boolean(g?.frozen),
       agent_keys: (g?.agent_keys ?? []).map((k: any) => (typeof k === "string" ? k : k.public_key)),

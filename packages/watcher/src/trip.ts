@@ -138,6 +138,8 @@ export class TripHandler {
     }, this.home);
     log.info(`freeze ${freeze.tx_hash} included in block ${freeze.block_height}: ${blocks_after_trip} block(s) after trip block ${height}; submit ${freeze.submitted_ms - t.detectedAt} ms after detection`);
     if (tx) void this.reportToRegistry(tx, attacker);
+    // Private attested incident report (NEAR AI Cloud TEE). Detached: a failure or a slow model never touches the freeze.
+    void import("@standin/nearai").then((m) => m.reportInBackground(tripTx, this.home)).catch(() => {});
   }
 
   /** Exactly one freeze tx per process (and none if already frozen on chain). */

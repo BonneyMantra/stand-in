@@ -80,4 +80,30 @@ Tests can inject `registryCheck`, `stateAt`, `currentCodeHash`.
 (its `tx_hash` is an on-chain failed `sign_evm`; `error` is the guardian's frozen message); if only the deleted-key attempt exists,
 that one is used, with an empty `tx_hash` because the RPC rejects it before it becomes a transaction.
 
+## Incident reports (NEAR AI Cloud TEE) and the optional `incident_reports` state field
+`packages/nearai` writes ledger events `incident_report` `{trip_tx_hash, model, report, proof}` (type added to `EVENT_TYPES`).
+`GET /api/state` gains an OPTIONAL top-level `incident_reports` array (present only when such events exist; latest per trip;
+no existing field changed). See packages/nearai/README.md for what `proof` verifies and what it lists as unverified.
+```json
+{ "incident_reports": [{
+    "trip_tx_hash": "", "at": "ISO", "model": "Qwen/Qwen3.8-27B",
+    "report": { "summary": "", "root_cause": "", "leaked_via": "", "blast_radius": "",
+                "actions_taken": [""], "recommended_next_steps": [""], "confidence": "low|medium|high" },
+    "proof": {
+      "model": "", "chat_id": "", "request_hash": "hex sha256", "response_hash": "hex sha256",
+      "signature": "0x..|null", "signing_address": "0x..|null", "signing_algo": "ecdsa",
+      "signature_kind": "provider_tee|gateway|null", "signed_text": "model:request_hash:response_hash|null",
+      "attestation": { "fetched_at": "ISO", "nonce": "64 hex", "verified": true,
+        "gateway": { "signing_address": "", "quote_sha256": "", "quote_version": 4, "tee_type": "0x81", "mrtd": "", "rtmr3": "",
+                     "mrconfigid": "", "report_data": "", "gpu_evidence_present": true, "event_log_present": true },
+        "model":   { "...same fields as gateway..." : "" } },
+      "verified": true,
+      "checks": [{ "name": "", "ok": true, "detail": "" }],
+      "unverified": [{ "what": "", "reason": "" }],
+      "billing": { "prompt_tokens": 0, "completion_tokens": 0, "usd": 0, "price_source": "models-endpoint|fallback" } } }] }
+```
+`proof.verified` = the signature exists and every local signature/attestation check passed; Intel DCAP chain, RTMR3 replay and GPU
+evidence are never verified locally and are always in `proof.unverified`. The watcher triggers `report(trip)` after a freeze only
+with `NEARAI_API_KEY` present and `STANDIN_NO_AI != "1"`; CLI: `node --import tsx packages/nearai/scripts/report.ts <trip_tx_hash> [--ledger <path>]`.
+
 ## Watcher API (127.0.0.1:4317) is in packages/watcher/README.md and follows docs/BRIEF.md exactly.
