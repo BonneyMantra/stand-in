@@ -133,13 +133,19 @@ Tested with Node 24 and pnpm 11; the contracts need Rust with `cargo-near`.
 git clone https://github.com/BonneyMantra/stand-in && cd stand-in && pnpm install
 pnpm standin dev up                         # check testnet accounts and contracts, decoy pool, watcher on 127.0.0.1:4317
 pnpm standin adopt --wallet --account you.testnet --home ~   # owner key stays in your wallet: approve the printed link
-pnpm standin adopt --home ~                 # no wallet: move the real key out, plant decoys
+pnpm standin adopt --home ~ --account you.testnet   # no wallet: move the real key out, deploy the guardian if the account has none, plant decoys
 pnpm standin:claude --home .sandbox/me      # Claude Code plugin into an isolated config dir
 pnpm standin:codex                          # Codex with decoys and hooks
-pnpm standin pay <account> <amount>         # counterparty check: allow / warn / block
+pnpm standin pay <contract> <method> --args '{"note":"x"}'   # counterparty check first: allow / warn / block
 cd apps/web && pnpm exec vite               # dashboard and landing page on 127.0.0.1:4173
 pnpm test                                   # TypeScript tests (147)
 ```
+
+`adopt --account` needs the account's full-access key in `HOME/.near-credentials/testnet/`, a `.env` or shell history,
+and about 2 NEAR on the account for the guardian. It writes `HOME/.standin/config.json` for that account and prints the
+watcher command (`STANDIN_WATCHER_PORT=<port>` if 4317 is taken). Every other command takes `--home HOME` to use that
+home's ledger, scoped key and config. The agent holds a function-call key, so `pay` calls a method on the project
+contract; it cannot transfer NEAR.
 
 The dashboard reads the live watcher; with no watcher it falls back to a recorded testnet run
 (`apps/web/public/demo-state.json`, built from real ledgers by `apps/web/src/data/build-demo-state.mjs`).
