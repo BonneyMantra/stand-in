@@ -1,0 +1,14 @@
+{
+  "network": "testnet",
+  "parent": "si-project-5289.testnet",
+  "intents": "si-intents-5289.testnet",
+  "thief_loot_milli_near": 50,
+  "accounts": {
+    "agent": "lab-agent.si-project-5289.testnet",
+    "decoy": "lab-decoy.si-project-5289.testnet",
+    "thief": "lab-thief.si-project-5289.testnet",
+    "watcher": "lab-watch.si-project-5289.testnet"
+  },
+  "watcher_fc_public_key": "ed25519:98jftKVME298yyc92YxHU73pdPvTWWN5xygzuXTXJVyZ",
+  "ntfy_topic_env": "STANDIN_LAB_NTFY_TOPIC"
+}

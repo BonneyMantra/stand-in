@@ -1,0 +1,8 @@
+name = "stand-in"
+pages_build_output_dir = "dist"
+compatibility_date = "2025-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[kv_namespaces]]
+binding = "LAB_KV"
+id = "1f04f9e23bf0445b8642947d9796e55c"

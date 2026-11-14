@@ -1,0 +1,2 @@
+{ "name": "@standin/lab", "version": "0.1.0", "private": true, "type": "module",
+  "dependencies": { "near-api-js": "^7.5.3" } }
