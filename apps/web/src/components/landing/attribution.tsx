@@ -1,6 +1,7 @@
 import { motion, useReducedMotion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { Frame, FramePanel, PanelBar } from "./frame";
+import { LiveLink } from "./cta";
 import { EASE_OUT, Reveal, Section, SectionHead } from "./primitives";
 
 type Tone = "neutral" | "tool" | "trip" | "chain" | "safe";
@@ -112,12 +113,12 @@ function Waterfall() {
 export function Attribution() {
   return (
     <Section id="attribution" labelledBy="attribution-title">
-      <div className="grid grid-cols-1 gap-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
+      <div className="grid grid-cols-1 gap-12 lg:grid-cols-[minmax(0,470px)_minmax(0,1fr)] lg:gap-16">
         <SectionHead
           id="attribution-title"
-          eyebrow="Attribution"
           title="One account, many keys."
-          muted="The key says where it leaked."
+          second="The key says where it leaked."
+          live={<LiveLink to="/app">See it live</LiveLink>}
           className="lg:pt-6"
         >
           <p>

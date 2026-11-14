@@ -1,6 +1,6 @@
 import { Link, NavLink } from "react-router";
-import { ArrowRight } from "lucide-react";
 import { DASHBOARD_PATH, REPO_URL } from "./content";
+import { AccentLink } from "./cta";
 
 export function BrandMark({ className = "size-5" }: { className?: string }) {
   // Two offset key-cards: the outline is the decoy, the filled one the real key kept out of reach.
@@ -40,12 +40,12 @@ export const focusRing =
 
 export function Nav() {
   return (
-    <header className="sticky top-0 z-40 border-b border-line/70 bg-ink-950/75 backdrop-blur-md supports-[backdrop-filter]:bg-ink-950/60">
+    <header className="sticky top-0 z-40 border-b border-line/50 bg-ink-950/75 backdrop-blur-md supports-[backdrop-filter]:bg-ink-950/60">
       <nav
         aria-label="Primary"
         className="mx-auto flex h-14 w-full max-w-[1200px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-10"
       >
-        <Link to="/" className={`flex items-center gap-2 rounded-md text-[15px] font-medium tracking-tight ${focusRing}`}>
+        <Link to="/" className={`flex shrink-0 items-center gap-2 rounded-md text-[15px] font-medium tracking-tight whitespace-nowrap ${focusRing}`}>
           <BrandMark />
           Stand-in
         </Link>
@@ -55,7 +55,7 @@ export function Nav() {
             <li key={l.href} className="hidden lg:block">
               <a
                 href={l.href}
-                className={`rounded-md px-3 py-1.5 text-[13px] text-fg-muted transition-colors hover:text-fg ${focusRing}`}
+                className={`rounded-md px-3 py-1.5 text-[13px] text-fg-muted transition-colors hover:bg-ink-800 hover:text-fg ${focusRing}`}
               >
                 {l.label}
               </a>
@@ -66,7 +66,7 @@ export function Nav() {
               <NavLink
                 to={p.to}
                 className={({ isActive }) =>
-                  `rounded-md px-2 py-1.5 text-[13px] transition-colors hover:text-fg sm:px-3 ${isActive ? "text-fg" : "text-fg-muted"} ${focusRing}`
+                  `rounded-md px-2 py-1.5 text-[13px] transition-colors hover:bg-ink-800 hover:text-fg sm:px-3 ${isActive ? "text-fg" : "text-fg-muted"} ${focusRing}`
                 }
               >
                 {p.label}
@@ -86,19 +86,7 @@ export function Nav() {
             <GithubMark className="size-4" />
             <span className="hidden sm:inline">GitHub</span>
           </a>
-          {/* Sliding-arrow CTA adapted from ReUI navbar-12's "Get Started" button. */}
-          <Link
-            to={DASHBOARD_PATH}
-            className={`group/cta relative inline-flex h-8 items-center overflow-hidden rounded-md bg-fg px-4 text-[13px] font-medium text-ink-950 transition-colors hover:bg-white ${focusRing}`}
-          >
-            <span className="transition-transform duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] group-hover/cta:-translate-x-2">
-              Dashboard
-            </span>
-            <ArrowRight
-              aria-hidden
-              className="absolute right-2 size-3.5 translate-x-6 opacity-0 transition-[transform,opacity] duration-300 ease-[cubic-bezier(0.23,1,0.32,1)] group-hover/cta:translate-x-0 group-hover/cta:opacity-100"
-            />
-          </Link>
+          <AccentLink to={DASHBOARD_PATH}>Dashboard</AccentLink>
         </div>
       </nav>
     </header>

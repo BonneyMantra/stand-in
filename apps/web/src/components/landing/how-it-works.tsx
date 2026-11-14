@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import { KeyRound, Lock, ScanSearch, ShieldBan, Snowflake, TriangleAlert } from "lucide-react";
 import { Frame, FramePanel } from "./frame";
+import { Bleed, LiveLink } from "./cta";
 import { Reveal, Section, SectionHead } from "./primitives";
 
 type Step = { verb: string; icon: LucideIcon; body: string; mono: string; tone: string };
@@ -9,8 +10,8 @@ const STEPS: Step[] = [
   {
     verb: "Adopt",
     icon: Lock,
-    body: "Moves the real full-access key out of the agent's reach. The agent gets a function-call key scoped to one contract.",
-    mono: "pnpm standin adopt",
+    body: "The owner's key stays in their own wallet, which approves a function-call key for the agent, scoped to one contract. No wallet? The CLI moves the real key out of the agent's reach.",
+    mono: "pnpm standin adopt --wallet",
     tone: "bg-fg-muted",
   },
   {
@@ -50,43 +51,51 @@ const STEPS: Step[] = [
   },
 ];
 
-/* Six-step sequence adapted from ReUI card-2 (frame grid, bordered icon tile, dotted backdrop on hover). */
+/* The six steps as one framed shot beside a short text column; the frame runs off the right edge. */
 export function HowItWorks() {
   return (
     <Section id="how" labelledBy="how-title">
-      <SectionHead id="how-title" eyebrow="How it works" title="Let the leak happen." muted="Catch who leaked it.">
-        <p>
-          Stand-in does not try to stop an agent from reading files. It makes sure that what it reads is bait, and that
-          using the bait costs the thief more than it costs you.
-        </p>
-      </SectionHead>
+      <div className="grid grid-cols-1 gap-12 lg:grid-cols-[minmax(0,470px)_minmax(0,1fr)] lg:gap-16">
+        <SectionHead
+          id="how-title"
+          title="Let the leak happen."
+          second="Catch who leaked it."
+          live={<LiveLink to="/lab">Run the whole loop live</LiveLink>}
+          className="lg:sticky lg:top-28 lg:self-start"
+        >
+          <p>
+            Adopt once. Each new Claude Code or Codex session gets its own decoy, and the first signature from one
+            freezes the real account.
+          </p>
+        </SectionHead>
 
-      <Reveal delay={0.05} className="mt-12">
-        <Frame>
-          <ol className="grid grid-cols-1 gap-[3px] sm:grid-cols-2 lg:grid-cols-3">
-            {STEPS.map((s, i) => (
-              <li key={s.verb} className="contents">
-                <FramePanel className="group/step flex min-h-[236px] flex-col overflow-hidden p-6 transition-colors duration-200 hover:bg-ink-850">
-                  <span
-                    aria-hidden
-                    className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover/step:opacity-100 [background-image:radial-gradient(var(--color-line-strong)_1px,transparent_1px)] [background-size:12px_12px] [mask-image:linear-gradient(160deg,black,transparent_55%)]"
-                  />
-                  <span aria-hidden className={`absolute top-0 left-6 h-px w-10 ${s.tone}`} />
-                  <div className="relative flex items-center justify-between">
-                    <span className="flex size-9 items-center justify-center rounded-lg border border-line-strong bg-ink-950 text-fg">
-                      <s.icon className="size-4" aria-hidden />
-                    </span>
-                    <span className="font-mono text-[11px] text-fg-muted">{String(i + 1).padStart(2, "0")} / 06</span>
-                  </div>
-                  <h3 className="relative mt-6 text-[17px] font-medium tracking-tight">{s.verb}</h3>
-                  <p className="relative mt-2 flex-1 text-[14px] leading-relaxed text-fg-muted">{s.body}</p>
-                  <p className="relative mt-5 truncate font-mono text-[11.5px] text-fg">{s.mono}</p>
-                </FramePanel>
-              </li>
-            ))}
-          </ol>
-        </Frame>
-      </Reveal>
+        <Reveal delay={0.05} className="min-w-0">
+          <Bleed fade={false}>
+            <Frame>
+              <FramePanel className="overflow-hidden">
+                <ol className="divide-y divide-line">
+                  {STEPS.map((s, i) => (
+                    <li key={s.verb} className="grid grid-cols-[36px_minmax(0,1fr)] gap-x-4 gap-y-1 px-5 py-5 sm:grid-cols-[36px_120px_minmax(0,1fr)] sm:px-6 lg:max-w-[760px]">
+                      <span className="row-span-2 flex size-9 items-center justify-center rounded-lg border border-line-strong bg-ink-950 text-fg sm:row-span-1">
+                        <s.icon className="size-4" aria-hidden />
+                      </span>
+                      <h3 className="flex items-center gap-2 text-[15px] font-medium tracking-tight sm:h-9">
+                        <span aria-hidden className={`size-1.5 rounded-full ${s.tone}`} />
+                        {s.verb}
+                        <span className="sr-only">, step {i + 1} of 6</span>
+                      </h3>
+                      <div className="min-w-0 sm:col-start-3 sm:row-start-1">
+                        <p className="text-[14px] leading-[21px] text-white/[0.63]">{s.body}</p>
+                        <p className="mt-2 truncate font-mono text-[11.5px] text-fg">{s.mono}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              </FramePanel>
+            </Frame>
+          </Bleed>
+        </Reveal>
+      </div>
     </Section>
   );
 }

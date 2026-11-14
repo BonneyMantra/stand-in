@@ -6,7 +6,7 @@ import type { StandinState, Trip } from "@/data/types";
 import { alreadyFrozen, shortHash } from "@/data/derive";
 import { useStandin } from "@/data/useStandin";
 import { EmptyState, Panel } from "../common";
-import { AGENT, ATTACKER, H, W, arc, dotField, layoutClusters, type MapNode } from "./layout";
+import { AGENT, ATTACKER, H, W, arc, layoutClusters, worldDots, type MapNode } from "./layout";
 import { MapTooltip } from "./MapTooltip";
 import { useTripReplay } from "./useTripReplay";
 
@@ -17,7 +17,7 @@ export function DecoyMap({ state }: { state: StandinState }) {
   const nav = useNavigate();
   const { lastTripSignal } = useStandin();
   const clusters = useMemo(() => layoutClusters(state), [state]);
-  const dots = useMemo(() => dotField(), []);
+  const dots = useMemo(() => worldDots(), []);
   const [hover, setHover] = useState<string | null>(null);
 
   // The trip to replay: newest live trip, else the latest trip with a measured freeze.
@@ -70,8 +70,7 @@ export function DecoyMap({ state }: { state: StandinState }) {
               </radialGradient>
               <filter id="dm-glow" x="-200%" y="-200%" width="500%" height="500%"><feGaussianBlur stdDeviation="3.5" /></filter>
             </defs>
-            <path d={dots.sparse} fill="var(--color-fg)" opacity="0.07" />
-            <path d={dots.dense} fill="var(--color-fg)" opacity="0.16" />
+            <path d={dots} fill="var(--color-fg-faint)" opacity="0.55" />
             <rect width={W} height={H} fill="url(#dm-vignette)" />
 
             {clusters.map((c) => (

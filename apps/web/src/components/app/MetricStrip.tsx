@@ -12,7 +12,6 @@ export interface Metric {
   preview?: boolean;
 }
 
-const TONE = { fg: "text-fg", trip: "text-trip", safe: "text-safe", decoy: "text-decoy", warn: "text-warn" };
 const BAR = { fg: "fill-fg-muted", trip: "fill-trip", safe: "fill-safe", decoy: "fill-decoy", warn: "fill-warn" };
 
 /** Bar sparkline (Edge dashboard style): thin bars, the last non-zero bar highlighted. */
@@ -30,7 +29,9 @@ export function Spark({ values, tone = "fg", className }: { values: number[]; to
   );
 }
 
-/** Adapted from ReUI card-38 (horizontal KPI strip, hairline dividers, dotted final cell)
+/** KPI numbers are white; only a trip/alert number takes the accent (trip). The tone still
+ *  marks the sparkline's last bar.
+ *  Adapted from ReUI card-38 (horizontal KPI strip, hairline dividers, dotted final cell)
  *  with chart-2's top-right sparkline per cell. */
 export function MetricStrip({ items, className }: { items: Metric[]; className?: string }) {
   const id = useId().replace(/:/g, "");
@@ -44,7 +45,7 @@ export function MetricStrip({ items, className }: { items: Metric[]; className?:
               {dotted && <DotField id={`${id}-${i}`} />}
               <dt className="relative truncate text-xs text-fg-muted">{m.label}</dt>
               <dd className="relative mt-2 flex items-baseline gap-1.5">
-                <span className={cn("min-w-0 font-mono text-2xl font-medium tracking-tight tabular-nums", TONE[m.tone ?? "fg"])}>{m.value}</span>
+                <span className={cn("min-w-0 font-mono text-2xl font-medium tracking-tight tabular-nums", m.tone === "trip" ? "text-trip" : "text-fg")}>{m.value}</span>
                 {m.unit && <span className="font-mono text-xs text-fg-faint">{m.unit}</span>}
                 {m.preview && <PreviewTag />}
                 {m.spark && <Spark values={m.spark} tone={m.tone} className="ml-auto hidden shrink-0 self-end sm:block" />}

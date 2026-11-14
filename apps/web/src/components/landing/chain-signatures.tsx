@@ -3,7 +3,8 @@ import { useInView, useReducedMotion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { txUrl } from "./content";
 import { Frame, FramePanel } from "./frame";
-import { Reveal, SourceLink } from "./primitives";
+import { H2, LEDE, Reveal, SourceLink } from "./primitives";
+import { LiveLink } from "./cta";
 import { CHAINSIG as C, blockLabel, short } from "./proof-data";
 import { Segmented } from "./segmented";
 
@@ -110,19 +111,18 @@ export function ChainSignatures() {
   const frozen = mode !== 0;
 
   return (
-    <section id="chain-signatures" aria-labelledby="chainsig-title" className="relative scroll-mt-20 overflow-hidden border-t border-line/70">
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-trip/40 to-transparent" />
-      <div className="mx-auto w-full max-w-[1200px] px-4 py-20 sm:px-6 md:py-28 lg:px-10">
+    <section id="chain-signatures" aria-labelledby="chainsig-title" className="relative scroll-mt-20 overflow-hidden">
+      <div className="mx-auto w-full max-w-[1200px] px-4 py-16 sm:px-6 md:py-24 lg:px-10">
         <Reveal className="mx-auto max-w-2xl text-center">
-          <p className="mb-4 font-mono text-[11px] tracking-[0.14em] text-fg-muted uppercase">Chain Signatures</p>
-          <h2 id="chainsig-title" className="text-[30px] leading-[1.08] font-medium tracking-[-0.025em] text-balance sm:text-[40px]">
+          <h2 id="chainsig-title" className={H2}>
             One decoy trip.
-            <span className="block text-fg-muted">Every chain goes dark.</span>
+            <span className="block">Every chain goes dark.</span>
           </h2>
-          <p className="mx-auto mt-5 max-w-[56ch] text-[15px] leading-relaxed text-pretty text-fg-muted">
+          <p className={cn("mx-auto mt-5 max-w-[56ch]", LEDE)}>
             The agent signs Ethereum transactions through the NEAR MPC network, by way of its guardian contract. The same
             freeze that deletes its NEAR keys shuts that path behind two independent checks.
           </p>
+          <LiveLink to="/app" className="mt-6">See it live</LiveLink>
         </Reveal>
 
         <div ref={ref} className="mt-12">

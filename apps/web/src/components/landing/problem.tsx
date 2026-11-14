@@ -1,38 +1,15 @@
-import { INCIDENT, INTEGRATIONS, PROBLEM_STATS } from "./content";
+import { INCIDENT, PROBLEM_STATS } from "./content";
 import { Frame, FramePanel } from "./frame";
 import { Reveal, Section, SectionHead, SourceLink } from "./primitives";
-
-/** Text marks only: no logos we do not own. */
-export function IntegrationsRow() {
-  return (
-    <div className="mx-auto w-full max-w-[1200px] px-4 pb-16 sm:px-6 lg:px-10">
-      <Reveal>
-        <p className="mb-4 font-mono text-[11px] tracking-[0.14em] text-fg-muted uppercase">Works with</p>
-        <ul className="grid grid-cols-2 gap-px overflow-hidden rounded-[12px] border border-line bg-line sm:grid-cols-5">
-          {INTEGRATIONS.map((name, i) => (
-            <li
-              key={name}
-              className={`flex h-16 items-center justify-center bg-ink-950 text-[15px] font-medium tracking-tight text-fg-muted transition-colors hover:bg-ink-900 hover:text-fg ${
-                i === INTEGRATIONS.length - 1 ? "col-span-2 sm:col-span-1" : ""
-              }`}
-            >
-              {name}
-            </li>
-          ))}
-        </ul>
-      </Reveal>
-    </div>
-  );
-}
 
 export function Problem() {
   return (
     <Section id="problem" labelledBy="problem-title">
       <SectionHead
         id="problem-title"
-        eyebrow="The problem"
         title="Coding agents read everything."
-        muted="Scanners read it faster."
+        second="Scanners read it faster."
+        className="max-w-[560px]"
       >
         <p>
           An agent with shell access can open <code className="font-mono text-fg">~/.near-credentials</code>, echo

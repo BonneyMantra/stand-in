@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router";
-import { History, Radio, RefreshCw, ServerCrash, WifiOff } from "lucide-react";
+import { History, Radio, RefreshCw, ServerCrash } from "lucide-react";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useStandin } from "@/data/useStandin";
@@ -23,7 +23,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         <AppSidebar />
         <SidebarInset className="min-w-0 bg-ink-950">
           <Header />
-          <SourceBanner />
           <main id="app-main" className="mx-auto w-full max-w-[1400px] min-w-0 flex-1 px-4 pt-4 pb-16 md:px-6">
             <Gate>{children}</Gate>
           </main>
@@ -66,40 +65,51 @@ function Header() {
             </button>
           </>
         )}
-        {source === "recorded" && (
-          <span className="inline-flex h-6 items-center gap-1.5 rounded-md border border-line-strong px-2 font-mono text-[11px] text-fg-muted">
-            <History className="size-3" aria-hidden />recorded
-          </span>
-        )}
+        {source === "recorded" && data && <SourcePill />}
       </div>
     </header>
   );
 }
 
-function SourceBanner() {
-  const { source, data, fallbackReason, retry, setPreferRecorded } = useStandin();
-  if (source !== "recorded" || !data) return null;
-  const when = data.recorded ? fmtDate(data.recorded.recorded_at) : "";
+/** Recorded-run state as a top-bar pill (was a full-width banner): amber when the watcher is
+ *  unreachable, neutral when the user paused live; the retry / back-to-live action sits beside it. */
+function SourcePill() {
+  const { data, fallbackReason, retry, setPreferRecorded } = useStandin();
+  const when = data?.recorded ? fmtDate(data.recorded.recorded_at) : "";
   const unreachable = fallbackReason === "unreachable";
+  const detail = `Recorded testnet run${when ? ` · ${when}` : ""}: real ledger events and tx hashes; values not yet measured carry a preview tag`;
+  const action = unreachable ? "Retry live" : "Back to live";
   return (
-    <div role="status" className="border-b border-line bg-ink-900">
-      <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2 text-xs md:px-6">
-        <span className={cn("inline-flex items-center gap-1.5", unreachable ? "text-warn" : "text-fg-muted")}>
-          {unreachable ? <WifiOff className="size-3.5" aria-hidden /> : <History className="size-3.5" aria-hidden />}
-          {unreachable ? "Watcher unreachable at 127.0.0.1:4317" : "Live watcher paused by you"}
+    <>
+      <span
+        role="status"
+        title={detail}
+        className={cn(
+          "inline-flex h-6 items-center gap-1.5 rounded-full border px-2.5 font-mono text-[11px] whitespace-nowrap",
+          unreachable ? "border-warn/30 bg-warn/10 text-warn" : "border-line-strong text-fg-muted",
+        )}
+      >
+        {unreachable ? <span className="size-1.5 rounded-full bg-warn" aria-hidden /> : <History className="size-3" aria-hidden />}
+        <span className="hidden sm:inline">{unreachable ? "Watcher unreachable" : "Live paused"}</span>
+        <span className="sm:hidden" aria-hidden>{unreachable ? "offline" : "paused"}</span>
+        <span className="text-fg-faint" aria-hidden>·</span>
+        <span aria-hidden>recorded</span>
+        <span className="sr-only">
+          {unreachable ? "The watcher at 127.0.0.1:4317 did not answer. " : "Live watcher paused by you. "}
+          {detail}.
         </span>
-        <span className="text-fg">Recorded testnet run · {when}</span>
-        <span className="hidden text-fg-faint lg:inline">real ledger events and tx hashes; values not yet measured carry a preview tag</span>
-        <button
-          type="button"
-          onClick={() => (unreachable ? retry() : setPreferRecorded(false))}
-          className="ml-auto inline-flex h-6 items-center gap-1.5 rounded-md border border-line-strong px-2 text-fg-muted outline-none hover:text-fg focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          {unreachable ? <RefreshCw className="size-3" aria-hidden /> : <Radio className="size-3" aria-hidden />}
-          {unreachable ? "Retry live" : "Back to live"}
-        </button>
-      </div>
-    </div>
+      </span>
+      {when && <span className="hidden font-mono text-[11px] text-fg-faint lg:inline">{when}</span>}
+      <button
+        type="button"
+        onClick={() => (unreachable ? retry() : setPreferRecorded(false))}
+        aria-label={action}
+        className="inline-flex h-6 items-center gap-1.5 rounded-md border border-line px-2 text-[11px] text-fg-muted outline-none hover:text-fg focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        {unreachable ? <RefreshCw className="size-3" aria-hidden /> : <Radio className="size-3" aria-hidden />}
+        <span className="hidden sm:inline">{action}</span>
+      </button>
+    </>
   );
 }
 

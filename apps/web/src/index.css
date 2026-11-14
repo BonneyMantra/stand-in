@@ -28,6 +28,10 @@
   --color-safe: #3ddc97;      /* healthy, allowed, attested */
   --color-safe-soft: #3ddc971a;
   --color-decoy: #8b8bff;     /* decoy keys, sessions */
+  /* The one accent for actions: the trip red, deepened for filled buttons so white 13px text clears
+     AA (4.7:1). Links use --color-trip itself (6:1 on ink-950). No second warm hue. */
+  --color-cta: #d6392e;
+  --color-cta-hover: #e5402f;
 
   --radius-panel: 10px;
   --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
@@ -126,3 +130,15 @@ body {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
 
+
+/* Hero streak glint: one bright segment travels the streak, then rests. Off under reduced motion. */
+@keyframes streak-glint {
+  0% { transform: translateX(-120%); opacity: 0; }
+  8% { opacity: 1; }
+  55% { transform: translateX(520%); opacity: 1; }
+  62%, 100% { transform: translateX(520%); opacity: 0; }
+}
+.streak-glint { animation: streak-glint 3.6s cubic-bezier(0.45, 0, 0.25, 1) infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .streak-glint { animation: none; opacity: 0; }
+}

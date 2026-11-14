@@ -1,7 +1,9 @@
 import { useEffect } from "react";
 import { Nav } from "@/components/landing/nav";
 import { Hero } from "@/components/landing/hero";
-import { IntegrationsRow, Problem } from "@/components/landing/problem";
+import { Problem } from "@/components/landing/problem";
+import { LogoRow } from "@/components/landing/logos";
+import { Statement } from "@/components/landing/statement";
 import { HowItWorks } from "@/components/landing/how-it-works";
 import { Attribution } from "@/components/landing/attribution";
 import { Registries } from "@/components/landing/registries";
@@ -27,8 +29,9 @@ export default function LandingPage() {
       <Nav />
       <main id="main">
         <Hero />
-        <IntegrationsRow />
+        <LogoRow />
         <Problem />
+        <Statement />
         <HowItWorks />
         <Attribution />
         <Registries />

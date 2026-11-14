@@ -6,7 +6,8 @@ import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "
 import { Kbd } from "@/components/ui/kbd";
 import { cn } from "@/lib/utils";
 import { Frame, FramePanel } from "./frame";
-import { EASE_OUT, FOCUS, Reveal } from "./primitives";
+import { Bleed, LiveLink } from "./cta";
+import { EASE_OUT, FOCUS, H2, LEDE, Reveal } from "./primitives";
 import { BLOCKLIST as B } from "./proof-data";
 import { Receipt, judge, type Verdict } from "./blocklist-receipt";
 
@@ -58,15 +59,14 @@ export function Blocklist() {
   };
 
   return (
-    <section id="blocklist" aria-labelledby="blocklist-title" className="relative scroll-mt-20 border-t border-line/70">
-      <div className="mx-auto grid w-full max-w-[1200px] grid-cols-1 gap-12 px-4 py-20 sm:px-6 md:py-28 lg:grid-cols-[minmax(0,1fr)_minmax(0,440px)] lg:gap-20 lg:px-10">
+    <section id="blocklist" aria-labelledby="blocklist-title" className="relative scroll-mt-20">
+      <div className="mx-auto grid w-full max-w-[1200px] grid-cols-1 gap-12 px-4 py-16 sm:px-6 md:py-24 lg:grid-cols-[minmax(0,470px)_minmax(0,1fr)] lg:gap-16 lg:px-10">
         <Reveal className="min-w-0">
-          <p className="mb-4 font-mono text-[11px] tracking-[0.14em] text-fg-muted uppercase">Shared blocklist</p>
-          <h2 id="blocklist-title" className="text-[30px] leading-[1.08] font-medium tracking-[-0.025em] text-balance sm:text-[40px]">
+          <h2 id="blocklist-title" className={H2}>
             Ask before you pay.
-            <span className="block text-fg-muted">The thief is already on the list.</span>
+            <span className="block">The thief is already on the list.</span>
           </h2>
-          <p className="mt-5 max-w-[54ch] text-[15px] leading-relaxed text-pretty text-fg-muted">
+          <p className={cn("mt-5", LEDE)}>
             Every trip reports the thief to a shared blocklist. The verdict is computed inside an Intel TDX enclave on
             OutLayer, so any agent can check the attestation instead of trusting Stand-in.
           </p>
@@ -123,9 +123,13 @@ export function Blocklist() {
           </form>
 
           <Ladder v={verdict} />
+          <LiveLink to="/verify" className="mt-8">Verify the attestation live</LiveLink>
         </Reveal>
 
         <Reveal delay={0.08} className="min-w-0">
+          <Bleed>
+          <div className="rounded-l-[16px] border-y border-l border-line bg-ink-900/40 p-3 sm:p-6 lg:p-8">
+          <div className="max-w-[520px]">
           <Frame>
             <FramePanel className="flex items-center justify-between gap-3 px-4 py-3 font-mono text-[10.5px] text-fg-muted">
               <span className="truncate">verdict · {B.contract}</span>
@@ -146,6 +150,9 @@ export function Blocklist() {
               <Receipt v={verdict} />
             </motion.div>
           </div>
+          </div>
+          </div>
+          </Bleed>
         </Reveal>
       </div>
     </section>

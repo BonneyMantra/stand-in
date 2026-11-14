@@ -1,87 +1,124 @@
+import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router";
-import { ArrowRight } from "lucide-react";
+import { fetchRuns } from "@/lib/lab/api";
+import { cn } from "@/lib/utils";
 import { DASHBOARD_PATH, PROBLEM_STATS, INCIDENT, REPO_URL } from "./content";
+import { AccentLink, lineBtn } from "./cta";
 import { BrandMark, GithubMark, focusRing } from "./nav";
 import { Reveal } from "./primitives";
 
 function ClosingCta() {
   return (
-    <div className="relative overflow-hidden border-t border-line/70">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 [background-image:radial-gradient(var(--color-line)_1px,transparent_1px)] [background-size:14px_14px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_70%)]"
-      />
-      <Reveal className="relative mx-auto flex w-full max-w-[1200px] flex-col items-start gap-8 px-4 py-20 sm:px-6 lg:flex-row lg:items-end lg:justify-between md:py-28 lg:px-10">
-        <h2 className="text-[32px] leading-[1.06] font-medium tracking-[-0.03em] text-balance sm:text-[44px]">
-          Watch a decoy trip, <span className="block text-fg-muted">end to end.</span>
-        </h2>
-        <div className="flex flex-wrap gap-3">
-          <Link
-            to={DASHBOARD_PATH}
-            className={`group/cta inline-flex h-10 items-center gap-2 rounded-md bg-fg px-4 text-[14px] font-medium text-ink-950 transition-[background-color,transform] duration-150 hover:bg-white active:scale-[0.98] ${focusRing}`}
-          >
-            Open the live dashboard
-            <ArrowRight aria-hidden className="size-4 transition-transform duration-200 group-hover/cta:translate-x-0.5" />
-          </Link>
-          <a
-            href={REPO_URL}
-            target="_blank"
-            rel="noreferrer"
-            className={`inline-flex h-10 items-center gap-2 rounded-md border border-line-strong px-4 text-[14px] text-fg transition-colors hover:bg-ink-800 ${focusRing}`}
-          >
-            <GithubMark className="size-4" />
-            Read the code
-          </a>
-        </div>
-      </Reveal>
-    </div>
+    <Reveal className="mx-auto flex w-full max-w-[1200px] flex-col items-center px-4 py-24 text-center sm:px-6 md:py-32 lg:px-10">
+      <h2 className="max-w-[640px] text-[34px] leading-[1.12] font-medium tracking-[-0.02em] text-balance sm:text-[48px] sm:leading-[56px]">
+        Watch a decoy trip, end to end.
+      </h2>
+      <div className="mt-8 flex flex-wrap justify-center gap-3">
+        <AccentLink to={DASHBOARD_PATH}>Open the live dashboard</AccentLink>
+        <a href={REPO_URL} target="_blank" rel="noreferrer" className={lineBtn}>
+          <GithubMark className="size-3.5" />
+          Read the code
+        </a>
+      </div>
+    </Reveal>
+  );
+}
+
+/** "Lab online" only when the hosted lab API really answered (dev mocks don't count); otherwise just "testnet". */
+function LabStatus() {
+  const [online, setOnline] = useState<boolean | null>(null);
+  useEffect(() => {
+    let live = true;
+    fetchRuns(1).then((r) => live && setOnline(r.ok && !r.mock));
+    return () => {
+      live = false;
+    };
+  }, []);
+  return (
+    <p className="flex items-center gap-2 font-mono text-[11px] text-fg-muted" role="status">
+      <span aria-hidden className={cn("size-1.5 rounded-full", online ? "bg-safe shadow-[0_0_8px_rgba(61,220,151,0.7)]" : "bg-fg-faint")} />
+      {online ? "Lab online · NEAR testnet" : "NEAR testnet"}
+    </p>
   );
 }
 
 const SOURCES = [...PROBLEM_STATS.map((s) => ({ label: s.source, href: s.href })), { label: INCIDENT.source, href: INCIDENT.href }];
 
+const PRODUCT = [
+  { to: "/app", label: "Dashboard" },
+  { to: "/lab", label: "Lab" },
+  { to: "/verify", label: "Verify" },
+  { to: "/app/owner", label: "Guardian" },
+];
+
+const PAGE = [
+  { href: "/#how", label: "How it works" },
+  { href: "/#attribution", label: "Attribution" },
+  { href: "/#blocklist", label: "Blocklist" },
+  { href: "/#benchmark", label: "Benchmark" },
+];
+
+const linkCls = `rounded-sm text-[13px] text-fg-muted transition-colors hover:text-fg ${focusRing}`;
+
+function Col({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div>
+      <p className="mb-4 font-mono text-[11px] tracking-[0.12em] text-fg-faint uppercase">{title}</p>
+      <ul className="space-y-2.5">{children}</ul>
+    </div>
+  );
+}
+
 export function Footer() {
   return (
     <footer>
       <ClosingCta />
-      <div className="border-t border-line/70">
-        <div className="mx-auto grid w-full max-w-[1200px] gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1fr_auto] lg:px-10">
-          <div className="space-y-3">
-            <p className="flex items-center gap-2 text-[15px] font-medium">
-              <BrandMark />
-              Stand-in
-            </p>
-            <p className="max-w-[46ch] text-[13px] leading-relaxed text-fg-muted">
-              Decoy NEAR keys for AI coding agents. Built at NEAR HACKATHON, November 2026. MIT licensed.
-            </p>
-            <a
-              href={REPO_URL}
-              target="_blank"
-              rel="noreferrer"
-              className={`inline-flex items-center gap-2 rounded-sm text-[13px] text-fg-muted transition-colors hover:text-fg ${focusRing}`}
-            >
-              <GithubMark className="size-3.5" />
-              github.com/BonneyMantra/stand-in
-            </a>
-          </div>
-          <div>
-            <p className="mb-3 font-mono text-[11px] tracking-[0.14em] text-fg-muted uppercase">Sources</p>
-            <ul className="space-y-1.5">
-              {SOURCES.map((s) => (
-                <li key={s.href}>
-                  <a
-                    href={s.href}
-                    target="_blank"
-                    rel="noreferrer"
-                    className={`rounded-sm text-[13px] text-fg-muted transition-colors hover:text-fg ${focusRing}`}
-                  >
-                    {s.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
+      <div className="mx-auto grid w-full max-w-[1200px] grid-cols-2 gap-x-8 gap-y-12 px-4 pt-12 pb-10 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr_1.6fr] lg:px-10">
+        <div className="col-span-2 space-y-4 md:col-span-1">
+          <p className="flex items-center gap-2 text-[15px] font-medium">
+            <BrandMark />
+            Stand-in
+          </p>
+          <p className="max-w-[34ch] text-[13px] leading-relaxed text-fg-muted">
+            Decoy NEAR keys for AI coding agents. Built at NEAR HACKATHON, November 2026. MIT licensed.
+          </p>
+          <LabStatus />
         </div>
+        <Col title="Product">
+          {PRODUCT.map((p) => (
+            <li key={p.to}>
+              <Link to={p.to} className={linkCls}>
+                {p.label}
+              </Link>
+            </li>
+          ))}
+        </Col>
+        <Col title="On this page">
+          {PAGE.map((p) => (
+            <li key={p.href}>
+              <a href={p.href} className={linkCls}>
+                {p.label}
+              </a>
+            </li>
+          ))}
+        </Col>
+        <div className="col-span-2 md:col-span-1">
+          <Col title="Sources">
+            {SOURCES.map((s) => (
+              <li key={s.href}>
+                <a href={s.href} target="_blank" rel="noreferrer" className={linkCls}>
+                  {s.label}
+                </a>
+              </li>
+            ))}
+          </Col>
+        </div>
+      </div>
+      <div className="mx-auto flex w-full max-w-[1200px] items-center justify-between gap-4 px-4 pb-10 sm:px-6 lg:px-10">
+        <a href={REPO_URL} target="_blank" rel="noreferrer" className={cn("inline-flex items-center gap-2", linkCls)}>
+          <GithubMark className="size-3.5" />
+          github.com/BonneyMantra/stand-in
+        </a>
       </div>
     </footer>
   );

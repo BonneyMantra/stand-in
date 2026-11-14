@@ -77,4 +77,3 @@ export const INCIDENT = {
   href: "https://github.com/anthropics/claude-code/issues/34133",
 } as const;
 
-export const INTEGRATIONS = ["Claude Code", "Codex", "NEAR Protocol", "NEAR Intents", "OutLayer TEE"] as const;

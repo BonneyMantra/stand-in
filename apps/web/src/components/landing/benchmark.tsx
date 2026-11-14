@@ -7,6 +7,7 @@ import { BENCH_RESULTS as R, BENCH_ROWS } from "./bench-data";
 import { RouteRow } from "./bench-row";
 import { Frame, FramePanel } from "./frame";
 import { EASE_OUT, FOCUS, Reveal, SourceLink } from "./primitives";
+import { LiveLink } from "./cta";
 
 const day = (iso: string) => iso.slice(0, 10);
 
@@ -95,8 +96,8 @@ export function Benchmark() {
   const flip = (v: boolean) => (setTouched(true), setOn(v));
 
   return (
-    <section id="benchmark" aria-labelledby="benchmark-title" className="relative scroll-mt-20 border-t border-line/70">
-      <div className="mx-auto w-full max-w-[1200px] px-4 py-20 sm:px-6 md:py-28 lg:px-10">
+    <section id="benchmark" aria-labelledby="benchmark-title" className="relative scroll-mt-20">
+      <div className="mx-auto w-full max-w-[1200px] px-4 py-16 sm:px-6 md:py-24 lg:px-10">
         <h2 id="benchmark-title" className="sr-only">
           Benchmark: {BENCH_ROWS.length} leak routes on testnet, with Stand-in on and off
         </h2>
@@ -104,6 +105,7 @@ export function Benchmark() {
           <Headline on={on} />
           <div className="flex flex-col items-start gap-5 lg:items-end">
             <StandinSwitch on={on} onChange={flip} />
+            <LiveLink to="/app/bench">See the full run</LiveLink>
             <dl className="grid grid-cols-4 gap-x-5 font-mono">
               {FACTS.map((f) => (
                 <div key={f.k} className={cn("transition-opacity duration-300", on ? "opacity-100" : "opacity-35")}>

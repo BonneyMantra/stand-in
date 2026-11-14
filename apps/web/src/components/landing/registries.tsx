@@ -3,7 +3,8 @@ import { motion, useInView, useReducedMotion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { txUrl } from "./content";
 import { Frame, FramePanel } from "./frame";
-import { ReplayButton, Reveal, SourceLink } from "./primitives";
+import { Bleed, LiveLink } from "./cta";
+import { H2, LEDE, ReplayButton, Reveal, SourceLink } from "./primitives";
 import { FREEZE, blockLabel, short } from "./proof-data";
 import { Scrubber } from "./scrubber";
 
@@ -97,27 +98,34 @@ export function Registries() {
   const rejected = step >= 2;
 
   return (
-    <section id="registries" aria-labelledby="registries-title" className="relative scroll-mt-20 border-t border-line/70">
-      <div className="mx-auto w-full max-w-[1200px] px-4 py-20 sm:px-6 md:py-28 lg:px-10">
-        <Reveal className="grid grid-cols-1 items-end gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)] lg:gap-16">
-          <div>
-            <p className="mb-4 font-mono text-[11px] tracking-[0.14em] text-fg-muted uppercase">The freeze</p>
-            <h2 id="registries-title" className="text-[30px] leading-[1.08] font-medium tracking-[-0.025em] text-balance sm:text-[40px]">
-              One call strikes both ledgers.
-            </h2>
-            <p className="mt-4 max-w-[52ch] text-[15px] leading-relaxed text-pretty text-fg-muted">
-              A signed NEAR Intents order can wait in a queue and settle after the account keys are gone. So the freeze
-              removes the agent's key from the account and from the intents registry in the same transaction.
-            </p>
-          </div>
-          <div onPointerDown={() => (setTouched(true), clear())} onKeyDown={() => (setTouched(true), clear())}>
+    <section id="registries" aria-labelledby="registries-title" className="relative scroll-mt-20">
+      <div className="mx-auto grid w-full max-w-[1200px] grid-cols-1 gap-12 px-4 py-16 sm:px-6 md:py-24 lg:grid-cols-[minmax(0,470px)_minmax(0,1fr)] lg:gap-16 lg:px-10">
+        <Reveal className="min-w-0 lg:pt-4">
+          <h2 id="registries-title" className={H2}>
+            One call strikes both ledgers.
+          </h2>
+          <p className={cn("mt-5", LEDE)}>
+            A signed NEAR Intents order can wait in a queue and settle after the account keys are gone. So the freeze
+            removes the agent's key from the account and from the intents registry in the same transaction.
+          </p>
+          <div className="mt-8" onPointerDown={() => (setTouched(true), clear())} onKeyDown={() => (setTouched(true), clear())}>
             <Scrubber stops={STOPS} value={step} onChange={go} label="Freeze timeline" />
+          </div>
+          <p className="mt-6 text-[13px] leading-[19.5px] text-white/50">
+            The signature on the queued intent is still valid. The registry checks whether the key is registered for the
+            signer now, and it is not. On testnet the intents side is a replica of the near/intents key registry with the
+            same check order.
+          </p>
+          <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3">
+            <LiveLink to="/app/owner">See the guardian live</LiveLink>
+            <ReplayButton onClick={() => (setTouched(true), play())}>Replay the freeze</ReplayButton>
           </div>
         </Reveal>
 
-        <div ref={ref} className="mt-10">
-          <Frame>
-            <div className="relative grid grid-cols-1 gap-[3px] lg:grid-cols-[minmax(0,1fr)_200px_minmax(0,1fr)]">
+        <div ref={ref} className="min-w-0">
+          <Bleed fade={false}>
+          <Frame className="lg:[&>*]:max-w-[600px]">
+            <div className="relative grid grid-cols-1 gap-[3px] md:grid-cols-[minmax(0,1fr)_200px_minmax(0,1fr)] lg:grid-cols-1">
               <Ledger account={FREEZE.agent} kind="access keys">
                 <KeyRow k={short(FREEZE.agentKey, 10, 6)} role="function-call · agent" struck={struck} action="DeleteKey" delay={380} />
                 <KeyRow k="owner full-access key" role="never recorded by the guardian" struck={false} action="kept" delay={0} keep />
@@ -170,15 +178,7 @@ export function Registries() {
               </div>
             </FramePanel>
           </Frame>
-        </div>
-
-        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <p className="max-w-3xl text-[13px] leading-relaxed text-fg-muted">
-            The signature on the queued intent is still valid. The registry checks whether the key is registered for the
-            signer now, and it is not. On testnet the intents side is a replica of the near/intents key registry with the
-            same check order.
-          </p>
-          <ReplayButton onClick={() => (setTouched(true), play())}>Replay the freeze</ReplayButton>
+          </Bleed>
         </div>
       </div>
     </section>

@@ -120,6 +120,12 @@ export function Reveal({
   );
 }
 
+/** Lede copy, Axiom proportions: 15/22.5 at 63% white. */
+export const LEDE = "text-[15px] leading-[22.5px] text-pretty text-white/[0.63]";
+/** Section heading: 40/500 at -1px; one colour, no greyed second line. */
+export const H2 = "text-[30px] leading-[1.1] font-medium tracking-[-0.025em] text-balance text-fg sm:text-[40px] sm:leading-[1.1]";
+
+/** A landing section: 96px of air above and below, no hairline between sections. */
 export function Section({
   id,
   children,
@@ -132,42 +138,36 @@ export function Section({
   labelledBy?: string;
 }) {
   return (
-    <section
-      id={id}
-      aria-labelledby={labelledBy}
-      className={cn("relative scroll-mt-20 border-t border-line/70", className)}
-    >
-      <div className="mx-auto w-full max-w-[1200px] px-4 py-20 sm:px-6 md:py-28 lg:px-10">{children}</div>
+    <section id={id} aria-labelledby={labelledBy} className={cn("relative scroll-mt-20", className)}>
+      <div className="mx-auto w-full max-w-[1200px] px-4 py-16 sm:px-6 md:py-24 lg:px-10">{children}</div>
     </section>
   );
 }
 
-/** Axiom-style section head: small mono eyebrow, a two-line heading, a muted lede. */
+/** Axiom-style section head: one heading (a second line stays the same colour), a lede, one live link. */
 export function SectionHead({
   id,
-  eyebrow,
   title,
-  muted,
+  second,
   children,
+  live,
   className,
 }: {
   id: string;
-  eyebrow: string;
   title: string;
-  muted?: string;
+  second?: string;
   children?: ReactNode;
+  live?: ReactNode;
   className?: string;
 }) {
   return (
-    <Reveal className={cn("max-w-2xl", className)}>
-      <p className="mb-4 font-mono text-[11px] tracking-[0.14em] text-fg-muted uppercase">{eyebrow}</p>
-      <h2 id={id} className="text-[30px] leading-[1.08] font-medium tracking-[-0.025em] text-balance sm:text-[40px]">
+    <Reveal className={cn("max-w-[470px]", className)}>
+      <h2 id={id} className={H2}>
         {title}
-        {muted ? <span className="block text-fg-muted">{muted}</span> : null}
+        {second ? <span className="block">{second}</span> : null}
       </h2>
-      {children ? (
-        <div className="mt-5 space-y-3 text-[15px] leading-relaxed text-pretty text-fg-muted">{children}</div>
-      ) : null}
+      {children ? <div className={cn("mt-5 space-y-3", LEDE)}>{children}</div> : null}
+      {live ? <div className="mt-6">{live}</div> : null}
     </Reveal>
   );
 }

@@ -1,5 +1,6 @@
 import type { StandinState } from "@/data/types";
 import { sessionLabel, statusMap, type DecoyStatus } from "@/data/derive";
+import { LAND, MAP_COLS, MAP_ROWS } from "@/components/landing/world-map";
 
 export const W = 1000;
 export const H = 440;
@@ -84,30 +85,21 @@ export function layoutClusters(s: StandinState): MapCluster[] {
   });
 }
 
-/** Dotted terrain (the Edge dashboard's halftone map, minus fake geography): value noise
- *  thresholded into two density bands, returned as two compact SVG paths. */
-export function dotField(step = 9): { dense: string; sparse: string } {
-  const g = 7;
-  const grid: number[] = [];
-  for (let i = 0; i < (g + 1) * (g + 1); i++) grid.push(hash01(`n${i}`));
-  const lerp = (a: number, b: number, t: number) => a + (b - a) * (t * t * (3 - 2 * t));
-  const noise = (u: number, v: number) => {
-    const x = u * g, y = v * g;
-    const xi = Math.min(g - 1, Math.floor(x)), yi = Math.min(g - 1, Math.floor(y));
-    const tx = x - xi, ty = y - yi;
-    const at = (a: number, b: number) => grid[b * (g + 1) + a];
-    return lerp(lerp(at(xi, yi), at(xi + 1, yi), tx), lerp(at(xi, yi + 1), at(xi + 1, yi + 1), tx), ty);
-  };
-  let dense = "", sparse = "";
-  for (let y = step / 2; y < H; y += step) {
-    for (let x = step / 2; x < W; x += step) {
-      const v = noise(x / W, y / H) * 0.75 + hash01(`${x},${y}`) * 0.25;
-      const d = `M${x.toFixed(1)} ${y.toFixed(1)}h1.6v1.6h-1.6z`;
-      if (v > 0.6) dense += d;
-      else if (v > 0.42) sparse += d;
+/** The landing's dotted world map (Natural Earth land mask from landing/world-map), scaled
+ *  uniformly to the map's width, centred vertically, and returned as one compact SVG path of
+ *  r=1.5 dots so the dashboard and the landing hero share one map. */
+export function worldDots(r = 1.5): string {
+  const cell = W / MAP_COLS;
+  const top = (H - MAP_ROWS * cell) / 2;
+  let d = "";
+  LAND.forEach((line, row) => {
+    for (let col = 0; col < line.length; col++) {
+      if (line[col] !== "#") continue;
+      const x = col * cell + cell / 2, y = top + row * cell + cell / 2;
+      d += `M${(x - r).toFixed(1)} ${y.toFixed(1)}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0`;
     }
-  }
-  return { dense, sparse };
+  });
+  return d;
 }
 
 /** Curved arc between two points, bowing upward like a flight path. */

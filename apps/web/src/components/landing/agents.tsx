@@ -3,7 +3,8 @@ import { useInView, useReducedMotion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { INSTALL } from "./content";
 import { Frame, FramePanel, PanelBar } from "./frame";
-import { CommandLine, ReplayButton, Reveal } from "./primitives";
+import { CommandLine, H2, LEDE, ReplayButton, Reveal } from "./primitives";
+import { LiveLink } from "./cta";
 import { BEATS, HOOKS, type Line } from "./agents-script";
 
 const STEP_MS = 1300;
@@ -100,19 +101,21 @@ export function Agents() {
   const done = at >= BEATS.length - 1;
 
   return (
-    <section id="agents" aria-labelledby="agents-title" className="relative scroll-mt-20 border-t border-line/70">
-      <div className="mx-auto w-full max-w-[1200px] px-4 py-20 sm:px-6 md:py-28 lg:px-10">
+    <section id="agents" aria-labelledby="agents-title" className="relative scroll-mt-20">
+      <div className="mx-auto w-full max-w-[1200px] px-4 py-16 sm:px-6 md:py-24 lg:px-10">
         <Reveal className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="mb-4 font-mono text-[11px] tracking-[0.14em] text-fg-muted uppercase">Install</p>
-            <h2 id="agents-title" className="text-[30px] leading-[1.08] font-medium tracking-[-0.025em] text-balance sm:text-[40px]">
+            <h2 id="agents-title" className={H2}>
               Two agents. One set of hooks.
             </h2>
           </div>
-          <p className="max-w-[46ch] text-[15px] leading-relaxed text-pretty text-fg-muted">
+          <div className="max-w-[470px]">
+          <p className={LEDE}>
             Each session gets its own decoys at start, and every prompt, tool input and tool output is checked for them. No
             prompt changes; the agent keeps working with a key scoped to your contract.
           </p>
+            <LiveLink to="/app/sessions" className="mt-5">See it live</LiveLink>
+          </div>
         </Reveal>
 
         <div ref={ref} className="mt-10 space-y-3">
@@ -129,7 +132,7 @@ export function Agents() {
           </div>
         </div>
 
-        <Reveal delay={0.05} className="mt-12 grid grid-cols-1 gap-6 border-t border-line pt-10 md:grid-cols-3">
+        <Reveal delay={0.05} className="mt-12 grid grid-cols-1 gap-6 md:grid-cols-3">
           {[
             { k: "Claude Code", lines: INSTALL.claude, p: "$" },
             { k: "Codex", lines: INSTALL.codex, p: "$" },

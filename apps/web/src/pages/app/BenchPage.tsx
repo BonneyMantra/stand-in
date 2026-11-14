@@ -77,7 +77,7 @@ export default function BenchPage() {
         {baseline.length ? (
           <div className="grid gap-3 sm:grid-cols-2">
             <div><p className="text-xs text-fg-faint">Off: thefts that succeeded</p><p className="mt-1 font-mono text-2xl text-trip">{baseline.filter((r) => r.theft_succeeded).length} / {baseline.length}</p></div>
-            <div><p className="text-xs text-fg-faint">On: leaks detected</p><p className="mt-1 font-mono text-2xl text-safe">{routes.filter((r) => r.detected).length} / {routes.length}</p></div>
+            <div><p className="text-xs text-fg-faint">On: leaks detected</p><p className="mt-1 font-mono text-2xl text-fg">{routes.filter((r) => r.detected).length} / {routes.length}</p></div>
           </div>
         ) : (
           <EmptyState icon={Split} title={data.recorded ? "Baseline not run in this recording" : "Baseline not in the live API"} className="py-6">
