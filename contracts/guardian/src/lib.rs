@@ -13,6 +13,10 @@ const GAS_REMOVE: Gas = Gas::from_tgas(8);
 const GAS_ADD: Gas = Gas::from_tgas(8);
 const GAS_CB: Gas = Gas::from_tgas(8);
 const MAX_LOG: usize = 50;
+/// Testnet MPC signer. Mainnet is v1.signer; a deployment on another network must change this.
+const MPC_SIGNER: &str = "v1.signer-prod.testnet";
+const GAS_SIGN: Gas = Gas::from_tgas(100);
+const SIGN_DEPOSIT: NearToken = NearToken::from_yoctonear(1);
 const MAX_KEYS: usize = 32;
 
 #[near(serializers = [json, borsh])]
@@ -105,6 +109,40 @@ impl Guardian {
             allowance,
             receiver_id,
             method_names.join(","),
+        )
+    }
+
+    /// Chain Signatures: request an ECDSA (secp256k1, domain 0) signature over a 32-byte payload hash
+    /// from the NEAR MPC signer. The MPC derives the key from (this account, `path`), so the signing
+    /// authority is this account's. The caller needs only a function-call key on this method (its
+    /// predecessor is this account); the guardian attaches the required 1 yoctoNEAR itself. Refused
+    /// while frozen, so a freeze cuts cross-chain signing even for the owner key until `unfreeze`.
+    /// `payload_hex`: 64 hex chars. Request shape per the near/mpc contract README:
+    /// `sign({request:{payload_v2:{Ecdsa:hex}, path, domain_id:0}})`. Returns the MPC response.
+    pub fn sign_evm(&mut self, payload_hex: String, path: String) -> Promise {
+        require!(env::predecessor_account_id() == self.owner, "sign_evm: caller not authorized");
+        require!(!self.frozen, "frozen: sign_evm refused until unfreeze");
+        require!(
+            payload_hex.len() == 64 && payload_hex.bytes().all(|b| b.is_ascii_hexdigit()),
+            "payload_hex must be 64 hex chars (32 bytes)"
+        );
+        require!(!path.is_empty() && path.len() <= 128, "path must be 1..128 bytes");
+        let payload = payload_hex.to_lowercase();
+        event(
+            "sign_evm",
+            &format!(
+                r#"{{"path":{},"payload":"{payload}"}}"#,
+                near_sdk::serde_json::to_string(&path).unwrap()
+            ),
+        );
+        let args = near_sdk::serde_json::json!({
+            "request": { "payload_v2": { "Ecdsa": payload }, "path": path, "domain_id": 0 }
+        });
+        Promise::new(MPC_SIGNER.parse().unwrap()).function_call(
+            "sign".into(),
+            args.to_string().into_bytes(),
+            SIGN_DEPOSIT,
+            GAS_SIGN,
         )
     }
 
