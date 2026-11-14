@@ -4,6 +4,7 @@ import {
   callMethod, explorerTx, loadNetworkConfig, requireAccount, roleAccount, setLogSink,
 } from "@standin/core";
 import { adopt } from "./adopt.ts";
+import { adoptWallet } from "./adopt-wallet.ts";
 import { attackDrain } from "./attack.ts";
 import { devUp } from "./devup.ts";
 import { pay } from "./pay.ts";
@@ -16,6 +17,8 @@ setLogSink((l) => process.stderr.write(l + "\n"));
 const USAGE = `standin <command>
   dev up [--no-watcher] [--pool N]       check accounts/contracts, mint decoy pool, start watcher
   adopt --home DIR [--keychain]          move real NEAR keys out of DIR, plant decoys, provision scoped key
+  adopt --wallet --account ID.testnet [--owner ID.testnet] --home DIR [--timeout SEC] [--resume]
+                                         owner key stays in your NEAR wallet: prints an owner-console link, the wallet signs one tx (guardian + scoped agent key), CLI waits, then plants a decoy in DIR (exit 6 on timeout)
   status [--json]                        agent/decoy/trips from the watcher API
   freeze [reason]                        manual guardian freeze
   unfreeze [--keychain]                  Touch ID gate, owner-key unfreeze, re-provision the agent key
@@ -33,7 +36,17 @@ async function main(argv: string[]): Promise<number> {
       return (await devUp({ noWatcher: values["no-watcher"], pool: values.pool ? Number(values.pool) : undefined })) ? 0 : 2;
     }
     case "adopt": {
-      const { values } = parse(rest, { home: { type: "string" }, keychain: { type: "boolean" }, methods: { type: "string" }, allowance: { type: "string" } });
+      const { values } = parse(rest, { home: { type: "string" }, keychain: { type: "boolean" }, methods: { type: "string" }, allowance: { type: "string" }, wallet: { type: "boolean" }, account: { type: "string" }, owner: { type: "string" }, resume: { type: "boolean" }, timeout: { type: "string" } });
+      if (values.wallet) {
+        if (!values.account) { err("adopt --wallet needs --account ID.testnet"); return 1; }
+        if (!values.home) { err("adopt needs --home DIR"); return 1; }
+        const t = values.timeout === undefined ? undefined : Number(values.timeout);
+        if (t !== undefined && !(t > 0)) { err("--timeout must be a positive number of seconds"); return 1; }
+        const home = path.resolve(values.home);
+        if (!process.env.STANDIN_HOME) process.env.STANDIN_HOME = path.join(home, ".standin");
+        return adoptWallet({ account: values.account, owner: values.owner, home, resume: values.resume, timeoutSec: t });
+      }
+      if (values.account || values.owner || values.resume || values.timeout) { err("--account, --owner, --resume and --timeout need --wallet"); return 1; }
       if (!values.home) { err("adopt needs --home DIR"); return 1; }
       await adopt({
         home: path.resolve(values.home), store: values.keychain ? "keychain" : "dev",
