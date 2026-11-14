@@ -5,6 +5,7 @@ import { accountUrl, agentName, alreadyFrozen, sessionLabel, shortHash, shortKey
 import { MetricStrip, type Metric } from "@/components/app/MetricStrip";
 import { WaterfallView } from "@/components/app/trip/WaterfallView";
 import { buildWaterfall } from "@/components/app/trip/buildRows";
+import { IncidentReportPanel } from "@/components/app/trip/IncidentReport";
 import { CopyText, EmptyState, ExtLink, KV, PageHeader, Panel, PreviewTag, Tag } from "@/components/app/common";
 
 export default function TripDetailPage() {
@@ -47,6 +48,7 @@ export default function TripDetailPage() {
       />
       <MetricStrip items={metrics} />
       <WaterfallView wf={wf} />
+      <IncidentReportPanel report={data.incident_reports?.filter((r) => r.trip_tx_hash === trip.tx_hash).at(-1)} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Panel title="Attribution" icon={FileSearch} id="attr-title">

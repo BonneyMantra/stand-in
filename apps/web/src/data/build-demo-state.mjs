@@ -138,6 +138,8 @@ const state = {
   },
   // Chain Signatures proof (packages/chainsig prove run), as the live watcher served it.
   ...(live?.chainsig ? { chainsig: live.chainsig } : {}),
+  // NEAR AI Cloud TEE incident reports (packages/nearai), as the live watcher served them; strings redacted.
+  ...(live?.incident_reports?.length ? { incident_reports: JSON.parse(JSON.stringify(live.incident_reports, (k, v) => typeof v === "string" && k !== "signature" && k !== "signing_address" ? redact(v) : v)) } : {}),
   recorded: {
     recorded_at: started[0]?.at ?? bench.generated_at,
     source: `bench ledger + ${benchFile.startsWith(repo + "/") ? path.relative(repo, benchFile) : `bench results (${path.basename(benchFile)})`} (testnet)`,

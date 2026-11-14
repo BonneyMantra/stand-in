@@ -109,6 +109,24 @@ export interface ChainSig {
   blocked_after_freeze: { tx_hash: string; error: string };
 }
 
+export interface IncidentReport {
+  trip_tx_hash: string;
+  at: string;
+  model: string;
+  report: {
+    summary: string; root_cause: string; leaked_via: string; blast_radius: string;
+    actions_taken: string[]; recommended_next_steps: string[]; confidence: "low" | "medium" | "high";
+  };
+  proof: {
+    chat_id: string; signature: string; signing_address: string; signing_algo: string; signature_kind: string;
+    attestation: { fetched_at: string; nonce: string; verified: boolean; gateway?: { tee_type?: string; gpu_evidence_present?: boolean } };
+    verified: boolean;
+    checks: { name: string; ok: boolean; detail?: string }[];
+    unverified: { what: string; reason: string }[];
+    billing?: { prompt_tokens: number; completion_tokens: number; usd: number };
+  };
+}
+
 export interface StandinState {
   network: Network;
   agent: AgentState;
@@ -120,6 +138,8 @@ export interface StandinState {
   bench: BenchSummary;
   /** Optional: Chain Signatures proof (guardian.sign_evm through the NEAR MPC signer). */
   chainsig?: ChainSig;
+  /** Optional: private incident reports written by a NEAR AI Cloud TEE model, one per trip. */
+  incident_reports?: IncidentReport[];
   /** Present only in public/demo-state.json (the recorded run), never in the live API. */
   recorded?: RecordedMeta;
 }

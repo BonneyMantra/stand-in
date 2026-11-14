@@ -1,5 +1,5 @@
 {
- "snapshot_at": "2026-11-14T05:08:42.487Z",
+ "snapshot_at": "2026-11-14T06:50:38.343Z",
  "network": "testnet",
  "chainsig": {
   "evm_address": "0x5ac75f605ff88b69195614f4256639f6acd31339",
@@ -15,17 +15,440 @@
    "error": "HostGuestPanicError: frozen: sign_evm refused until unfreeze"
   }
  },
+ "incident_reports": [
+  {
+   "trip_tx_hash": "8yzSGUvEnor42xFgvcnFAcec75DxjQfgfensb9nzPHkp",
+   "at": "2026-11-14T06:46:37.402Z",
+   "model": "Qwen/Qwen3.8-27B",
+   "report": {
+    "summary": "A decoy NEAR key was tripped on testnet by account si-attacker-5289.testnet using a key planted in a local file. The incident was contained within 3 blocks.",
+    "root_cause": "The specific cause is unknown as the tool input summary and exposure location were not recorded.",
+    "leaked_via": "The key was planted in a file at ~/Documents/hackathons/near-standin/.sandbox/07-cat-credentials-exfil-on/.near-credentials/testnet/si-agent-5289.testnet.json.",
+    "blast_radius": "Two agent keys were deleted and one intents key was removed during the response.",
+    "actions_taken": [
+     "Freeze transaction DuyfJZZFDkxsiAFsdF6eEw2aLTroG8rwuCqMFDboCaUv was executed.",
+     "Two agent keys were deleted.",
+     "One intents key was removed."
+    ],
+    "recommended_next_steps": [
+     "Investigate the unrecorded tool input to determine the exfiltration method.",
+     "Review the session c219469f-207d-4e12-a7a2-6e82ff526cb8 for other potential exposures."
+    ],
+    "confidence": "medium"
+   },
+   "proof": {
+    "model": "Qwen/Qwen3.8-27B",
+    "chat_id": "2e8460cb429f4012aaa5f333c0cf8c47",
+    "request_hash": "5a7f31b616287801f587d447d4a91df459a5a80fe6b45bc56be20d97f088152f",
+    "response_hash": "4e00703baa11642489855ef175f1e42153f03028b5a05b5f32c3b1f8be565e51",
+    "signature": "0x83b3be43c1b0b6e1f6b5e0910de00bb25d7c3896a43f8fcbea804cd7333fae204e5ce756d6e52cff0320eec9076f4b68293454d217bf518840aaf24c359136701c",
+    "signing_address": "0x835ab53d20294ef795906dff21ae4c045336aa26",
+    "signing_algo": "ecdsa",
+    "signature_kind": "provider_tee",
+    "signed_text": "Qwen/Qwen3.8-27B:5a7f31b616287801f587d447d4a91df459a5a80fe6b45bc56be20d97f088152f:4e00703baa11642489855ef175f1e42153f03028b5a05b5f32c3b1f8be565e51",
+    "attestation": {
+     "fetched_at": "2026-11-14T06:46:30.096Z",
+     "nonce": "298c23d4e54ad3c907528a6c9e36e6f0698cbf4e1494af4ac2ea2848a4e42995",
+     "gateway": {
+      "signing_address": "0xb98a789cdc4817275f5155593ba73ef2a957e779",
+      "signing_algo": "ecdsa",
+      "quote_sha256": "5efab0b00b5bb346250335f83ec87a6c6dddbbb3dd05eda8d6d53e5c9f717790",
+      "quote_version": 4,
+      "tee_type": "0x81",
+      "mrtd": "7fe60787222bd394cb516abca2435f22f035ab2cc9c0a4b4b3b148e46297f3d931a237b72f359052c6e657d8c1409173",
+      "rtmr3": "74ea3e995d95b03058291f49cef0e1a05db746c4942b91478be6f7050b13434af6059ca038ac7821edffcbe7c8d4de8f",
+      "mrconfigid": "012643bc7ae47ecf4cf84509a647d2c2cc3bcacad95a87b8a73d543e6c48ad3b22000000000000000000000000000000",
+      "report_data": "b98a789cdc4817275f5155593ba73ef2a957e779000000000000000000000000298c23d4e54ad3c907528a6c9e36e6f0698cbf4e1494af4ac2ea2848a4e42995",
+      "gpu_evidence_present": false,
+      "event_log_present": true
+     },
+     "model": {
+      "signing_address": "0x835ab53d20294ef795906dff21ae4c045336aa26",
+      "signing_algo": "ecdsa",
+      "quote_sha256": "3b30b3e61da5e5d05bf8100fb4bcd128b78d416b31498c0ac3003114a8c3679e",
+      "quote_version": 4,
+      "tee_type": "0x81",
+      "mrtd": "df4d77c857de652bd0fafa343a2026b51071ee03773d076d283abf1a7d36ff91ffa279ee4a617ac664f7e2a2c8d5891b",
+      "rtmr3": "bbada8ce4eb49dcf9d67f987f8ce6a3a3a59e8e86374180075aa12b4cdad6b06234acb1e044902cbcac130993ef9bb46",
+      "mrconfigid": "01e8416a02d6f7ce47baaa52e3925b934fd30834b04fc9086b363db9b1d12c729d000000000000000000000000000000",
+      "report_data": "835ab53d20294ef795906dff21ae4c045336aa26000000000000000000000000298c23d4e54ad3c907528a6c9e36e6f0698cbf4e1494af4ac2ea2848a4e42995",
+      "gpu_evidence_present": true,
+      "event_log_present": true
+     },
+     "verified": true
+    },
+    "verified": true,
+    "checks": [
+     {
+      "name": "gateway: request_nonce echoed",
+      "ok": true,
+      "detail": "report.request_nonce equals the nonce we sent"
+     },
+     {
+      "name": "gateway: quote report_data binds nonce",
+      "ok": true,
+      "detail": "nonce found inside the TDX quote's 64-byte report_data (parsed from the quote bytes)"
+     },
+     {
+      "name": "gateway: quote report_data binds signing address",
+      "ok": true,
+      "detail": "signing_address found inside the TDX quote's report_data"
+     },
+     {
+      "name": "gateway: MRCONFIGID = 01||sha256(app_compose)",
+      "ok": true,
+      "detail": "sha256 of the reported app_compose matches the quote's MRCONFIGID"
+     },
+     {
+      "name": "model: request_nonce echoed",
+      "ok": true,
+      "detail": "report.request_nonce equals the nonce we sent"
+     },
+     {
+      "name": "model: quote report_data binds nonce",
+      "ok": true,
+      "detail": "nonce found inside the TDX quote's 64-byte report_data (parsed from the quote bytes)"
+     },
+     {
+      "name": "model: quote report_data binds signing address",
+      "ok": true,
+      "detail": "signing_address found inside the TDX quote's report_data"
+     },
+     {
+      "name": "model: MRCONFIGID = 01||sha256(app_compose)",
+      "ok": true,
+      "detail": "sha256 of the reported app_compose matches the quote's MRCONFIGID"
+     },
+     {
+      "name": "signature: ECDSA (EIP-191) recovers to signing_address",
+      "ok": true,
+      "detail": "recovered 0x835ab53d20294ef795906dff21ae4c045336aa26"
+     },
+     {
+      "name": "signature: signed text matches sha256 of our exact request and response bytes",
+      "ok": true,
+      "detail": "hashes equal"
+     },
+     {
+      "name": "signature: signer equals a preflight attestation's signing_address",
+      "ok": true,
+      "detail": "model report signer 0x835ab53d20294ef795906dff21ae4c045336aa26"
+     }
+    ],
+    "unverified": [
+     {
+      "what": "Intel TDX quote signature chain (DCAP)",
+      "reason": "no DCAP verifier in this package; quote fields were parsed and bound, but Intel's certificate chain and TCB status were not checked (verify at https://cloud.near.ai/verify or with dcap-qvl)"
+     },
+     {
+      "what": "RTMR3 event-log replay",
+      "reason": "not implemented locally"
+     },
+     {
+      "what": "NVIDIA GPU evidence (nvidia_payload)",
+      "reason": "no NVIDIA attestation verifier run locally; presence only"
+     }
+    ],
+    "billing": {
+     "prompt_tokens": 631,
+     "completion_tokens": 305,
+     "usd": 0.00043699,
+     "price_source": "models-endpoint"
+    }
+   }
+  },
+  {
+   "trip_tx_hash": "FFauEE4u9rsVdmvYVmdWyNxiAEVPJSWL55zzqbzZ76tE",
+   "at": "2026-11-14T06:46:53.500Z",
+   "model": "Qwen/Qwen3.8-27B",
+   "report": {
+    "summary": "A decoy NEAR key on testnet was used by account si-attacker-5289.testnet in transaction FFauEE4u9rsVdmvYVmdWyNxiAEVPJSWL55zzqbzZ76tE. The key was planted in a local file path within a sandbox directory.",
+    "root_cause": "The specific cause is unknown, but the key was exposed via a file at ~/Documents/hackathons/near-standin/.sandbox/w3-proof-2/.near-credentials/.near-credentials/testnet/si-decoy-5289.testnet.json. The agent kind was identified as manual.",
+    "leaked_via": "The key was planted in a file at the path ~/Documents/hackathons/near-standin/.sandbox/w3-proof-2/.near-credentials/.near-credentials/testnet/si-decoy-5289.testnet.json. The specific exposure location is not recorded.",
+    "blast_radius": "One agent key was deleted and zero intents keys were removed. The attacker account was not blocklisted.",
+    "actions_taken": [
+     "Freeze transaction J2QNzq2Gh2VK92XB9y9GE2vkrmVXpF5nWCLQAQzoeLhN was executed at block 277551931.",
+     "One agent key was deleted."
+    ],
+    "recommended_next_steps": [
+     "Investigate the manual session that accessed the decoy key file.",
+     "Review the sandbox directory for other potential exposures."
+    ],
+    "confidence": "medium"
+   },
+   "proof": {
+    "model": "Qwen/Qwen3.8-27B",
+    "chat_id": "9c506b16b4564fa082594d9637fc985a",
+    "request_hash": "864bd5acb43503c95f4c0a2d8fa287f8299adb30a023dc2f6796647c396b4147",
+    "response_hash": "a007ac4b6c5b21eecb6a4ac641716e19b9dd15adde98f9dd9f1816e7744e1051",
+    "signature": "0x6caab6c1da5930b75fea7cfcf59ab204f3c07795ae08504ee5d8cddbbef453494322f8d937d979d087b21a1f5351e5008e189eb82fb8e0d1c3702f22c78aba211c",
+    "signing_address": "0x835ab53d20294ef795906dff21ae4c045336aa26",
+    "signing_algo": "ecdsa",
+    "signature_kind": "provider_tee",
+    "signed_text": "Qwen/Qwen3.8-27B:864bd5acb43503c95f4c0a2d8fa287f8299adb30a023dc2f6796647c396b4147:a007ac4b6c5b21eecb6a4ac641716e19b9dd15adde98f9dd9f1816e7744e1051",
+    "attestation": {
+     "fetched_at": "2026-11-14T06:46:47.018Z",
+     "nonce": "5839e1f48ba159ccd59f24f86468b425541442e00c7b083f45c36069f2095d17",
+     "gateway": {
+      "signing_address": "0xb98a789cdc4817275f5155593ba73ef2a957e779",
+      "signing_algo": "ecdsa",
+      "quote_sha256": "a0576d87f3015b38e27c267d7fbc76cdb53c81b8a3db981a01250c1894056e13",
+      "quote_version": 4,
+      "tee_type": "0x81",
+      "mrtd": "7fe60787222bd394cb516abca2435f22f035ab2cc9c0a4b4b3b148e46297f3d931a237b72f359052c6e657d8c1409173",
+      "rtmr3": "857cfdb7e763c49c351279b8d47e0dc69b7d6b556699bfe9854433ad3d761cddd871ecf93bd1b372cfb1d0aca4bf630a",
+      "mrconfigid": "012643bc7ae47ecf4cf84509a647d2c2cc3bcacad95a87b8a73d543e6c48ad3b22000000000000000000000000000000",
+      "report_data": "b98a789cdc4817275f5155593ba73ef2a957e7790000000000000000000000005839e1f48ba159ccd59f24f86468b425541442e00c7b083f45c36069f2095d17",
+      "gpu_evidence_present": false,
+      "event_log_present": true
+     },
+     "model": {
+      "signing_address": "0x835ab53d20294ef795906dff21ae4c045336aa26",
+      "signing_algo": "ecdsa",
+      "quote_sha256": "a3226526061e5b366859fc9144d4fbc8f1dfb7496d10717a0df294b00be8ea83",
+      "quote_version": 4,
+      "tee_type": "0x81",
+      "mrtd": "df4d77c857de652bd0fafa343a2026b51071ee03773d076d283abf1a7d36ff91ffa279ee4a617ac664f7e2a2c8d5891b",
+      "rtmr3": "bbada8ce4eb49dcf9d67f987f8ce6a3a3a59e8e86374180075aa12b4cdad6b06234acb1e044902cbcac130993ef9bb46",
+      "mrconfigid": "01e8416a02d6f7ce47baaa52e3925b934fd30834b04fc9086b363db9b1d12c729d000000000000000000000000000000",
+      "report_data": "835ab53d20294ef795906dff21ae4c045336aa260000000000000000000000005839e1f48ba159ccd59f24f86468b425541442e00c7b083f45c36069f2095d17",
+      "gpu_evidence_present": true,
+      "event_log_present": true
+     },
+     "verified": true
+    },
+    "verified": true,
+    "checks": [
+     {
+      "name": "gateway: request_nonce echoed",
+      "ok": true,
+      "detail": "report.request_nonce equals the nonce we sent"
+     },
+     {
+      "name": "gateway: quote report_data binds nonce",
+      "ok": true,
+      "detail": "nonce found inside the TDX quote's 64-byte report_data (parsed from the quote bytes)"
+     },
+     {
+      "name": "gateway: quote report_data binds signing address",
+      "ok": true,
+      "detail": "signing_address found inside the TDX quote's report_data"
+     },
+     {
+      "name": "gateway: MRCONFIGID = 01||sha256(app_compose)",
+      "ok": true,
+      "detail": "sha256 of the reported app_compose matches the quote's MRCONFIGID"
+     },
+     {
+      "name": "model: request_nonce echoed",
+      "ok": true,
+      "detail": "report.request_nonce equals the nonce we sent"
+     },
+     {
+      "name": "model: quote report_data binds nonce",
+      "ok": true,
+      "detail": "nonce found inside the TDX quote's 64-byte report_data (parsed from the quote bytes)"
+     },
+     {
+      "name": "model: quote report_data binds signing address",
+      "ok": true,
+      "detail": "signing_address found inside the TDX quote's report_data"
+     },
+     {
+      "name": "model: MRCONFIGID = 01||sha256(app_compose)",
+      "ok": true,
+      "detail": "sha256 of the reported app_compose matches the quote's MRCONFIGID"
+     },
+     {
+      "name": "signature: ECDSA (EIP-191) recovers to signing_address",
+      "ok": true,
+      "detail": "recovered 0x835ab53d20294ef795906dff21ae4c045336aa26"
+     },
+     {
+      "name": "signature: signed text matches sha256 of our exact request and response bytes",
+      "ok": true,
+      "detail": "hashes equal"
+     },
+     {
+      "name": "signature: signer equals a preflight attestation's signing_address",
+      "ok": true,
+      "detail": "model report signer 0x835ab53d20294ef795906dff21ae4c045336aa26"
+     }
+    ],
+    "unverified": [
+     {
+      "what": "Intel TDX quote signature chain (DCAP)",
+      "reason": "no DCAP verifier in this package; quote fields were parsed and bound, but Intel's certificate chain and TCB status were not checked (verify at https://cloud.near.ai/verify or with dcap-qvl)"
+     },
+     {
+      "what": "RTMR3 event-log replay",
+      "reason": "not implemented locally"
+     },
+     {
+      "what": "NVIDIA GPU evidence (nvidia_payload)",
+      "reason": "no NVIDIA attestation verifier run locally; presence only"
+     }
+    ],
+    "billing": {
+     "prompt_tokens": 588,
+     "completion_tokens": 371,
+     "usd": 0.00052437,
+     "price_source": "models-endpoint"
+    }
+   }
+  },
+  {
+   "trip_tx_hash": "8VbsWdYZibxKgXdMHVbQqoLienzq8z1tByEf8mHwGcaK",
+   "at": "2026-11-14T06:47:01.014Z",
+   "model": "Qwen/Qwen3.8-27B",
+   "report": {
+    "summary": "A decoy key planted in a local file was used by a manual agent to sign a transaction on near-testnet. The attacker account si-attacker-5289.testnet executed the trip at block 277548776.",
+    "root_cause": "The specific tool or mechanism that exposed the key is not recorded in the evidence packet. The key was planted in a file at /private/tmp/claude-501/scratch~/testnet/si-decoy-5289.testnet.json.",
+    "leaked_via": "The exposure location is not recorded. The key was stored in a file on the local system.",
+    "blast_radius": "The incident occurred on near-testnet. No agent keys were deleted and no intents keys were removed during the response.",
+    "actions_taken": [
+     "Freeze transaction 6FVxN1oGvpMFhEEpthoMSutmgorXE7bVqSHxCVcY5fXT was executed at block 277548778.",
+     "The freeze occurred 2 blocks after the trip transaction."
+    ],
+    "recommended_next_steps": [
+     "Investigate the manual session s-lat to determine how the key was accessed.",
+     "Review the file path /private/tmp/claude-501/scratch~/testnet/si-decoy-5289.testnet.json for residual data."
+    ],
+    "confidence": "medium"
+   },
+   "proof": {
+    "model": "Qwen/Qwen3.8-27B",
+    "chat_id": "83925da3c4904071bc9b4d2357472bef",
+    "request_hash": "575fe4859b92516d085435ce18da92bd5b7af45d45f3f38c8e2d3f7c994d7f28",
+    "response_hash": "48f3e308390966e00df76873e8e6469b01b91e95a06aa44a11c3b859f9753319",
+    "signature": "0x6fed2ff87ac508e0b9b372b58f518f8cddf24ce01011ce1eb897084bbd8954be061af53ee0bfa41582a4ea46c7a369b295bd6e802f8dc6b287a8b94f3671805b1c",
+    "signing_address": "0x835ab53d20294ef795906dff21ae4c045336aa26",
+    "signing_algo": "ecdsa",
+    "signature_kind": "provider_tee",
+    "signed_text": "Qwen/Qwen3.8-27B:575fe4859b92516d085435ce18da92bd5b7af45d45f3f38c8e2d3f7c994d7f28:48f3e308390966e00df76873e8e6469b01b91e95a06aa44a11c3b859f9753319",
+    "attestation": {
+     "fetched_at": "2026-11-14T06:46:55.105Z",
+     "nonce": "6d25e3d0c49c52a6ef6718d4f620a2d8ecd2f4492873bd94d3e8174ae4bababc",
+     "gateway": {
+      "signing_address": "0xb98a789cdc4817275f5155593ba73ef2a957e779",
+      "signing_algo": "ecdsa",
+      "quote_sha256": "36502db547523b316f90fb259a954a9e39cf8736eaa0d06a06f59383bd8df5e3",
+      "quote_version": 4,
+      "tee_type": "0x81",
+      "mrtd": "7fe60787222bd394cb516abca2435f22f035ab2cc9c0a4b4b3b148e46297f3d931a237b72f359052c6e657d8c1409173",
+      "rtmr3": "74ea3e995d95b03058291f49cef0e1a05db746c4942b91478be6f7050b13434af6059ca038ac7821edffcbe7c8d4de8f",
+      "mrconfigid": "012643bc7ae47ecf4cf84509a647d2c2cc3bcacad95a87b8a73d543e6c48ad3b22000000000000000000000000000000",
+      "report_data": "b98a789cdc4817275f5155593ba73ef2a957e7790000000000000000000000006d25e3d0c49c52a6ef6718d4f620a2d8ecd2f4492873bd94d3e8174ae4bababc",
+      "gpu_evidence_present": false,
+      "event_log_present": true
+     },
+     "model": {
+      "signing_address": "0x835ab53d20294ef795906dff21ae4c045336aa26",
+      "signing_algo": "ecdsa",
+      "quote_sha256": "346d87c2b828364a187f6fa6ee2de59d87cc40068f30978582eff8d9f4bbb0e0",
+      "quote_version": 4,
+      "tee_type": "0x81",
+      "mrtd": "df4d77c857de652bd0fafa343a2026b51071ee03773d076d283abf1a7d36ff91ffa279ee4a617ac664f7e2a2c8d5891b",
+      "rtmr3": "bbada8ce4eb49dcf9d67f987f8ce6a3a3a59e8e86374180075aa12b4cdad6b06234acb1e044902cbcac130993ef9bb46",
+      "mrconfigid": "01e8416a02d6f7ce47baaa52e3925b934fd30834b04fc9086b363db9b1d12c729d000000000000000000000000000000",
+      "report_data": "835ab53d20294ef795906dff21ae4c045336aa260000000000000000000000006d25e3d0c49c52a6ef6718d4f620a2d8ecd2f4492873bd94d3e8174ae4bababc",
+      "gpu_evidence_present": true,
+      "event_log_present": true
+     },
+     "verified": true
+    },
+    "verified": true,
+    "checks": [
+     {
+      "name": "gateway: request_nonce echoed",
+      "ok": true,
+      "detail": "report.request_nonce equals the nonce we sent"
+     },
+     {
+      "name": "gateway: quote report_data binds nonce",
+      "ok": true,
+      "detail": "nonce found inside the TDX quote's 64-byte report_data (parsed from the quote bytes)"
+     },
+     {
+      "name": "gateway: quote report_data binds signing address",
+      "ok": true,
+      "detail": "signing_address found inside the TDX quote's report_data"
+     },
+     {
+      "name": "gateway: MRCONFIGID = 01||sha256(app_compose)",
+      "ok": true,
+      "detail": "sha256 of the reported app_compose matches the quote's MRCONFIGID"
+     },
+     {
+      "name": "model: request_nonce echoed",
+      "ok": true,
+      "detail": "report.request_nonce equals the nonce we sent"
+     },
+     {
+      "name": "model: quote report_data binds nonce",
+      "ok": true,
+      "detail": "nonce found inside the TDX quote's 64-byte report_data (parsed from the quote bytes)"
+     },
+     {
+      "name": "model: quote report_data binds signing address",
+      "ok": true,
+      "detail": "signing_address found inside the TDX quote's report_data"
+     },
+     {
+      "name": "model: MRCONFIGID = 01||sha256(app_compose)",
+      "ok": true,
+      "detail": "sha256 of the reported app_compose matches the quote's MRCONFIGID"
+     },
+     {
+      "name": "signature: ECDSA (EIP-191) recovers to signing_address",
+      "ok": true,
+      "detail": "recovered 0x835ab53d20294ef795906dff21ae4c045336aa26"
+     },
+     {
+      "name": "signature: signed text matches sha256 of our exact request and response bytes",
+      "ok": true,
+      "detail": "hashes equal"
+     },
+     {
+      "name": "signature: signer equals a preflight attestation's signing_address",
+      "ok": true,
+      "detail": "model report signer 0x835ab53d20294ef795906dff21ae4c045336aa26"
+     }
+    ],
+    "unverified": [
+     {
+      "what": "Intel TDX quote signature chain (DCAP)",
+      "reason": "no DCAP verifier in this package; quote fields were parsed and bound, but Intel's certificate chain and TCB status were not checked (verify at https://cloud.near.ai/verify or with dcap-qvl)"
+     },
+     {
+      "what": "RTMR3 event-log replay",
+      "reason": "not implemented locally"
+     },
+     {
+      "what": "NVIDIA GPU evidence (nvidia_payload)",
+      "reason": "no NVIDIA attestation verifier run locally; presence only"
+     }
+    ],
+    "billing": {
+     "prompt_tokens": 572,
+     "completion_tokens": 335,
+     "usd": 0.00047513,
+     "price_source": "models-endpoint"
+    }
+   }
+  }
+ ],
  "agent": {
   "account_id": "si-agent-5289.testnet",
   "frozen": false,
   "agent_keys": [
-   "ed25519:AJ4GD6K9tewfPmrKdcwrTRy4WDfriWcAA1M4YKvvL6PG"
+   "ed25519:4QfSXZYLCSmacwaKDhsYNPstLFWHzzrsATHFZJ5UPtFS"
   ],
   "intents_keys": []
  },
  "decoy": {
   "account_id": "si-decoy-5289.testnet",
-  "balance_yocto": "3094619687087500000000000",
+  "balance_yocto": "2891059069937500000000000",
   "keys": [
    {
     "public_key": "ed25519:7JXxtiddaycVeHpXcQV1385CopaZoXxdBGkkH3Za6UQN",
@@ -128,6 +551,33 @@
     "outlayer_execution": "",
     "attested": false
    }
+  },
+  {
+   "tx_hash": "GdQ8wC378iCb9iYVxW5nC3Mgbra2fUgdGMy86LdCwiw2",
+   "block_height": 277620545,
+   "decoy_public_key": "ed25519:45D6DkSevSh3BVVWxXnCX8qX7t71pEHRYDkA6gGQe1bP",
+   "attacker_account": "si-attacker-5289.testnet",
+   "attributed_to": {
+    "session_id": "",
+    "agent": "",
+    "tool_name": "",
+    "tool_use_id": "",
+    "path": ""
+   },
+   "freeze": {
+    "tx_hash": "HY6FtnJGxfnFkma4jD6kXjSmquEnvt1B5dfRDKPGhL9m",
+    "block_height": 277620548,
+    "blocks_after_trip": 3,
+    "deleted_keys": [
+     "ed25519:3XK4UeUWHHzEu6jdv7EE3fEgokJCEYMhncX5wsMDttEW"
+    ],
+    "intents_keys_removed": []
+   },
+   "blocklist": {
+    "tx_hash": "FdDiwpR43KB1YQ1v3k2LRJYx5Cf1toFaBdDKHVYkKJSi",
+    "outlayer_execution": "FdDiwpR43KB1YQ1v3k2LRJYx5Cf1toFaBdDKHVYkKJSi",
+    "attested": true
+   }
   }
  ],
  "blocklist": [
@@ -139,9 +589,9 @@
   },
   {
    "account_id": "si-attacker-5289.testnet",
-   "evidence_tx": "68KXaCsncDdk8yJKZB5JpqksaDR1CUxKf3FbqGczyY2H",
-   "decoy_public_key": "ed25519:4Dy9tyjddwNfriM7qwzu5P9Hz2sQwyvUwLZ8yDQkHgYF",
-   "attested_at": "2026-11-13T20:28:37.960Z"
+   "evidence_tx": "GdQ8wC378iCb9iYVxW5nC3Mgbra2fUgdGMy86LdCwiw2",
+   "decoy_public_key": "ed25519:45D6DkSevSh3BVVWxXnCX8qX7t71pEHRYDkA6gGQe1bP",
+   "attested_at": "2026-11-14T06:32:42.324Z"
   }
  ],
  "bench": {
