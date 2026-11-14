@@ -1,0 +1,149 @@
+{
+ "run_id": "8f27c681-6aa9-41d2-91d3-2c3a03769dc1",
+ "at": "2026-11-14T09:07:40.058Z",
+ "blocks_to_freeze": 3,
+ "steps": [
+  {
+   "run_id": "8f27c681-6aa9-41d2-91d3-2c3a03769dc1",
+   "step": "plant",
+   "status": "start",
+   "at": "2026-11-14T09:07:27.382Z",
+   "title": "Planting a fresh decoy key on the lab decoy account"
+  },
+  {
+   "run_id": "8f27c681-6aa9-41d2-91d3-2c3a03769dc1",
+   "step": "plant",
+   "status": "ok",
+   "at": "2026-11-14T09:07:29.192Z",
+   "title": "Decoy key ed25519:HVbkVnWPTS... added to lab-decoy.si-project-5289.testnet",
+   "tx_hash": "H2HoXRW5LZKYYcsZbm3QeM9BiBLBnar8quf9hcF9qyhZ",
+   "block": 277636302,
+   "explorer": "https://testnet.nearblocks.io/txns/H2HoXRW5LZKYYcsZbm3QeM9BiBLBnar8quf9hcF9qyhZ"
+  },
+  {
+   "run_id": "8f27c681-6aa9-41d2-91d3-2c3a03769dc1",
+   "step": "leak",
+   "status": "start",
+   "at": "2026-11-14T09:07:29.192Z",
+   "title": "A simulated agent session reads the decoy credentials"
+  },
+  {
+   "run_id": "8f27c681-6aa9-41d2-91d3-2c3a03769dc1",
+   "step": "leak",
+   "status": "ok",
+   "at": "2026-11-14T09:07:29.892Z",
+   "title": "Tool response exposed the decoy key to the session (simulated, no transaction)",
+   "detail": "Bash(cat ~/.near-credentials/testnet/lab-decoy.si-project-5289.testnet.json) -> tool_response contained the decoy secret"
+  },
+  {
+   "run_id": "8f27c681-6aa9-41d2-91d3-2c3a03769dc1",
+   "step": "theft",
+   "status": "start",
+   "at": "2026-11-14T09:07:29.892Z",
+   "title": "Thief signs a 0.05 NEAR transfer from the decoy with the leaked key"
+  },
+  {
+   "run_id": "8f27c681-6aa9-41d2-91d3-2c3a03769dc1",
+   "step": "detect",
+   "status": "start",
+   "at": "2026-11-14T09:07:30.314Z",
+   "title": "Watching the decoy account for any use of the new key"
+  },
+  {
+   "run_id": "8f27c681-6aa9-41d2-91d3-2c3a03769dc1",
+   "step": "theft",
+   "status": "ok",
+   "at": "2026-11-14T09:07:31.850Z",
+   "title": "Decoy-signed transfer included in block 277636306",
+   "tx_hash": "8gxu7SfmNpsUsiCPi4DxVnCZd3FPQNL4Fu6aai6pNUFm",
+   "block": 277636306,
+   "explorer": "https://testnet.nearblocks.io/txns/8gxu7SfmNpsUsiCPi4DxVnCZd3FPQNL4Fu6aai6pNUFm"
+  },
+  {
+   "run_id": "8f27c681-6aa9-41d2-91d3-2c3a03769dc1",
+   "step": "detect",
+   "status": "ok",
+   "at": "2026-11-14T09:07:31.850Z",
+   "title": "Decoy key use seen on chain in block 277636306",
+   "block": 277636306,
+   "detail": "access-key change (nonce bump) in the inclusion block; freeze broadcast 1328 ms after the theft broadcast"
+  },
+  {
+   "run_id": "8f27c681-6aa9-41d2-91d3-2c3a03769dc1",
+   "step": "freeze",
+   "status": "start",
+   "at": "2026-11-14T09:07:31.850Z",
+   "title": "Watcher function-call key calls guardian.freeze"
+  },
+  {
+   "run_id": "8f27c681-6aa9-41d2-91d3-2c3a03769dc1",
+   "step": "freeze",
+   "status": "ok",
+   "at": "2026-11-14T09:07:34.065Z",
+   "title": "Agent account frozen in block 277636309, 3 blocks after the theft",
+   "tx_hash": "DAweb2Xm7vUDsRvYizQFwR5ACnn3wkSkYVj8c2G6BRtf",
+   "block": 277636309,
+   "blocks_after_trip": 3,
+   "explorer": "https://testnet.nearblocks.io/txns/DAweb2Xm7vUDsRvYizQFwR5ACnn3wkSkYVj8c2G6BRtf"
+  },
+  {
+   "run_id": "8f27c681-6aa9-41d2-91d3-2c3a03769dc1",
+   "step": "notify",
+   "status": "start",
+   "at": "2026-11-14T09:07:34.065Z",
+   "title": "Pushing the alert to the public lab topic"
+  },
+  {
+   "run_id": "8f27c681-6aa9-41d2-91d3-2c3a03769dc1",
+   "step": "notify",
+   "status": "fail",
+   "at": "2026-11-14T09:07:36.565Z",
+   "title": "Server-side ntfy publish failed (ntfy.sh blocks Workers egress)",
+   "detail": "The operation was aborted due to timeout",
+   "ntfy": {
+    "topic": "standin-lab-dev-mock",
+    "title": "Decoy tripped -> frozen in 3 blocks",
+    "message": "Decoy key used in block 277636306; guardian froze lab-agent.si-project-5289.testnet in block 277636309.",
+    "click": "https://testnet.nearblocks.io/txns/DAweb2Xm7vUDsRvYizQFwR5ACnn3wkSkYVj8c2G6BRtf"
+   }
+  },
+  {
+   "run_id": "8f27c681-6aa9-41d2-91d3-2c3a03769dc1",
+   "step": "reset",
+   "status": "start",
+   "at": "2026-11-14T09:07:36.565Z",
+   "title": "Resetting: unfreeze, re-provision the agent key, return the loot, delete the decoy key"
+  },
+  {
+   "run_id": "8f27c681-6aa9-41d2-91d3-2c3a03769dc1",
+   "step": "reset",
+   "status": "ok",
+   "at": "2026-11-14T09:07:40.058Z",
+   "title": "Lab agent UNFROZEN with 1 agent key; loot returned; used decoy key deleted",
+   "tx_hash": "GPNko4pLsagQtkutRzxkoe2HqEDutV7eub8pyuuJ5BqH",
+   "txs": [
+    {
+     "label": "delete_decoy_key",
+     "tx_hash": "GPNko4pLsagQtkutRzxkoe2HqEDutV7eub8pyuuJ5BqH",
+     "explorer": "https://testnet.nearblocks.io/txns/GPNko4pLsagQtkutRzxkoe2HqEDutV7eub8pyuuJ5BqH"
+    },
+    {
+     "label": "unfreeze",
+     "tx_hash": "9z9BtskxPSQGTqaUXQN9UygExGnPRDPMP6kPhKsAKj8F",
+     "explorer": "https://testnet.nearblocks.io/txns/9z9BtskxPSQGTqaUXQN9UygExGnPRDPMP6kPhKsAKj8F"
+    },
+    {
+     "label": "return_loot",
+     "tx_hash": "BmAjiziTuFHMvXeLvSoZzR9cs2JikJcvJ6JhT2QWrvpn",
+     "explorer": "https://testnet.nearblocks.io/txns/BmAjiziTuFHMvXeLvSoZzR9cs2JikJcvJ6JhT2QWrvpn"
+    },
+    {
+     "label": "add_agent_key",
+     "tx_hash": "CpFEwT7g6FJ8CMMit1XQh6vLDVyGATUM75NNaDUQ4iqk",
+     "explorer": "https://testnet.nearblocks.io/txns/CpFEwT7g6FJ8CMMit1XQh6vLDVyGATUM75NNaDUQ4iqk"
+    }
+   ],
+   "explorer": "https://testnet.nearblocks.io/txns/GPNko4pLsagQtkutRzxkoe2HqEDutV7eub8pyuuJ5BqH"
+  }
+ ]
+}

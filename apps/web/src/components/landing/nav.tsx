@@ -1,4 +1,4 @@
-import { Link } from "react-router";
+import { Link, NavLink } from "react-router";
 import { ArrowRight } from "lucide-react";
 import { DASHBOARD_PATH, REPO_URL } from "./content";
 
@@ -21,11 +21,18 @@ export function GithubMark({ className = "size-4" }: { className?: string }) {
   );
 }
 
+// Section anchors resolve against the landing page, so they also work from /lab and /verify.
 const LINKS = [
-  { href: "#how", label: "How it works" },
-  { href: "#attribution", label: "Attribution" },
-  { href: "#blocklist", label: "Blocklist" },
-  { href: "#benchmark", label: "Benchmark" },
+  { href: "/#how", label: "How it works" },
+  { href: "/#attribution", label: "Attribution" },
+  { href: "/#blocklist", label: "Blocklist" },
+  { href: "/#benchmark", label: "Benchmark" },
+];
+
+/** Public proof pages: shown at every width (the section anchors collapse below lg). */
+const PAGES = [
+  { to: "/lab", label: "Lab" },
+  { to: "/verify", label: "Verify" },
 ];
 
 export const focusRing =
@@ -43,9 +50,9 @@ export function Nav() {
           Stand-in
         </Link>
 
-        <ul className="hidden items-center gap-1 md:flex">
+        <ul className="flex min-w-0 items-center gap-0.5 sm:gap-1">
           {LINKS.map((l) => (
-            <li key={l.href}>
+            <li key={l.href} className="hidden lg:block">
               <a
                 href={l.href}
                 className={`rounded-md px-3 py-1.5 text-[13px] text-fg-muted transition-colors hover:text-fg ${focusRing}`}
@@ -54,9 +61,21 @@ export function Nav() {
               </a>
             </li>
           ))}
+          {PAGES.map((p) => (
+            <li key={p.to}>
+              <NavLink
+                to={p.to}
+                className={({ isActive }) =>
+                  `rounded-md px-2 py-1.5 text-[13px] transition-colors hover:text-fg sm:px-3 ${isActive ? "text-fg" : "text-fg-muted"} ${focusRing}`
+                }
+              >
+                {p.label}
+              </NavLink>
+            </li>
+          ))}
         </ul>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
           <a
             href={REPO_URL}
             target="_blank"
