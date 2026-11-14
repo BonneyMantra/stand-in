@@ -1,6 +1,6 @@
 import { loadNetworkConfig, type NetworkConfig } from "./config.ts";
 import { interactionCount } from "./ledger.ts";
-import { makeProvider } from "./rpc.ts";
+import { eachEndpoint, makeProvider } from "./rpc.ts";
 import { logger } from "./logger.ts";
 
 const log = logger("counterparty");
@@ -43,16 +43,16 @@ function isMissing(e: unknown): boolean {
 }
 
 async function archivalStateAt(cfg: NetworkConfig, accountId: string, ageMs: number) {
-  const prov = makeProvider(cfg, true);
-  const head = (await makeProvider(cfg).viewBlock({ finality: "final" } as any)) as any;
+  const never = () => false;
+  const head = (await eachEndpoint(cfg, false, (p) => p.viewBlock({ finality: "final" } as any), never)) as any;
   const guess = head.header.height - Math.round(ageMs / 1000);
   // correct the guess once using the timestamp of the guessed block
-  const probe = (await prov.viewBlock({ blockId: guess } as any)) as any;
+  const probe = (await eachEndpoint(cfg, true, (p) => p.viewBlock({ blockId: guess } as any), never)) as any;
   const wantNs = BigInt(head.header.timestamp_nanosec) - BigInt(ageMs) * 1_000_000n;
   const driftS = Number((wantNs - BigInt(probe.header.timestamp_nanosec)) / 1_000_000_000n);
   const height = guess + driftS;
   try {
-    const a = (await prov.viewAccount({ accountId, blockQuery: { blockId: height } } as any)) as any;
+    const a = (await eachEndpoint(cfg, true, (p) => p.viewAccount({ accountId, blockQuery: { blockId: height } } as any), isMissing)) as any;
     return { existed: true, codeHash: String(a.code_hash) };
   } catch (e) {
     if (isMissing(e)) return { existed: false };
@@ -112,7 +112,7 @@ export async function checkCounterparty(accountId: string, o: CheckOpts = {}): P
 
 async function currentCode(cfg: NetworkConfig, accountId: string): Promise<string | null> {
   try {
-    const a = (await makeProvider(cfg).viewAccount({ accountId } as any)) as any;
+    const a = (await eachEndpoint(cfg, false, (p) => p.viewAccount({ accountId } as any), isMissing)) as any;
     return String(a.code_hash);
   } catch (e) {
     if (isMissing(e)) return null;

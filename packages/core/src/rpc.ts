@@ -18,13 +18,38 @@ export function publicKeyOf(secret: string): string {
   return KeyPair.fromString(secret as `ed25519:${string}`).getPublicKey().toString();
 }
 
+const RPC_OPTS = { retries: 6, backoff: 1.6, wait: 600 } as any;
+
+/** The RPC urls a provider would use, in order, without duplicates. */
+export function endpointUrls(cfg: NetworkConfig, archival = false): string[] {
+  const urls = archival ? [cfg.archivalRpcUrl, cfg.network === "mainnet" ? "https://archival-rpc.mainnet.near.org" : "https://archival-rpc.testnet.near.org"] : orderedEndpoints(cfg);
+  return [...new Set(urls)];
+}
+
 /** Provider with failover across the configured RPC urls (fastnear free tier rate-limits at ~2 req/s). */
 export function makeProvider(cfg: NetworkConfig, archival = false): JsonRpcProvider {
-  const urls = archival ? [cfg.archivalRpcUrl, cfg.network === "mainnet" ? "https://archival-rpc.mainnet.near.org" : "https://archival-rpc.testnet.near.org"] : orderedEndpoints(cfg);
-  const uniq = [...new Set(urls)];
-  const opts = { retries: 6, backoff: 1.6, wait: 600 } as any;
-  if (uniq.length === 1) return new JsonRpcProvider({ url: uniq[0]! }, opts);
-  return new FailoverRpcProvider(uniq.map((url) => new JsonRpcProvider({ url }, opts))) as unknown as JsonRpcProvider;
+  const uniq = endpointUrls(cfg, archival);
+  if (uniq.length === 1) return new JsonRpcProvider({ url: uniq[0]! }, RPC_OPTS);
+  return new FailoverRpcProvider(uniq.map((url) => new JsonRpcProvider({ url }, RPC_OPTS))) as unknown as JsonRpcProvider;
+}
+
+/**
+ * Runs `fn` against each endpoint in turn, silently. A thrown error for which `definitive(e)` is true (for
+ * example "account does not exist") is an answer, not an outage: it is rethrown at once without trying other
+ * endpoints. near-api-js's FailoverRpcProvider instead prints every error and wraps a definitive answer into
+ * "Exceeded N providers", which hid AccountDoesNotExist from callers.
+ */
+export async function eachEndpoint<T>(cfg: NetworkConfig, archival: boolean, fn: (p: JsonRpcProvider) => Promise<T>, definitive: (e: unknown) => boolean): Promise<T> {
+  let last: unknown;
+  for (const url of endpointUrls(cfg, archival)) {
+    try {
+      return await fn(new JsonRpcProvider({ url }, RPC_OPTS));
+    } catch (e) {
+      if (definitive(e)) throw e;
+      last = e;
+    }
+  }
+  throw last ?? new Error("no RPC endpoint configured");
 }
 export function makeAccount(cfg: NetworkConfig, accountId: string, secretKey: string): Account {
   return new Account(accountId, makeProvider(cfg), KeyPairSigner.fromSecretKey(secretKey as `ed25519:${string}`));
