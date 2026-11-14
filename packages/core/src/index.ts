@@ -1,6 +1,7 @@
 export * from "./logger.ts";
 export * from "./config.ts";
 export * from "./ledger.ts";
+export * from "./chainsig-ledger.ts";
 export * from "./rpc.ts";
 export * from "./pool.ts";
 export * from "./plant.ts";

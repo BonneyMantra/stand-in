@@ -95,6 +95,21 @@ importers:
 
   bench: {}
 
+  packages/chainsig:
+    dependencies:
+      '@noble/curves':
+        specifier: ^2.0.0
+        version: 2.4.0
+      '@noble/hashes':
+        specifier: ^2.0.0
+        version: 2.4.0
+      '@standin/core':
+        specifier: workspace:*
+        version: link:../core
+      near-api-js:
+        specifier: ^7.5.3
+        version: 7.5.3
+
   packages/cli:
     dependencies:
       '@standin/core':

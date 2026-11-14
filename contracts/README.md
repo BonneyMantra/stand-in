@@ -27,6 +27,7 @@ signed by the agent account's full-access key. The owner full-access key is neve
 | `add_agent_key(public_key, receiver_id, method_names[], allowance)` | owner | `AddKey(FunctionCall)` on its own account; `allowance` is a yoctoNEAR string, `"0"` = unlimited; empty `method_names` = any method |
 | `add_intents_key(public_key)` | owner | calls intents `add_public_key` with 1 yocto as the account; records the key in a callback only on success |
 | `freeze(reason, decoy_public_key?, tx_hash?)` | watcher or owner | one `DeleteKey` receipt per agent key (so one failure cannot block the rest) plus intents `remove_public_key` (1 yocto) per intents key; sets `frozen`; appends `{at_block, reason, decoy_public_key, tx_hash, by, deleted_keys, intents_keys_removed}` to `freeze_log` |
+| `sign_evm(payload_hex, path)` | owner (the account itself, so also its function-call key on this method) | forwards an ECDSA request to the NEAR MPC signer `v1.signer-prod.testnet` (domain 0, 1 yocto attached by the guardian); refused while `frozen`. Added 2026-11-14 by code upgrade with state preserved; see `packages/chainsig/README.md` |
 | `unfreeze()` | owner | clears `frozen`; keys must then be re-provisioned |
 | `get_state()` | view | everything above |
 

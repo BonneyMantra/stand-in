@@ -65,4 +65,19 @@ Tests can inject `registryCheck`, `stateAt`, `currentCodeHash`.
 `generateKey()`, `publicKeyOf(secret)`, `loadScopedKey()` (agent's legit FC key written by `standin adopt`:
 `{account_id, public_key, secret_key, receiver_id, method_names}`), `explorerTx(cfg, hash)`.
 
+## Chain Signatures ledger and the optional `chainsig` state field
+`$STANDIN_HOME/chainsig.ndjson` (separate from `ledger.ndjson`), written by `packages/chainsig/scripts/prove.ts` via
+`appendChainsig`, read by `chainsigState()`. Lines: `{type:"sign", at, evm_address, chain_id, path, ok, tx_hash, error?}` and
+`{type:"blocked", at, evm_address, chain_id, path, via:"deleted-agent-key"|"owner-key", tx_hash?, error}`.
+
+`GET /api/state` gains an OPTIONAL top-level `chainsig` object, present only when that ledger has events (no existing field changed):
+```json
+{ "chainsig": { "evm_address": "0x...", "chain_id": 11155111, "path": "standin-evm-1",
+    "last_sign": {"tx_hash": "", "at": "", "ok": true},
+    "blocked_after_freeze": {"tx_hash": "", "error": ""} } }
+```
+`last_sign` is the latest `sign` event (empty strings and `ok:false` if none). `blocked_after_freeze` is the latest owner-key refusal
+(its `tx_hash` is an on-chain failed `sign_evm`; `error` is the guardian's frozen message); if only the deleted-key attempt exists,
+that one is used, with an empty `tx_hash` because the RPC rejects it before it becomes a transaction.
+
 ## Watcher API (127.0.0.1:4317) is in packages/watcher/README.md and follows docs/BRIEF.md exactly.

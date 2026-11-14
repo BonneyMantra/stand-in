@@ -1,4 +1,4 @@
-import { loadDevKey, makeProvider, readEvents, requireAccount, type LedgerEvent, type NetworkConfig } from "@standin/core";
+import { chainsigState, loadDevKey, makeProvider, readEvents, requireAccount, type LedgerEvent, type NetworkConfig } from "@standin/core";
 
 const s = (v: unknown) => (v == null ? "" : String(v));
 
@@ -67,8 +67,10 @@ export async function buildState(cfg: NetworkConfig, home?: string) {
         attested_at: e.attested_at_ns ? new Date(Number(BigInt(e.attested_at_ns.toString()) / 1_000_000n)).toISOString() : s(e.attested_at),
       }))
     : ledgerBlocklist;
+  const chainsig = chainsigState(home);
   return {
     network: cfg.network,
+    ...(chainsig ? { chainsig } : {}),
     agent: {
       account_id: requireAccount(cfg, "agent"), frozen: Boolean(g?.frozen),
       agent_keys: (g?.agent_keys ?? []).map((k: any) => (typeof k === "string" ? k : k.public_key)),
