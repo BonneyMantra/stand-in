@@ -13,6 +13,9 @@ incident report.
 
 Built for NEAR HACKATHON (November 2026), Security and Agents tracks. MIT licensed.
 
+**Try it without installing anything:** leak a decoy yourself at https://stand-in-44e.pages.dev/lab, check every claim
+from chain at https://stand-in-44e.pages.dev/verify, and see the guide for judges in [JUDGES.md](JUDGES.md).
+
 ## How it works
 
 | Step | What happens | Where |
@@ -25,6 +28,10 @@ Built for NEAR HACKATHON (November 2026), Security and Agents tracks. MIT licens
 | Attribute | The decoy's public key maps to the session that received it and the tool call that exposed it. | ledger + dashboard |
 | Blocklist | An OutLayer TEE app verifies the theft from chain data and signs a verdict; the registry adds the thief. `standin pay` refuses blocklisted receivers. | `outlayer/verdict`, `contracts/blocklist` |
 | Report | A NEAR AI Cloud model inside a TEE writes the incident report; the signature and attestation are checked locally. | `packages/nearai` |
+| Prevent | Before the agent installs or runs packages, the hook checks OSV.dev and denies known malware; a provenance downgrade is flagged. | `integrations/common/supplychain` |
+| Canary | Each session also gets Canarytokens decoys (DNS, URL, MCP config) that alert even if the thief never touches NEAR. | `packages/canary` |
+| Alert | The owner's phone gets an ntfy push with Freeze now and Ignore buttons; a fired canary can freeze before any theft. | `packages/notify`, `packages/watcher` |
+| Recover | Unfreezing, or approving a payment that only warns, needs the owner's fingerprint (Touch ID). | `packages/touchid`, `packages/cli` |
 
 ## NEAR technology used
 
@@ -82,7 +89,7 @@ pnpm standin:claude --home .sandbox/me      # Claude Code plugin into an isolate
 pnpm standin:codex                          # Codex with decoys and hooks
 pnpm standin pay <account> <amount>         # counterparty check: allow / warn / block
 cd apps/web && pnpm exec vite               # dashboard and landing page on 127.0.0.1:4173
-pnpm test                                   # TypeScript tests (36)
+pnpm test                                   # TypeScript tests (105)
 ```
 
 The dashboard reads the live watcher; with no watcher it falls back to a recorded testnet run
@@ -99,7 +106,8 @@ The dashboard reads the live watcher; with no watcher it falls back to a recorde
 | `packages/chainsig`, `packages/mainnet`, `packages/nearai` | Chain Signatures, mainnet slice with spend guard, NEAR AI Cloud reports |
 | `integrations/` | Claude Code plugin and Codex launcher with shared hooks |
 | `attacks/`, `bench/` | 20 attack routes and the on/off benchmark |
-| `apps/web` | Landing page and dashboard (`apps/web/UI-SOURCES.md` lists component sources) |
+| `apps/web` | Landing page, dashboard, hosted lab (`/lab`, Pages Functions in `functions/`) and claim checker (`/verify`); `UI-SOURCES.md` lists component sources |
+| `packages/lab`, `packages/notify`, `packages/touchid`, `packages/canary` | Hosted lab backend, phone alerts, fingerprint gate, canary decoys |
 
 ## Limits and planned work
 
@@ -109,6 +117,8 @@ The dashboard reads the live watcher; with no watcher it falls back to a recorde
 - The NEAR AI Cloud proof is checked locally except Intel's DCAP certificate chain, RTMR3 replay and NVIDIA GPU evidence.
 - The plugin marketplace listing and an npm package are planned; today everything runs from a clone.
 - No live public bait has been published yet; the mainnet theft above is our own scripted thief.
+- The hosted lab sends its phone push from the visitor's browser, because ntfy.sh refuses connections from Cloudflare Workers.
+- The OSV check reads package.json and the named packages; installs hidden inside scripts are not parsed.
 
 ## Safety
 
