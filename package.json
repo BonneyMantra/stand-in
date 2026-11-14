@@ -6,7 +6,9 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.base.json --noEmit",
-    "standin": "node --import tsx packages/cli/src/bin.ts"
+    "standin": "node --import tsx packages/cli/src/bin.ts",
+    "standin:claude": "node integrations/claude-code/install.mjs",
+    "standin:codex": "node integrations/codex/bin/standin-codex.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

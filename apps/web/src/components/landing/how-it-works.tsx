@@ -10,7 +10,7 @@ const STEPS: Step[] = [
     verb: "Adopt",
     icon: Lock,
     body: "Moves the real full-access key out of the agent's reach. The agent gets a function-call key scoped to one contract.",
-    mono: "npx stand-in adopt",
+    mono: "pnpm standin adopt",
     tone: "bg-fg-muted",
   },
   {

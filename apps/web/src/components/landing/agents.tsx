@@ -131,7 +131,7 @@ export function Agents() {
 
         <Reveal delay={0.05} className="mt-12 grid grid-cols-1 gap-6 border-t border-line pt-10 md:grid-cols-3">
           {[
-            { k: "Claude Code", lines: INSTALL.claude, p: ">" },
+            { k: "Claude Code", lines: INSTALL.claude, p: "$" },
             { k: "Codex", lines: INSTALL.codex, p: "$" },
             { k: "Adopt the account", lines: INSTALL.cli, p: "$" },
           ].map((g) => (

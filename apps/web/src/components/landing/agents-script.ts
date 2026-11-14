@@ -14,11 +14,11 @@ export const BEATS: Beat[] = [
   {
     hook: "install",
     claude: [
-      { t: "cmd", text: "/plugin install stand-in@stand-in" },
+      { t: "cmd", text: "! pnpm standin:claude --home .sandbox/me" },
       { t: "out", text: "installed · 4 hooks registered" },
     ],
     codex: [
-      { t: "cmd", text: "npx stand-in codex" },
+      { t: "cmd", text: "pnpm standin:codex" },
       { t: "out", text: "hooks.json written to $CODEX_HOME" },
       { t: "out", text: "decoy env passed via shell_environment_policy" },
     ],

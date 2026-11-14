@@ -14,16 +14,17 @@ export const PROOF_TX = {
 } as const;
 
 export const INSTALL = {
-  claude: ["/plugin marketplace add BonneyMantra/stand-in", "/plugin install stand-in@stand-in"],
-  codex: ["npx stand-in codex"],
-  cli: ["npx stand-in adopt"],
+  claude: ["git clone https://github.com/BonneyMantra/stand-in && cd stand-in && pnpm install", "pnpm standin:claude --home .sandbox/me"],
+  codex: ["pnpm standin:codex"],
+  cli: ["pnpm standin adopt --home ~"],
 } as const;
 
 export const SETUP_PROMPT = [
   "Install Stand-in (decoy NEAR keys for coding agents) in this project.",
-  "If you are Claude Code: run `/plugin marketplace add BonneyMantra/stand-in`, then `/plugin install stand-in@stand-in`.",
-  "If you are Codex: run `npx stand-in codex`.",
-  "Then run `npx stand-in adopt` and tell me which account it moved the full-access key out of, which function-call key you now hold, and where the decoy keys were planted.",
+  "Clone https://github.com/BonneyMantra/stand-in and run `pnpm install`.",
+  "If you are Claude Code: run `pnpm standin:claude --home .sandbox/me` (this build installs the plugin into an isolated config dir).",
+  "If you are Codex: launch through `pnpm standin:codex`.",
+  "Then run `pnpm standin adopt --home ~` and tell me which account it moved the full-access key out of, which function-call key you now hold, and where the decoy keys were planted.",
   `Docs: ${REPO_URL}`,
 ].join("\n");
 
