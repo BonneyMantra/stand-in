@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Check, Copy, ExternalLink, type LucideIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Frame, FrameHeader, FramePanel } from "@/components/reui/frame";
 import type { DecoyStatus } from "@/data/derive";
@@ -75,17 +76,18 @@ export function CopyText({ value, display, className }: { value: string; display
     }
   };
   return (
-    <button
-      type="button"
+    <Button
+      variant="bare"
+      size="bare"
       onClick={copy}
       title={value}
       aria-label={`Copy ${value}`}
-      className={cn("group inline-flex max-w-full items-center gap-1.5 rounded font-mono text-xs text-fg-muted outline-none hover:text-fg focus-visible:ring-2 focus-visible:ring-ring", className)}
+      className={cn("group inline-flex max-w-full shrink items-center justify-start gap-1.5 rounded font-mono text-xs whitespace-normal text-fg-muted outline-none transition-none hover:text-fg focus-visible:ring-2 focus-visible:ring-ring", className)}
     >
       <span className="truncate">{display ?? value}</span>
       {done ? <Check className="size-3 shrink-0 text-safe" aria-hidden /> : <Copy className="size-3 shrink-0 opacity-0 transition-opacity group-hover:opacity-70 group-focus-visible:opacity-70" aria-hidden />}
       <span className="sr-only" aria-live="polite">{done ? "Copied" : ""}</span>
-    </button>
+    </Button>
   );
 }
 

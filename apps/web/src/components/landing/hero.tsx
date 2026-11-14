@@ -2,8 +2,9 @@ import { Link } from "react-router";
 import { motion, useReducedMotion } from "motion/react";
 import { ArrowRight } from "lucide-react";
 import { DASHBOARD_PATH, SETUP_PROMPT } from "./content";
-import { CopyIcon, EASE_OUT, useCopy } from "./primitives";
-import { focusRing } from "./nav";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { CopyIcon, EASE_OUT, FOCUS, useCopy } from "./primitives";
 import { TripMap } from "./trip-map";
 
 /* Axiom's hero streaks: thin diagonal light lines in the top-right. Static, decorative. */
@@ -77,27 +78,28 @@ export function Hero() {
         </motion.p>
 
         <motion.div {...rise(0.16, 8)} className="mt-8 flex flex-wrap items-center gap-3">
-          <Link
-            to={DASHBOARD_PATH}
-            className={`group/cta inline-flex h-10 items-center gap-2 rounded-md bg-fg px-4 text-[14px] font-medium text-ink-950 transition-[background-color,transform] duration-150 hover:bg-white active:scale-[0.98] ${focusRing}`}
-          >
-            Open the live dashboard
-            <ArrowRight
-              aria-hidden
-              className="size-4 transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] group-hover/cta:translate-x-0.5"
-            />
-          </Link>
-          <button
-            type="button"
+          <Button asChild variant="invert" size="lg" className={cn("group/cta gap-2 px-4 text-[14px] duration-150 active:scale-[0.98]", FOCUS)}>
+            <Link to={DASHBOARD_PATH}>
+              Open the live dashboard
+              <ArrowRight
+                aria-hidden
+                data-icon="inline-end"
+                className="size-4 transition-transform duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] group-hover/cta:translate-x-0.5"
+              />
+            </Link>
+          </Button>
+          <Button
+            variant="line"
+            size="lg"
             onClick={() => copy(SETUP_PROMPT)}
-            className={`inline-flex h-10 items-center gap-2 rounded-md border border-line-strong bg-ink-900/80 px-4 text-[14px] text-fg transition-[background-color,transform] duration-150 hover:bg-ink-800 active:scale-[0.98] ${focusRing}`}
+            className={cn("gap-2 px-4 text-[14px] duration-150 active:scale-[0.98]", FOCUS)}
           >
             <CopyIcon copied={copied} />
             <span className="relative">
               <span className={copied ? "invisible" : ""}>Copy setup prompt</span>
               <span className={`absolute inset-0 ${copied ? "" : "invisible"}`}>Prompt copied</span>
             </span>
-          </button>
+          </Button>
           <span className="sr-only" aria-live="polite">
             {copied ? "Setup prompt copied. Paste it into Claude Code or Codex." : ""}
           </span>

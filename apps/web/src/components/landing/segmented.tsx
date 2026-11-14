@@ -1,7 +1,12 @@
-import { useRef, type KeyboardEvent } from "react";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
+import { FOCUS } from "./primitives";
 
-/** A segmented radiogroup: roving tabindex, arrow keys move and select, Home/End jump. */
+/**
+ * A segmented single-choice control on the shadcn ToggleGroup (ReUI's primitive). Radix gives the
+ * radio semantics, roving tabindex and arrow/Home/End movement; selecting on focus keeps the
+ * "arrow keys move and select" behaviour, and an empty value (re-clicking the active item) is ignored.
+ */
 export function Segmented({
   options,
   value,
@@ -15,42 +20,25 @@ export function Segmented({
   label: string;
   className?: string;
 }) {
-  const refs = useRef<(HTMLButtonElement | null)[]>([]);
-  const last = options.length - 1;
-  const move = (i: number) => {
-    const next = (i + options.length) % options.length;
-    onChange(next);
-    refs.current[next]?.focus();
-  };
-  const onKey = (e: KeyboardEvent) => {
-    const map: Record<string, number> = { ArrowRight: value + 1, ArrowDown: value + 1, ArrowLeft: value - 1, ArrowUp: value - 1, Home: 0, End: last };
-    if (e.key in map) {
-      e.preventDefault();
-      move(map[e.key]!);
-    }
-  };
   return (
-    <div
+    <ToggleGroup
+      type="single"
       role="radiogroup"
       aria-label={label}
-      onKeyDown={onKey}
+      value={String(value)}
+      onValueChange={(v) => v !== "" && onChange(Number(v))}
       className={cn("inline-flex w-full rounded-lg border border-line bg-ink-950 p-[3px] sm:w-auto", className)}
     >
       {options.map((o, i) => (
-        <button
+        <ToggleGroupItem
           key={o.label}
-          ref={(el) => {
-            refs.current[i] = el;
-          }}
-          type="button"
-          role="radio"
-          aria-checked={i === value}
+          value={String(i)}
           aria-label={o.label}
-          tabIndex={i === value ? 0 : -1}
-          onClick={() => onChange(i)}
+          onFocus={() => i !== value && onChange(i)}
           className={cn(
-            "h-8 min-w-0 flex-1 rounded-md px-3 font-mono text-[11.5px] whitespace-nowrap transition-[background-color,color] duration-200 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-fg-muted active:scale-[0.98] sm:flex-none",
-            i === value ? "bg-ink-800 text-fg" : "text-fg-muted hover:text-fg",
+            "h-8 min-w-0 flex-1 rounded-md px-3 font-mono text-[11.5px] font-normal whitespace-nowrap text-fg-muted transition-[background-color,color,scale] duration-200 hover:bg-transparent hover:text-fg active:scale-[0.98] data-[spacing=0]:rounded-md data-[state=on]:bg-ink-800 data-[state=on]:text-fg sm:flex-none",
+            FOCUS,
+            "focus-visible:-outline-offset-2",
           )}
         >
           {o.short ? (
@@ -61,8 +49,8 @@ export function Segmented({
           ) : (
             o.label
           )}
-        </button>
+        </ToggleGroupItem>
       ))}
-    </div>
+    </ToggleGroup>
   );
 }

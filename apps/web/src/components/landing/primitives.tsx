@@ -1,9 +1,14 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { ArrowUpRight, Check, Copy } from "lucide-react";
+import { ArrowUpRight, Check, Copy, RotateCcw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export const EASE_OUT = [0.23, 1, 0.32, 1] as const;
+
+/** The landing's focus treatment on shadcn/ReUI controls: a crisp offset outline instead of the soft ring. */
+export const FOCUS =
+  "focus-visible:ring-0 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fg-muted";
 
 /* Copy with a timed "copied" state; the timer is cleared on unmount (pattern from ReUI hero-10). */
 export function useCopy(resetMs = 1800) {
@@ -58,18 +63,34 @@ export function CommandLine({ command, prompt = ">" }: { command: string; prompt
       <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap text-fg [scrollbar-width:none]">
         {command}
       </code>
-      <button
-        type="button"
+      <Button
+        variant="quiet"
+        size="icon-sm"
         onClick={() => copy(command)}
         aria-label={copied ? `Copied: ${command}` : `Copy command: ${command}`}
-        className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-fg-muted transition-colors hover:bg-ink-800 hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fg-muted"
+        className={cn("size-7", FOCUS)}
       >
         <CopyIcon copied={copied} />
-      </button>
+      </Button>
       <span className="sr-only" aria-live="polite">
         {copied ? "Copied to clipboard" : ""}
       </span>
     </div>
+  );
+}
+
+/** Mono outline "replay" control shared by the animated sections. */
+export function ReplayButton({ onClick, children }: { onClick: () => void; children: ReactNode }) {
+  return (
+    <Button
+      variant="quiet"
+      size="sm"
+      onClick={onClick}
+      className={cn("h-8 gap-2 self-start border border-line-strong px-3 font-mono text-[11px] active:scale-[0.98]", FOCUS)}
+    >
+      <RotateCcw aria-hidden data-icon="inline-start" className="size-3.5" />
+      {children}
+    </Button>
   );
 }
 

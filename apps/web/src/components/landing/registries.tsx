@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { motion, useInView, useReducedMotion } from "motion/react";
-import { RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { txUrl } from "./content";
 import { Frame, FramePanel } from "./frame";
-import { Reveal, SourceLink } from "./primitives";
+import { ReplayButton, Reveal, SourceLink } from "./primitives";
 import { FREEZE, blockLabel, short } from "./proof-data";
 import { Scrubber } from "./scrubber";
 
@@ -179,14 +178,7 @@ export function Registries() {
             signer now, and it is not. On testnet the intents side is a replica of the near/intents key registry with the
             same check order.
           </p>
-          <button
-            type="button"
-            onClick={() => (setTouched(true), play())}
-            className="inline-flex h-8 shrink-0 items-center gap-2 self-start rounded-md border border-line-strong px-3 font-mono text-[11px] text-fg-muted transition-colors hover:bg-ink-800 hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fg-muted"
-          >
-            <RotateCcw aria-hidden className="size-3.5" />
-            Replay the freeze
-          </button>
+          <ReplayButton onClick={() => (setTouched(true), play())}>Replay the freeze</ReplayButton>
         </div>
       </div>
     </section>

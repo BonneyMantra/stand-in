@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ShieldCheck } from "lucide-react";
 import type { StandinState } from "@/data/types";
 import { alreadyFrozen, shortKey } from "@/data/derive";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { CopyText, Panel, Tag } from "./common";
 
@@ -48,9 +49,9 @@ function Registry({ title, where, list }: { title: string; where: string; list: 
           ))}
           {list.length > SHOWN && (
             <li>
-              <button type="button" onClick={() => setAll((v) => !v)} aria-expanded={all} className="w-full px-3.5 py-2 text-left font-mono text-[11px] text-fg-muted outline-none hover:text-fg focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
+              <Button variant="bare" size="bare" onClick={() => setAll((v) => !v)} aria-expanded={all} className="w-full justify-start rounded-none px-3.5 py-2 text-left font-mono text-[11px] text-fg-muted outline-none transition-none hover:text-fg focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
                 {all ? "show fewer" : `+${list.length - SHOWN} more`}
-              </button>
+              </Button>
             </li>
           )}
         </ul>

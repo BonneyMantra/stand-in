@@ -1,39 +1,37 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { AnimatePresence, motion, useInView, useReducedMotion } from "motion/react";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { BENCH_URL } from "./content";
 import { BENCH_RESULTS as R, BENCH_ROWS } from "./bench-data";
 import { RouteRow } from "./bench-row";
 import { Frame, FramePanel } from "./frame";
-import { EASE_OUT, Reveal, SourceLink } from "./primitives";
+import { EASE_OUT, FOCUS, Reveal, SourceLink } from "./primitives";
 
 const day = (iso: string) => iso.slice(0, 10);
 
-function Switch({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
+/** The on/off control: the shadcn Switch (ReUI's primitive) at size lg, toned safe/trip, with a clickable label. */
+function StandinSwitch({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
+  const id = useId();
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={on}
-      aria-label="Stand-in"
-      onClick={() => onChange(!on)}
-      className="group/sw inline-flex items-center gap-3 rounded-full py-1 pr-1 pl-0 lg:pl-4 font-mono text-[12px] text-fg-muted transition-colors hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fg-muted"
-    >
-      Stand-in <span className={cn("w-6 text-left transition-colors", on ? "text-fg" : "text-trip")}>{on ? "on" : "off"}</span>
-      <span
+    <div className="group/sw inline-flex items-center gap-3 py-1 pr-1 pl-0 font-mono text-[12px] text-fg-muted transition-colors hover:text-fg lg:pl-4">
+      <label htmlFor={id} className="cursor-pointer select-none">
+        Stand-in <span className={cn("inline-block w-6 text-left transition-colors", on ? "text-fg" : "text-trip")}>{on ? "on" : "off"}</span>
+      </label>
+      <Switch
+        id={id}
+        size="lg"
+        checked={on}
+        onCheckedChange={onChange}
+        aria-label="Stand-in"
         className={cn(
-          "relative h-7 w-[52px] rounded-full border transition-[background-color,border-color] duration-300",
-          on ? "border-safe/50 bg-safe-soft" : "border-trip/50 bg-trip-soft",
+          "cursor-pointer border shadow-none transition-[background-color,border-color] duration-300 active:[&>span]:scale-95",
+          "data-[state=checked]:border-safe/50 data-[state=checked]:bg-safe-soft data-[state=unchecked]:border-trip/50 data-[state=unchecked]:bg-trip-soft",
+          FOCUS,
         )}
-      >
-        <span
-          className={cn(
-            "absolute top-[3px] left-[3px] size-5 rounded-full transition-[transform,background-color] duration-300 ease-[var(--ease-out-strong)] group-active/sw:scale-95",
-            on ? "translate-x-6 bg-safe" : "translate-x-0 bg-trip",
-          )}
-        />
-      </span>
-    </button>
+        thumbClassName="transition-[translate,scale,background-color] duration-300 ease-[var(--ease-out-strong)] data-[state=checked]:bg-safe data-[state=unchecked]:bg-trip"
+      />
+    </div>
   );
 }
 
@@ -105,7 +103,7 @@ export function Benchmark() {
         <Reveal className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
           <Headline on={on} />
           <div className="flex flex-col items-start gap-5 lg:items-end">
-            <Switch on={on} onChange={flip} />
+            <StandinSwitch on={on} onChange={flip} />
             <dl className="grid grid-cols-4 gap-x-5 font-mono">
               {FACTS.map((f) => (
                 <div key={f.k} className={cn("transition-opacity duration-300", on ? "opacity-100" : "opacity-35")}>

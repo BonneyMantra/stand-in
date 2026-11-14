@@ -1,17 +1,18 @@
 import type { ComponentProps, ReactNode } from "react";
+import { Frame as ReuiFrame, FramePanel as ReuiFramePanel } from "@/components/reui/frame";
 import { cn } from "@/lib/utils";
 
 /*
- * Adapted from the ReUI Pro `frame` primitive: an outer hairline frame with a 3px inset that holds
- * one or more concentric inner panels. Trimmed to the two variants this page uses and re-pointed
- * at the Stand-in ink/line tokens instead of shadcn muted/card.
+ * The ReUI Pro `frame` primitive (src/components/reui/frame.tsx), themed for the landing: a 14px
+ * outer hairline frame with a 3px inset and concentric 10px inner panels on the ink tokens.
+ * Panel padding is zeroed so each section sets its own, panels size to content (`fit`), and
+ * overflow stays visible so glows and thumbs are not clipped. A consumer className still wins.
  */
-export function Frame({ className, ...props }: ComponentProps<"div">) {
+export function Frame({ className, ...props }: ComponentProps<typeof ReuiFrame>) {
   return (
-    <div
-      data-slot="frame"
+    <ReuiFrame
       className={cn(
-        "relative flex flex-col gap-[3px] rounded-[14px] border border-line bg-ink-900/60 p-[3px]",
+        "bg-ink-900/60 [--frame-radius:14px] [--frame-panel-px-base:0px] [--frame-panel-py-base:0px]",
         className,
       )}
       {...props}
@@ -19,14 +20,8 @@ export function Frame({ className, ...props }: ComponentProps<"div">) {
   );
 }
 
-export function FramePanel({ className, ...props }: ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="frame-panel"
-      className={cn("relative rounded-[10px] border border-line bg-ink-900", className)}
-      {...props}
-    />
-  );
+export function FramePanel({ className, ...props }: ComponentProps<typeof ReuiFramePanel>) {
+  return <ReuiFramePanel fit className={cn("overflow-visible shadow-none", className)} {...props} />;
 }
 
 /** Window chrome strip used on product shots: three muted dots and a mono path. */

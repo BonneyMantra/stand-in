@@ -1,3 +1,4 @@
+import { Badge } from "@/components/reui/badge";
 import { cn } from "@/lib/utils";
 import { txUrl } from "./content";
 import type { BenchRow } from "./bench-data";
@@ -91,7 +92,15 @@ export function RouteRow({ r, on, index }: { r: BenchRow; on: boolean; index: nu
         <span className="min-w-0 truncate text-fg" title={r.name}>
           {r.name}
         </span>
-        {r.agent ? <span className="shrink-0 rounded border border-decoy/40 px-1.5 text-[10px] text-decoy">{r.agent}</span> : null}
+        {r.agent ? (
+          <Badge
+            variant="info-outline"
+            size="sm"
+            className="h-[17px] shrink-0 rounded border-decoy/40 bg-transparent px-1.5 text-[10px] leading-[15px] font-normal text-decoy dark:bg-transparent"
+          >
+            {r.agent}
+          </Badge>
+        ) : null}
       </span>
       <span className="col-start-2 flex min-w-0 items-center justify-between gap-3 lg:contents">
         <span className="grid h-4 min-w-0 items-center">

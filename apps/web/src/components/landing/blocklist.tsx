@@ -1,9 +1,12 @@
 import { useId, useRef, useState, type FormEvent } from "react";
 import { motion, useInView, useReducedMotion } from "motion/react";
 import { CornerDownLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@/components/ui/input-group";
+import { Kbd } from "@/components/ui/kbd";
 import { cn } from "@/lib/utils";
 import { Frame, FramePanel } from "./frame";
-import { EASE_OUT, Reveal } from "./primitives";
+import { EASE_OUT, FOCUS, Reveal } from "./primitives";
 import { BLOCKLIST as B } from "./proof-data";
 import { Receipt, judge, type Verdict } from "./blocklist-receipt";
 
@@ -72,11 +75,9 @@ export function Blocklist() {
             <label htmlFor={inputId} className="mb-2 block font-mono text-[11px] text-fg-muted">
               Try it: who is your agent about to pay?
             </label>
-            <div className="flex items-center gap-2 rounded-lg border border-line-strong bg-ink-900 py-1.5 pr-1.5 pl-3.5 font-mono text-[13px] transition-colors focus-within:border-fg-faint sm:text-[14px]">
-              <span aria-hidden className="hidden shrink-0 text-fg-faint select-none sm:inline">
-                standin pay
-              </span>
-              <input
+            <InputGroup className="h-auto rounded-lg border-line-strong bg-ink-900 py-1.5 pr-1.5 font-mono text-[13px] shadow-none has-[>[data-align=inline-start]]:[&>input]:pl-3.5 sm:text-[14px] sm:has-[>[data-align=inline-start]]:[&>input]:pl-2">
+              <InputGroupAddon aria-hidden className="hidden py-0 pl-3.5 font-normal text-[length:inherit] text-fg-faint sm:flex">standin pay</InputGroupAddon>
+              <InputGroupInput
                 id={inputId}
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
@@ -85,30 +86,38 @@ export function Blocklist() {
                 autoComplete="off"
                 maxLength={64}
                 placeholder="account.testnet"
-                className="h-9 min-w-0 flex-1 bg-transparent text-fg outline-none placeholder:text-fg-faint"
+                className="h-9 text-[13px] text-fg placeholder:text-fg-faint sm:text-[14px] md:text-[14px]"
               />
-              <span aria-hidden className="hidden shrink-0 text-fg-faint select-none sm:inline">
-                0.5
-              </span>
-              <button
-                type="submit"
-                className="inline-flex h-9 shrink-0 items-center gap-2 rounded-md bg-fg px-3 text-[12.5px] font-medium text-ink-950 transition-[background-color,transform] duration-150 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fg-muted active:scale-[0.97]"
-              >
-                Check
-                <CornerDownLeft aria-hidden className="size-3.5" />
-              </button>
-            </div>
+              <InputGroupAddon align="inline-end" className="gap-3 py-0 pr-0 font-normal text-[length:inherit] has-[>button]:mr-0">
+                <span aria-hidden className="hidden text-fg-faint sm:inline">0.5</span>
+                <InputGroupButton
+                  type="submit"
+                  variant="invert"
+                  size="sm"
+                  className={cn("h-9 gap-2 px-3 text-[12.5px] font-medium active:scale-[0.97]", FOCUS)}
+                >
+                  Check
+                  <Kbd aria-hidden className="h-4 min-w-4 bg-ink-950/10 px-0.5 text-ink-950/70">
+                    <CornerDownLeft />
+                  </Kbd>
+                </InputGroupButton>
+              </InputGroupAddon>
+            </InputGroup>
             <div className="mt-3 flex flex-wrap gap-2">
               {TRY.map((t) => (
-                <button
+                <Button
                   key={t.account}
-                  type="button"
+                  variant="quiet"
+                  size="bare"
                   onClick={() => (setValue(t.account), check(t.account))}
-                  className="inline-flex max-w-full items-center gap-2 rounded-md border border-line px-2.5 py-1 font-mono text-[11px] text-fg-muted transition-colors hover:border-line-strong hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fg-muted"
+                  className={cn(
+                    "max-w-full gap-2 rounded-md border border-line px-2.5 py-1 font-mono text-[11px] hover:border-line-strong hover:bg-transparent",
+                    FOCUS,
+                  )}
                 >
                   <span className="truncate">{t.account}</span>
                   <span className="shrink-0 text-fg-faint">{t.note}</span>
-                </button>
+                </Button>
               ))}
             </div>
           </form>

@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useInView, useReducedMotion } from "motion/react";
-import { RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { INSTALL } from "./content";
 import { Frame, FramePanel, PanelBar } from "./frame";
-import { CommandLine, Reveal } from "./primitives";
+import { CommandLine, ReplayButton, Reveal } from "./primitives";
 import { BEATS, HOOKS, type Line } from "./agents-script";
 
 const STEP_MS = 1300;
@@ -126,14 +125,7 @@ export function Agents() {
             <p className={cn("text-[13px] leading-relaxed text-fg-muted transition-opacity duration-500", done ? "opacity-100" : "opacity-0")}>
               When a decoy later signs on-chain, the watcher matches its key to these exposures: this session, this tool call.
             </p>
-            <button
-              type="button"
-              onClick={() => (setAt(-1), setRun((n) => n + 1))}
-              className="inline-flex h-8 shrink-0 items-center gap-2 self-start rounded-md border border-line-strong px-3 font-mono text-[11px] text-fg-muted transition-colors hover:bg-ink-800 hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fg-muted"
-            >
-              <RotateCcw aria-hidden className="size-3.5" />
-              Replay
-            </button>
+            <ReplayButton onClick={() => (setAt(-1), setRun((n) => n + 1))}>Replay</ReplayButton>
           </div>
         </div>
 

@@ -18,6 +18,11 @@ const buttonVariants = cva(
         ghost:
           "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
         link: "text-primary underline-offset-4 hover:underline",
+        // Stand-in theme variants (dark-only ink palette, no dark: split).
+        invert: "bg-fg text-ink-950 hover:bg-white",
+        line: "border border-line-strong bg-ink-900/80 font-normal text-fg hover:bg-ink-800",
+        quiet: "font-normal text-fg-muted hover:bg-ink-800 hover:text-fg",
+        bare: "font-normal",
       },
       size: {
         default: "h-9 px-4 py-2 has-[>svg]:px-3",
@@ -28,6 +33,7 @@ const buttonVariants = cva(
         "icon-xs": "size-6 rounded-md [&_svg:not([class*='size-'])]:size-3",
         "icon-sm": "size-8",
         "icon-lg": "size-10",
+        bare: "",
       },
     },
     defaultVariants: {

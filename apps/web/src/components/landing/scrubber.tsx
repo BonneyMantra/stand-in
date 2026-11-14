@@ -1,11 +1,14 @@
-import { useRef, type KeyboardEvent } from "react";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
+import { FOCUS } from "./primitives";
 
 export type Stop = { label: string; sub: string };
 
 /**
- * A stepped scrubber: a radiogroup of stops along a hairline track with a sliding thumb.
- * Arrow keys move between stops (roving tabindex); the thumb moves on transform only.
+ * A stepped scrubber: a hairline track with a sliding thumb over a shadcn ToggleGroup of stops
+ * (ReUI's primitive). Radix gives radio semantics and roving focus (arrows, Home/End, no wrap);
+ * selecting on focus keeps "arrow keys move and select". The thumb moves on transform only.
+ * ReUI Stepper was considered: it has no sliding thumb, so the track stays custom.
  */
 export function Scrubber({
   stops,
@@ -20,23 +23,11 @@ export function Scrubber({
   label: string;
   tone?: "trip" | "fg";
 }) {
-  const refs = useRef<(HTMLButtonElement | null)[]>([]);
   const last = stops.length - 1;
-  const move = (i: number) => {
-    const next = Math.max(0, Math.min(last, i));
-    onChange(next);
-    refs.current[next]?.focus();
-  };
-  const onKey = (e: KeyboardEvent) => {
-    if (e.key === "ArrowRight" || e.key === "ArrowDown") (e.preventDefault(), move(value + 1));
-    if (e.key === "ArrowLeft" || e.key === "ArrowUp") (e.preventDefault(), move(value - 1));
-    if (e.key === "Home") (e.preventDefault(), move(0));
-    if (e.key === "End") (e.preventDefault(), move(last));
-  };
   const pct = last === 0 ? 0 : (value / last) * 100;
 
   return (
-    <div role="radiogroup" aria-label={label} onKeyDown={onKey} className="relative select-none">
+    <div className="relative select-none">
       <div className="relative mx-[7px] h-5">
         <span aria-hidden className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-line-strong" />
         <span
@@ -69,29 +60,33 @@ export function Scrubber({
           </span>
         </span>
       </div>
-      <div className="mt-2 grid" style={{ gridTemplateColumns: `repeat(${stops.length}, minmax(0, 1fr))` }}>
+      <ToggleGroup
+        type="single"
+        role="radiogroup"
+        aria-label={label}
+        loop={false}
+        value={String(value)}
+        onValueChange={(v) => v !== "" && onChange(Number(v))}
+        className="mt-2 grid w-full items-stretch"
+        style={{ gridTemplateColumns: `repeat(${stops.length}, minmax(0, 1fr))` }}
+      >
         {stops.map((s, i) => (
-          <button
+          <ToggleGroupItem
             key={s.label}
-            ref={(el) => {
-              refs.current[i] = el;
-            }}
-            type="button"
-            role="radio"
-            aria-checked={i === value}
-            tabIndex={i === value ? 0 : -1}
-            onClick={() => onChange(i)}
+            value={String(i)}
+            onFocus={() => i !== value && onChange(i)}
             className={cn(
-              "min-w-0 rounded-sm px-0.5 py-1 font-mono text-[10.5px] leading-tight transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fg-muted",
+              "block h-auto w-full min-w-0 rounded-sm px-0.5 py-1 font-mono text-[10.5px] leading-tight font-normal whitespace-normal transition-colors hover:bg-transparent data-[spacing=0]:rounded-sm data-[state=on]:bg-transparent",
+              FOCUS,
               i === 0 ? "text-left" : i === last ? "text-right" : "text-center",
-              i === value ? "text-fg" : "text-fg-faint hover:text-fg-muted",
+              i === value ? "text-fg data-[state=on]:text-fg" : "text-fg-faint hover:text-fg-muted",
             )}
           >
             <span className="block truncate">{s.label}</span>
             <span className="block truncate text-fg-faint">{s.sub}</span>
-          </button>
+          </ToggleGroupItem>
         ))}
-      </div>
+      </ToggleGroup>
     </div>
   );
 }
