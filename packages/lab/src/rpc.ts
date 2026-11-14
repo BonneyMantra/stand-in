@@ -1,5 +1,5 @@
 // Minimal JSON-RPC client over fetch with endpoint rotation and backoff (public RPCs rate-limit).
-export const DEFAULT_RPCS = ["https://test.rpc.fastnear.com", "https://near-testnet.drpc.org"];
+export const DEFAULT_RPCS = ["https://near-testnet.drpc.org", "https://test.rpc.fastnear.com"];
 
 export class RpcError extends Error {
   constructor(message: string, public data?: unknown) { super(message); }

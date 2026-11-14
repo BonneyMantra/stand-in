@@ -25,6 +25,7 @@ function sleep(ms: number) {
 async function withLock<T>(file: string, fn: () => Promise<T> | T, waitMs = 60_000): Promise<T> {
   const lock = file + ".lock";
   const start = Date.now();
+  fs.mkdirSync(path.dirname(lock), { recursive: true });
   for (;;) {
     try {
       fs.mkdirSync(lock);

@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
-import { Account, FailoverRpcProvider, JsonRpcProvider, KeyPair, KeyPairSigner, actions } from "near-api-js";
+import { Account, FailoverRpcError, FailoverRpcProvider, JsonRpcProvider, KeyPair, KeyPairSigner, actions } from "near-api-js";
 import { orderedEndpoints, markFailure, markOk } from "./health.ts";
+import { logger } from "./logger.ts";
 import { devKeysDir, requireAccount, type NetworkConfig, type Role } from "./config.ts";
 
 export { actions };
@@ -18,11 +19,48 @@ export function publicKeyOf(secret: string): string {
   return KeyPair.fromString(secret as `ed25519:${string}`).getPublicKey().toString();
 }
 
+const rpcLog = logger("rpc");
 const RPC_OPTS = { retries: 6, backoff: 1.6, wait: 600 } as any;
+
+/** Archival order: the configured one (drpc on testnet, which only serves recent blocks), then archives that serve old ones, FastNEAR last. */
+function archivalUrls(cfg: NetworkConfig): string[] {
+  return cfg.network === "mainnet"
+    ? [cfg.archivalRpcUrl, "https://archival-rpc.mainnet.near.org"]
+    : [cfg.archivalRpcUrl, "https://archival-rpc.testnet.near.org", "https://archival-rpc.testnet.fastnear.com"];
+}
+
+/**
+ * near-api-js prints every failed attempt with console.error (stack included). This keeps its failover behaviour,
+ * logs each attempt at debug level only (STANDIN_LOG=debug) and ends with one readable line naming the last cause.
+ */
+function quietFailover(p: FailoverRpcProvider): FailoverRpcProvider {
+  (p as any).withBackoff = quietBackoff.withBackoff;
+  return p;
+}
+
+const quietBackoff = {
+  async withBackoff<T>(this: any, getResult: (p: unknown) => Promise<T>): Promise<T> {
+    const self = this;
+    const errors: unknown[] = [];
+    for (let i = 0; i < self.providers.length; i++) {
+      try {
+        return await getResult(self.currentProvider);
+      } catch (e) {
+        errors.push(e);
+        rpcLog.debug(`rpc attempt ${i + 1}/${self.providers.length} failed: ${String((e as Error)?.message ?? e).slice(0, 300)}`);
+        self.switchToNextProvider();
+      }
+    }
+    const err = new FailoverRpcError(self.providers.length, errors);
+    const last = errors[errors.length - 1] as Error | undefined;
+    if (last?.message) err.message = `${err.message}: ${last.message.slice(0, 300)}`;
+    throw err;
+  }
+}
 
 /** The RPC urls a provider would use, in order, without duplicates. */
 export function endpointUrls(cfg: NetworkConfig, archival = false): string[] {
-  const urls = archival ? [cfg.archivalRpcUrl, cfg.network === "mainnet" ? "https://archival-rpc.mainnet.near.org" : "https://archival-rpc.testnet.near.org"] : orderedEndpoints(cfg);
+  const urls = archival ? archivalUrls(cfg) : orderedEndpoints(cfg);
   return [...new Set(urls)];
 }
 
@@ -30,7 +68,7 @@ export function endpointUrls(cfg: NetworkConfig, archival = false): string[] {
 export function makeProvider(cfg: NetworkConfig, archival = false): JsonRpcProvider {
   const uniq = endpointUrls(cfg, archival);
   if (uniq.length === 1) return new JsonRpcProvider({ url: uniq[0]! }, RPC_OPTS);
-  return new FailoverRpcProvider(uniq.map((url) => new JsonRpcProvider({ url }, RPC_OPTS))) as unknown as JsonRpcProvider;
+  return quietFailover(new FailoverRpcProvider(uniq.map((url) => new JsonRpcProvider({ url }, RPC_OPTS)))) as unknown as JsonRpcProvider;
 }
 
 /**

@@ -59,10 +59,10 @@ export function loadNetworkConfig(file?: string): NetworkConfig {
   const main = c.network === "mainnet";
   return {
     network: c.network,
-    rpcUrl: process.env.STANDIN_RPC ?? c.rpc_url ?? c.rpcUrl ?? (main ? "https://rpc.mainnet.fastnear.com" : "https://rpc.testnet.fastnear.com"),
-    archivalRpcUrl: c.archival_rpc_url ?? c.archivalRpcUrl ?? (main ? "https://archival-rpc.mainnet.fastnear.com" : "https://archival-rpc.testnet.fastnear.com"),
+    rpcUrl: process.env.STANDIN_RPC ?? c.rpc_url ?? c.rpcUrl ?? (main ? "https://rpc.mainnet.fastnear.com" : "https://near-testnet.drpc.org"),
+    archivalRpcUrl: c.archival_rpc_url ?? c.archivalRpcUrl ?? (main ? "https://archival-rpc.mainnet.fastnear.com" : "https://near-testnet.drpc.org"),
     // mainnet rotation (all probed 2026-11-14): fastnear first, then free.rpc.fastnear.com and drpc (1rpc.io lacks EXPERIMENTAL_changes: dropped); the deprecated rpc.mainnet.near.org is last resort
-    rpcFallbackUrls: main ? ["https://free.rpc.fastnear.com", "https://near.drpc.org"] : ["https://near-testnet.drpc.org"],
+    rpcFallbackUrls: main ? ["https://free.rpc.fastnear.com", "https://near.drpc.org"] : ["https://rpc.testnet.fastnear.com"],
     // rpc.testnet.near.org is deprecated and slow (~3 s): last resort only
     rpcLastResortUrls: [c.rpc_fallback_url ?? (main ? "https://rpc.mainnet.near.org" : "https://rpc.testnet.near.org")],
     neardataUrl: process.env.STANDIN_NEARDATA ?? (main ? "https://mainnet.neardata.xyz" : "https://testnet.neardata.xyz"),

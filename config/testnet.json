@@ -1,6 +1,7 @@
 {
   "network": "testnet",
   "rpc_url": "https://near-testnet.drpc.org",
+  "archival_rpc_url": "https://near-testnet.drpc.org",
   "rpc_fallback_url": "https://rpc.testnet.near.org",
   "suffix": "5289",
   "accounts": {

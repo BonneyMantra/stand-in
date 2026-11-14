@@ -63,7 +63,6 @@ export async function adopt(o: AdoptOpts): Promise<void> {
   }
 
   // Mint every decoy in one transaction first: concurrent mints from the decoy admin key collide on its nonce.
-  fs.mkdirSync(ledgerHome, { recursive: true });
   await refillPool(found.length, cfg, ledgerHome);
   const rows: string[][] = [];
   const bySecret = new Map<string, Found[]>();
