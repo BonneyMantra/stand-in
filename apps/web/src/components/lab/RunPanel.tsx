@@ -18,7 +18,7 @@ function Notice({ run, latest, current }: { run: LabRunState; latest?: RunRecord
       return (
         <Alert variant="warning" className="border-warn/30 bg-warn/5">
           <Clock />
-          <AlertTitle>Another run holds the lab</AlertTitle>
+          <AlertTitle className="line-clamp-none">Another run holds the lab</AlertTitle>
           <AlertDescription>
             The lab runs one attack at a time.{showing} {run.retryIn > 0 ? `Try again in ${run.retryIn}s.` : "The lock has expired; try again."}
           </AlertDescription>
@@ -28,7 +28,7 @@ function Notice({ run, latest, current }: { run: LabRunState; latest?: RunRecord
       return (
         <Alert variant="warning" className="border-warn/30 bg-warn/5">
           <Clock />
-          <AlertTitle>Run limit reached</AlertTitle>
+          <AlertTitle className="line-clamp-none">Run limit reached</AlertTitle>
           <AlertDescription>
             The lab allows 3 runs per visitor every 10 minutes.{showing} {run.retryIn > 0 ? `Try again in ${run.retryIn}s.` : ""}
           </AlertDescription>
@@ -38,7 +38,7 @@ function Notice({ run, latest, current }: { run: LabRunState; latest?: RunRecord
       return (
         <Alert variant="warning" className="border-warn/30 bg-warn/5">
           <WifiOff />
-          <AlertTitle>Live stream dropped{current ? ` during "${STEP_LABEL[current.id]}"` : ""}</AlertTitle>
+          <AlertTitle className="line-clamp-none">Live stream dropped{current ? ` during "${STEP_LABEL[current.id]}"` : ""}</AlertTitle>
           <AlertDescription>The run may still finish on the server. Recent runs below refreshes in 15 s.</AlertDescription>
         </Alert>
       );
@@ -46,7 +46,7 @@ function Notice({ run, latest, current }: { run: LabRunState; latest?: RunRecord
       return (
         <Alert variant="destructive" className="border-trip/40 bg-trip-soft">
           <CircleAlert />
-          <AlertTitle>The run stopped</AlertTitle>
+          <AlertTitle className="line-clamp-none">The run stopped</AlertTitle>
           <AlertDescription className="[overflow-wrap:anywhere]">{run.error ?? "The lab reported an error."}</AlertDescription>
         </Alert>
       );
@@ -54,7 +54,7 @@ function Notice({ run, latest, current }: { run: LabRunState; latest?: RunRecord
       return (
         <Alert variant="destructive" className="border-trip/40 bg-trip-soft">
           <CircleAlert />
-          <AlertTitle>The hosted lab is not answering here</AlertTitle>
+          <AlertTitle className="line-clamp-none">The hosted lab is not answering here</AlertTitle>
           <AlertDescription>
             <p>
               The lab API returned HTTP {run.unavailableStatus}. The recorded runs can still be checked on chain from{" "}
@@ -67,7 +67,7 @@ function Notice({ run, latest, current }: { run: LabRunState; latest?: RunRecord
       return (
         <Alert variant="destructive" className="border-trip/40 bg-trip-soft">
           <WifiOff />
-          <AlertTitle>Could not reach the lab API</AlertTitle>
+          <AlertTitle className="line-clamp-none">Could not reach the lab API</AlertTitle>
           <AlertDescription>Check your connection and try again.</AlertDescription>
         </Alert>
       );

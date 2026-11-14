@@ -9,10 +9,12 @@ import { Frame, FramePanel } from "./frame";
 import { Bleed, LiveLink } from "./cta";
 import { EASE_OUT, FOCUS, H2, LEDE, Reveal } from "./primitives";
 import { BLOCKLIST as B } from "./proof-data";
-import { Receipt, judge, type Verdict } from "./blocklist-receipt";
+import { Receipt } from "./blocklist-receipt";
+import { checkOnChain, parseAccount, type Verdict } from "./blocklist-check";
 
 const TRY = [
-  { account: B.thief, note: "recorded thief" },
+  { account: B.thief, note: "OutLayer proof run" },
+  { account: "si-attacker-5289.testnet", note: "dashboard thief" },
   { account: "si-project-5289.testnet", note: "Stand-in demo contract" },
 ];
 
@@ -26,7 +28,12 @@ const DOT = { trip: "bg-trip", warn: "bg-warn", safe: "bg-safe" } as const;
 const TXT = { trip: "text-trip", warn: "text-warn", safe: "text-safe" } as const;
 
 function Ladder({ v }: { v: Verdict }) {
-  const lit = (level: string) => (v.kind === "block" ? level === "block" : v.kind === "clear" ? level !== "block" : false);
+  const lit = (level: string) =>
+    v.kind === "block" || v.kind === "listed"
+      ? level === "block"
+      : v.kind === "clear"
+        ? v.exists === false ? level === "warn" : level !== "block"
+        : false;
   return (
     <ol className="mt-6 space-y-2" aria-label="Verdict rules">
       {LADDER.map((l) => (
@@ -44,18 +51,30 @@ export function Blocklist() {
   const reduce = useReducedMotion();
   const inputId = useId();
   const [value, setValue] = useState<string>(B.thief);
-  const [verdict, setVerdict] = useState<Verdict>({ kind: "block" });
+  const [verdict, setVerdict] = useState<Verdict>({ kind: "block", live: false });
   const [run, setRun] = useState(0);
   const slot = useRef<HTMLDivElement>(null);
+  const latest = useRef(0);
   const printed = useInView(slot, { once: true, amount: 0.2 });
 
-  const check = (account: string) => {
-    setVerdict(judge(account));
+  // Each check reads the registry live; a newer check wins over a slower earlier one.
+  const check = async (raw: string) => {
+    const id = ++latest.current;
+    const parsed = parseAccount(raw);
+    if (!parsed.ok) {
+      setVerdict(parsed.verdict);
+      setRun((n) => n + 1);
+      return;
+    }
+    setVerdict({ kind: "checking", account: parsed.account });
+    const v = await checkOnChain(parsed.account);
+    if (id !== latest.current) return;
+    setVerdict(v);
     setRun((n) => n + 1);
   };
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    check(value);
+    void check(value);
   };
 
   return (
@@ -109,7 +128,7 @@ export function Blocklist() {
                   key={t.account}
                   variant="quiet"
                   size="bare"
-                  onClick={() => (setValue(t.account), check(t.account))}
+                  onClick={() => { setValue(t.account); void check(t.account); }}
                   className={cn(
                     "max-w-full gap-2 rounded-md border border-line px-2.5 py-1 font-mono text-[11px] hover:border-line-strong hover:bg-transparent",
                     FOCUS,
@@ -127,7 +146,7 @@ export function Blocklist() {
         </Reveal>
 
         <Reveal delay={0.08} className="min-w-0">
-          <Bleed>
+          <Bleed className="max-lg:[mask-image:linear-gradient(to_bottom,#000_calc(100%_-_56px),transparent)]">
           <div className="rounded-l-[16px] border-y border-l border-line bg-ink-900/40 p-3 sm:p-6 lg:p-8">
           <div className="max-w-[520px]">
           <Frame>
@@ -140,7 +159,7 @@ export function Blocklist() {
             </FramePanel>
             <div aria-hidden className="mx-3 h-[3px] rounded-full bg-ink-950 shadow-[inset_0_1px_2px_rgba(0,0,0,0.9)]" />
           </Frame>
-          <div ref={slot} className="relative -mt-[6px] overflow-hidden px-3 pt-[6px] lg:min-h-[640px]" aria-live="polite">
+          <div ref={slot} className="relative -mt-[6px] overflow-hidden px-3 pt-[6px] pb-8 lg:min-h-[640px] lg:pb-0" aria-live="polite">
             <motion.div
               key={run}
               initial={{ y: reduce ? 0 : "-104%", opacity: reduce ? 0 : 1 }}

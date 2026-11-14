@@ -77,7 +77,7 @@ export function Hero() {
         </motion.p>
 
         <motion.div {...rise(0.14, 8)} className="mt-8 flex flex-wrap items-center gap-3">
-          <AccentLink to={DASHBOARD_PATH}>Open the live dashboard</AccentLink>
+          <AccentLink to={DASHBOARD_PATH}>Open the dashboard</AccentLink>
           <button type="button" onClick={() => copy(SETUP_PROMPT)} className={lineBtn}>
             <CopyIcon copied={copied} />
             <span className="relative">

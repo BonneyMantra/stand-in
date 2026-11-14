@@ -23,6 +23,10 @@ const NODES: Node[] = [
   { gate: C.chain, title: () => short(C.evmAddress, 6, 4), sub: () => "the signature recovers to this address" },
 ];
 
+/** Account ids wrap after a dot ("v1.signer-prod." / "testnet"), never mid-word. */
+const breakAtDots = (s: string) =>
+  s.split(".").flatMap((part, i, all) => (i < all.length - 1 ? [`${part}.`, <wbr key={i} />] : [part]));
+
 /** Index of the node the request stops at, or the last node when it gets through. */
 const STOP: Record<Mode, number> = { 0: 4, 1: 1, 2: 2 };
 
@@ -83,7 +87,7 @@ function NodeCard({ n, i, mode }: { n: Node; i: number; mode: Mode }) {
         <span className={cn("size-1.5 shrink-0 rounded-full", blocked ? "bg-trip" : done ? "bg-safe" : reached ? "bg-fg" : "bg-line-strong")} />
       </div>
       <div className="min-w-0">
-        <p className={cn("font-mono text-[12.5px] break-all", blocked ? "text-trip" : "text-fg")}>{n.title(mode)}</p>
+        <p className={cn("font-mono text-[12.5px] [overflow-wrap:anywhere]", blocked ? "text-trip" : "text-fg")}>{breakAtDots(n.title(mode))}</p>
         <p className="mt-1 text-[12px] leading-snug text-fg-muted">{n.sub(mode)}</p>
       </div>
     </FramePanel>
@@ -122,7 +126,7 @@ export function ChainSignatures() {
             The agent signs Ethereum transactions through the NEAR MPC network, by way of its guardian contract. The same
             freeze that deletes its NEAR keys shuts that path behind two independent checks.
           </p>
-          <LiveLink to="/app" className="mt-6">See it live</LiveLink>
+          <LiveLink to="/verify" className="mt-6">Check it on chain</LiveLink>
         </Reveal>
 
         <div ref={ref} className="mt-12">

@@ -55,6 +55,8 @@ export function SignatureChecks({ state }: Props) {
       <p className="mt-3 max-w-2xl text-[14px] leading-relaxed text-fg-muted">
         Each report's signature is checked here with secp256k1 recovery over the EIP-191 message (<span className="font-mono text-[12.5px]">@noble/curves</span>).
         The address it recovers must equal the report's signing address, which must equal the model's address in the attestation recorded with it.
+        The reports are the ones in the recorded run this page ships with (<span className="font-mono text-[12.5px]">/demo-state.json</span>);
+        the recovery itself runs here, in your browser.
       </p>
       <div className="mt-5 overflow-hidden rounded-[14px] border border-line bg-ink-900/60 p-[3px]">
         <div className="rounded-[10px] border border-line bg-ink-950">

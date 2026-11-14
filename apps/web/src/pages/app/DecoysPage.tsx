@@ -20,7 +20,7 @@ export default function DecoysPage() {
   const RANK = { tripped: 2, exposed: 1, dormant: 0 };
 
   const cols: Column<DecoyKey>[] = [
-    { id: "pk", header: "Public key", className: "w-[44%] sm:w-[20%]", cell: (k) => <CopyText value={k.public_key} display={shortKey(k.public_key, 7, 5)} className="text-fg" /> },
+    { id: "pk", header: "Public key", className: "w-[44%] @xl:w-[20%]", cell: (k) => <CopyText value={k.public_key} display={shortKey(k.public_key, 7, 5)} className="text-fg" /> },
     {
       id: "where", header: "Planted in", className: "w-[30%]",
       cell: (k) => (
@@ -34,7 +34,7 @@ export default function DecoysPage() {
     { id: "agent", header: "Agent", hide: "md", className: "w-28", cell: (k) => <span className="text-fg-muted">{agentName(k.planted.agent)}</span>, sort: (k) => k.planted.agent },
     { id: "session", header: "Session", hide: "lg", cell: (k) => <span className="font-mono text-fg-muted">{k.planted.session_id ? sessionLabel(data, k.planted.session_id) : "–"}</span>, sort: (k) => sessionLabel(data, k.planted.session_id) },
     { id: "at", header: "Planted", hide: "lg", className: "w-24", cell: (k) => <span className="font-mono text-fg-faint">{fmtTime(k.planted.at)}</span>, sort: (k) => k.planted.at },
-    { id: "status", header: "Status", className: "w-[96px] sm:w-28", cell: (k) => <StatusPill status={st(k)} />, sort: (k) => RANK[st(k)] },
+    { id: "status", header: "Status", className: "w-[96px] @xl:w-28", cell: (k) => <StatusPill status={st(k)} />, sort: (k) => RANK[st(k)] },
   ];
 
   return (

@@ -7,8 +7,9 @@ export type Source = "loading" | "live" | "recorded" | "error";
 interface StoreValue {
   source: Source;
   data: StandinState | null;
-  /** Why we are on the recorded run (watcher unreachable vs chosen by the viewer). */
-  fallbackReason: "unreachable" | "chosen" | null;
+  /** Why we are on the recorded run: this host serves no watcher API (the hosted site), the watcher did not
+   *  answer, or the viewer chose it. */
+  fallbackReason: "none" | "unreachable" | "chosen" | null;
   error: string | null;
   /** Bumped when a live SSE `trip` arrives, so the map can play the trip moment. */
   lastTripSignal: { tx: string; n: number } | null;
@@ -51,11 +52,15 @@ function clean(s: StandinState): StandinState {
   return trips.length === s.trips.length ? s : { ...s, trips };
 }
 
+/** The host has no watcher API at all: a static deploy answers /api/state with its HTML fallback page. */
+class NoWatcherHere extends Error {}
+
 async function getJson(url: string, ms: number): Promise<StandinState> {
   const ctl = new AbortController();
   const timer = window.setTimeout(() => ctl.abort(), ms);
   try {
     const res = await fetch(url, { signal: ctl.signal, headers: { accept: "application/json" } });
+    if (res.ok && (res.headers.get("content-type") ?? "").includes("text/html")) throw new NoWatcherHere(url);
     if (!res.ok) throw new Error(`${url} answered ${res.status}`);
     const body: unknown = await res.json();
     if (!isState(body)) throw new Error(`${url} did not return the watcher state schema`);
@@ -80,7 +85,7 @@ export function StandinProvider({ children }: { children: ReactNode }) {
     let es: EventSource | null = null;
     setSource("loading");
 
-    const loadRecorded = async (reason: "unreachable" | "chosen") => {
+    const loadRecorded = async (reason: "none" | "unreachable" | "chosen") => {
       try {
         const rec = await getJson("/demo-state.json", 8000);
         if (cancelled) return;
@@ -118,8 +123,8 @@ export function StandinProvider({ children }: { children: ReactNode }) {
           }, 150);
         };
         for (const n of EVENTS) es.addEventListener(n, onEvent(n) as EventListener);
-      } catch {
-        if (!cancelled) await loadRecorded("unreachable");
+      } catch (e) {
+        if (!cancelled) await loadRecorded(e instanceof NoWatcherHere ? "none" : "unreachable");
       }
     };
 

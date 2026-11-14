@@ -33,8 +33,8 @@ export default function VerifyPage() {
       </section>
 
       <p className="mt-5 font-mono text-[11px] leading-relaxed text-fg-faint">
-        RPC order, archival first: {ENDPOINTS.testnet.map(host).join(" → ")} (testnet), {ENDPOINTS.mainnet.map(host).join(" → ")} (mainnet).
-        A node that fails, rate-limits or lacks the tx is skipped for the next.
+        RPC order: {ENDPOINTS.testnet.map(host).join(" → ")} (testnet), {ENDPOINTS.mainnet.map(host).join(" → ")} (mainnet).
+        A node that fails, rate-limits or lacks the tx is skipped for the next; the archival nodes hold the older blocks.
       </p>
 
       <SignatureChecks state={sigs} />

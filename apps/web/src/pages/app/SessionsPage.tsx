@@ -11,7 +11,7 @@ export default function SessionsPage() {
   const tripOf = (s: Session) => data.trips.find((t) => t.attributed_to.session_id === s.session_id);
   const cols: Column<Session>[] = [
     {
-      id: "session", header: "Session", className: "w-[46%] sm:w-[26%]",
+      id: "session", header: "Session", className: "w-[46%] @xl:w-[26%]",
       cell: (s) => (
         <span className="block min-w-0">
           <span className="block truncate font-mono text-fg">{sessionLabel(data, s.session_id)}</span>
@@ -20,7 +20,7 @@ export default function SessionsPage() {
       ),
       sort: (s) => sessionLabel(data, s.session_id),
     },
-    { id: "agent", header: "Agent", className: "w-24 sm:w-28", cell: (s) => <Tag tone={s.agent === "codex" ? "muted" : "decoy"}>{agentName(s.agent)}</Tag>, sort: (s) => s.agent },
+    { id: "agent", header: "Agent", className: "w-24 @xl:w-28", cell: (s) => <Tag tone={s.agent === "codex" ? "muted" : "decoy"}>{agentName(s.agent)}</Tag>, sort: (s) => s.agent },
     { id: "decoy", header: "Decoys", hide: "md", cell: (s) => <span className="inline-flex items-center gap-2"><CopyText value={s.decoy_public_key} display={shortKey(s.decoy_public_key, 6, 4)} /><span className="text-fg-faint">+{Math.max(0, decoysFor(data, s.session_id).length - 1)}</span></span> },
     { id: "calls", header: "Tool calls", hide: "sm", className: "w-24 text-right", cell: (s) => <span className="font-mono text-fg tabular-nums">{s.tool_calls}</span>, sort: (s) => s.tool_calls },
     {
@@ -42,7 +42,7 @@ export default function SessionsPage() {
         rowHref={(s) => { const t = tripOf(s); return t ? `/app/trips/${t.tx_hash}` : undefined; }}
         rowTone={(s) => (tripOf(s) ? "trip" : undefined)}
         initialSort={{ id: "start", dir: "desc" }}
-        empty={<EmptyState icon={TerminalSquare} title="No guarded sessions yet">Install the Claude Code plugin or launch <code className="font-mono text-fg">standin codex</code>; each new session mints a decoy and shows up here.</EmptyState>}
+        empty={<EmptyState icon={TerminalSquare} title="No guarded sessions yet">Install the Claude Code plugin or launch Codex with <code className="font-mono text-fg">pnpm standin:codex</code>; each new session mints a decoy and shows up here.</EmptyState>}
       />
     </div>
   );

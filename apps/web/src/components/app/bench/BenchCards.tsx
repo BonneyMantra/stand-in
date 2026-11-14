@@ -68,7 +68,7 @@ export function BlocksChart({ routes, target }: { routes: BenchRoute[]; target: 
         return v === null ? (
           <g key={i}>
             <rect x={x} y={H - 16} width={bw} height="2" fill="var(--color-line-strong)" />
-            <text x={x + bw / 2} y={H - 2} textAnchor="middle" fontSize="8.5" className="font-mono" fill="var(--color-fg-faint)">n/a</text>
+            <text x={x + bw / 2} y={H - 2} textAnchor="middle" fontSize="8.5" className="font-mono" fill="var(--color-fg-faint)">–</text>
           </g>
         ) : (
           <g key={i}>

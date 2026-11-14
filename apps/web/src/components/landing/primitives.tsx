@@ -10,6 +10,26 @@ export const EASE_OUT = [0.23, 1, 0.32, 1] as const;
 export const FOCUS =
   "focus-visible:ring-0 focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fg-muted";
 
+/** Legacy copy path for browsers that refuse navigator.clipboard (insecure context, denied permission). */
+function copyBySelection(text: string): boolean {
+  const back = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.setAttribute("readonly", "");
+  ta.style.position = "fixed";
+  ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.select();
+  try {
+    return document.execCommand("copy");
+  } catch {
+    return false;
+  } finally {
+    ta.remove();
+    back?.focus({ preventScroll: true });
+  }
+}
+
 /* Copy with a timed "copied" state; the timer is cleared on unmount (pattern from ReUI hero-10). */
 export function useCopy(resetMs = 1800) {
   const [copied, setCopied] = useState(false);
@@ -19,14 +39,18 @@ export function useCopy(resetMs = 1800) {
   }, []);
   const copy = useCallback(
     async (text: string) => {
+      let ok = false;
       try {
         await navigator.clipboard.writeText(text);
-        setCopied(true);
-        if (timer.current) clearTimeout(timer.current);
-        timer.current = setTimeout(() => setCopied(false), resetMs);
+        ok = true;
       } catch {
-        // Clipboard needs a secure context; the command stays selectable as text.
+        // The async Clipboard API needs a secure context and permission; fall back to a selected textarea.
+        ok = copyBySelection(text);
       }
+      if (!ok) return;
+      setCopied(true);
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = setTimeout(() => setCopied(false), resetMs);
     },
     [resetMs],
   );

@@ -16,15 +16,18 @@ export const PROOF_TX = {
 export const INSTALL = {
   claude: ["git clone https://github.com/BonneyMantra/stand-in && cd stand-in && pnpm install", "pnpm standin:claude --home .sandbox/me"],
   codex: ["pnpm standin:codex"],
-  cli: ["pnpm standin adopt --home ~"],
+  cli: ["pnpm standin adopt --wallet --account you.testnet --home ~"],
 } as const;
 
+// Wallet first: the owner key stays in the owner's NEAR wallet; the keystore route is the fallback.
 export const SETUP_PROMPT = [
   "Install Stand-in (decoy NEAR keys for coding agents) in this project.",
   "Clone https://github.com/BonneyMantra/stand-in and run `pnpm install`.",
   "If you are Claude Code: run `pnpm standin:claude --home .sandbox/me` (this build installs the plugin into an isolated config dir).",
   "If you are Codex: launch through `pnpm standin:codex`.",
-  "Then run `pnpm standin adopt --home ~` and tell me which account it moved the full-access key out of, which function-call key you now hold, and where the decoy keys were planted.",
+  "Then ask me for my NEAR testnet account id and run `pnpm standin adopt --wallet --account <my account> --home ~`. It prints an owner-console link: give it to me and wait while I approve the one transaction in my own wallet (my owner key never touches this machine).",
+  "When it finishes, tell me which function-call key you now hold, which contract it is scoped to, and where the decoy key was planted.",
+  "If I say I have no wallet, run `pnpm standin adopt --home ~` instead and tell me which account it moved the full-access key out of.",
   `Docs: ${REPO_URL}`,
 ].join("\n");
 

@@ -88,11 +88,13 @@ export function Registries() {
     timers.current = [setTimeout(() => go(1), 650), setTimeout(() => go(2), 2300)];
   };
 
+  // Autoplay once on first view. Timers are cleared only on unmount: clearing them when inView flips would
+  // cancel a Replay pressed while the section was still scrolling into view.
   useEffect(() => {
     if (inView && !touched) play();
-    return clear;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inView]);
+  useEffect(() => clear, []);
 
   const struck = step >= 1;
   const rejected = step >= 2;
@@ -117,7 +119,7 @@ export function Registries() {
             same check order.
           </p>
           <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3">
-            <LiveLink to="/app/owner">See the guardian live</LiveLink>
+            <LiveLink to="/app/owner">Protect your own account</LiveLink>
             <ReplayButton onClick={() => (setTouched(true), play())}>Replay the freeze</ReplayButton>
           </div>
         </Reveal>
@@ -163,16 +165,16 @@ export function Registries() {
                 </p>
                 <p className="truncate text-fg-faint">"{FREEZE.rejectedNote}", signed before the freeze</p>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex shrink-0 items-center gap-3">
                 <span
                   className={cn(
-                    "inline-flex h-7 items-center rounded-md border px-2.5 font-mono text-[11px] transition-[color,border-color,background-color,transform] duration-300 ease-[var(--ease-out-strong)]",
+                    "inline-flex h-7 items-center rounded-md border px-2.5 font-mono text-[11px] whitespace-nowrap transition-[color,border-color,background-color,transform] duration-300 ease-[var(--ease-out-strong)]",
                     rejected ? "scale-100 border-trip/50 bg-trip-soft text-trip" : "border-line-strong text-fg-muted",
                   )}
                 >
                   {rejected ? "PublicKeyNotExist" : "waiting in queue"}
                 </span>
-                <SourceLink href={txUrl(FREEZE.rejectedTx)} className={cn("transition-opacity", rejected ? "opacity-100" : "opacity-40")}>
+                <SourceLink href={txUrl(FREEZE.rejectedTx)} className={cn("whitespace-nowrap transition-opacity", rejected ? "opacity-100" : "opacity-40")}>
                   {short(FREEZE.rejectedTx)}
                 </SourceLink>
               </div>

@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
-import { Navigate, Route, Routes } from "react-router";
+import { Route, Routes } from "react-router";
+import { AppNotFound } from "@/pages/NotFoundPage";
 import { StandinProvider } from "@/data/useStandin";
 import { AppShell } from "@/components/app/shell/AppShell";
 import OverviewPage from "./OverviewPage";
@@ -26,7 +27,7 @@ export default function AppRoutes() {
           <Route path="blocklist" element={<BlocklistPage />} />
           <Route path="bench" element={<BenchPage />} />
           <Route path="owner" element={<Suspense fallback={null}><OwnerPage /></Suspense>} />
-          <Route path="*" element={<Navigate to="/app" replace />} />
+          <Route path="*" element={<AppNotFound />} />
         </Routes>
       </AppShell>
     </StandinProvider>

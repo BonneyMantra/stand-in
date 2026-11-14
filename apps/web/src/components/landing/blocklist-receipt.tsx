@@ -4,23 +4,15 @@ import { cn } from "@/lib/utils";
 import { txUrl } from "./content";
 import { SourceLink } from "./primitives";
 import { BLOCKLIST as B, blockLabel, short } from "./proof-data";
+import type { Verdict } from "./blocklist-check";
 
-export type Verdict = { kind: "block" } | { kind: "clear"; account: string } | { kind: "invalid"; input: string };
+type Tone = "trip" | "safe" | "warn" | "muted";
+const TONE: Record<Tone, string> = { trip: "text-trip", safe: "text-safe", warn: "text-warn", muted: "text-fg-muted" };
 
-const NEAR_ID = /^(?=.{2,64}$)(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
-
-export function judge(raw: string): Verdict {
-  const a = raw.trim().toLowerCase();
-  if (a === B.thief) return { kind: "block" };
-  return NEAR_ID.test(a) ? { kind: "clear", account: a } : { kind: "invalid", input: raw.trim() };
-}
-
-const Row = ({ k, children, tone }: { k: string; children: ReactNode; tone?: "trip" | "safe" | "muted" }) => (
+const Row = ({ k, children, tone }: { k: string; children: ReactNode; tone?: Tone }) => (
   <div className="flex items-baseline justify-between gap-4">
     <dt className="shrink-0 text-fg-faint">{k}</dt>
-    <dd className={cn("min-w-0 truncate text-right", tone === "trip" ? "text-trip" : tone === "safe" ? "text-safe" : tone === "muted" ? "text-fg-muted" : "text-fg")}>
-      {children}
-    </dd>
+    <dd className={cn("min-w-0 truncate text-right", tone ? TONE[tone] : "text-fg")}>{children}</dd>
   </div>
 );
 
@@ -37,11 +29,18 @@ const CHECKS = [
   "contract checked the signature against the pinned key",
 ];
 
-function BlockBody() {
+const Source = ({ live }: { live: boolean }) => (
+  <Row k="source" tone="muted">{live ? "read from chain just now" : "recorded entry (RPC unreachable)"}</Row>
+);
+
+function BlockBody({ live }: { live: boolean }) {
   return (
     <>
-      <Row k="verdict" tone="trip">BLOCK</Row>
-      <Row k="exit" tone="trip">{B.payExit} · payment refused</Row>
+      <dl className="space-y-1.5">
+        <Row k="verdict" tone="trip">BLOCK</Row>
+        <Row k="exit" tone="trip">{B.payExit} · payment refused</Row>
+        <Source live={live} />
+      </dl>
       <Rule />
       <dl className="space-y-1.5">
         <Row k="drained">{B.decoy}</Row>
@@ -77,30 +76,90 @@ function BlockBody() {
   );
 }
 
-function ClearBody({ account }: { account: string }) {
+/** Another thief on the live list: the registry's own reason, as the contract returns it. */
+function ListedBody({ reason }: { reason: string }) {
   return (
     <>
-      <Row k="blocklist" tone="safe">no entry</Row>
+      <dl className="space-y-1.5">
+        <Row k="verdict" tone="trip">BLOCK</Row>
+        <Row k="exit" tone="trip">{B.payExit} · payment refused</Row>
+        <Source live />
+      </dl>
       <Rule />
-      <p className="mb-2 text-fg-faint">then the CLI checks live, on archival RPC</p>
+      <p className="mb-2 text-fg-faint">registry reason</p>
+      <p className="leading-relaxed text-fg-muted [overflow-wrap:anywhere]">{reason || "listed, no reason recorded"}</p>
+    </>
+  );
+}
+
+function ClearBody({ exists }: { exists: boolean | null }) {
+  return (
+    <>
+      <dl className="space-y-1.5">
+        <Row k="blocklist" tone="safe">no entry</Row>
+        <Row k="on chain" tone={exists === false ? "warn" : "muted"}>
+          {exists === null ? "not read" : exists ? "account exists" : "does not exist · warn"}
+        </Row>
+        <Source live />
+      </dl>
+      <Rule />
+      <p className="mb-2 text-fg-faint">then the CLI checks, on archival RPC</p>
       <dl className="space-y-1.5">
         <Row k="account age" tone="muted">warn if younger than 7 days</Row>
         <Row k="contract code" tone="muted">warn if changed in 72 h</Row>
-        <Row k="on chain" tone="muted">warn if it does not exist</Row>
       </dl>
       <Rule />
-      <Row k="verdict">allow or warn</Row>
-      <Row k="exit" tone="muted">0 sent · 4 warn not approved</Row>
+      <dl className="space-y-1.5">
+        <Row k="verdict" tone={exists === false ? "warn" : undefined}>{exists === false ? "warn" : "allow or warn"}</Row>
+        <Row k="exit" tone="muted">0 sent · 4 warn not approved</Row>
+      </dl>
       <p className="mt-3 leading-relaxed text-fg-faint">
-        This page holds the one recorded entry, not the live list. Run <span className="text-fg-muted">standin check {account}</span> for the
-        current answer.
+        <span className="text-fg-muted">standin pay</span> makes this same registry call, then the age and code checks, before it
+        sends anything. A warned payment needs the owner's fingerprint.
       </p>
     </>
   );
 }
 
+function Note({ verdict, children }: { verdict: string; children: ReactNode }) {
+  return (
+    <>
+      <dl>
+        <Row k="verdict" tone="muted">{verdict}</Row>
+      </dl>
+      <p className="mt-3 leading-relaxed text-fg-muted">{children}</p>
+    </>
+  );
+}
+
+function Body({ v }: { v: Verdict }) {
+  switch (v.kind) {
+    case "block":
+      return <BlockBody live={v.live} />;
+    case "listed":
+      return <ListedBody reason={v.reason} />;
+    case "clear":
+      return <ClearBody exists={v.exists} />;
+    case "checking":
+      return (
+        <Note verdict="checking…">
+          <span className="inline-flex items-center gap-2">
+            <i aria-hidden className="size-1.5 animate-pulse rounded-full bg-fg-muted" />
+            Reading {B.contract} on NEAR testnet.
+          </span>
+        </Note>
+      );
+    case "unreachable":
+      return <Note verdict="not checked">No NEAR RPC node answered from this browser. Check your connection and try again.</Note>;
+    case "empty":
+      return <Note verdict="not checked">Type the account your agent is about to pay, for example alice.testnet.</Note>;
+    case "invalid":
+      return <Note verdict="not checked">Not a valid NEAR account id: 2 to 64 characters, lowercase letters, digits and - _ . separators.</Note>;
+  }
+}
+
 export function Receipt({ v }: { v: Verdict }) {
-  const account = v.kind === "block" ? B.thief : v.kind === "clear" ? v.account : v.input;
+  const account = v.kind === "block" ? B.thief : v.kind === "invalid" ? v.input : v.kind === "empty" ? "" : v.account;
   return (
     <div
       className="relative bg-ink-850 px-5 pt-5 pb-8 font-mono text-[11.5px] leading-snug"
@@ -115,18 +174,7 @@ export function Receipt({ v }: { v: Verdict }) {
         standin pay {account || "…"} 0.5
       </p>
       <Rule />
-      {v.kind === "block" ? (
-        <BlockBody />
-      ) : v.kind === "clear" ? (
-        <ClearBody account={v.account} />
-      ) : (
-        <>
-          <Row k="verdict" tone="muted">not checked</Row>
-          <p className="mt-3 leading-relaxed text-fg-muted">
-            Not a valid NEAR account id: 2 to 64 characters, lowercase letters, digits and - _ . separators.
-          </p>
-        </>
-      )}
+      <Body v={v} />
     </div>
   );
 }

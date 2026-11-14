@@ -1,5 +1,5 @@
-import { NavLink, useLocation } from "react-router";
-import { Activity, Ban, FlaskConical, Gauge, KeyRound, Snowflake, TerminalSquare, Wallet, Zap } from "lucide-react";
+import { Link, NavLink, useLocation } from "react-router";
+import { Activity, Ban, FlaskConical, Gauge, KeyRound, Play, ShieldCheck, Snowflake, TerminalSquare, Wallet, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
@@ -19,6 +19,12 @@ const NAV = [
   { to: "/app/owner", label: "Owner console", icon: Wallet },
 ] as const;
 
+/** The public pages that run against testnet right now, outside the recorded run. */
+const LIVE = [
+  { to: "/lab", label: "Leak a decoy (lab)", icon: Play },
+  { to: "/verify", label: "Verify claims on chain", icon: ShieldCheck },
+] as const;
+
 export function AppSidebar() {
   const { data } = useStandin();
   const { pathname } = useLocation();
@@ -30,13 +36,17 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="offcanvas" className="border-r border-line">
       <SidebarHeader className="px-3 pt-4 pb-2">
-        <div className="flex items-center gap-2.5 rounded-lg px-1 py-1">
+        <Link
+          to="/"
+          aria-label="Stand-in home"
+          className="flex items-center gap-2.5 rounded-lg px-1 py-1 outline-none hover:bg-ink-850 focus-visible:ring-2 focus-visible:ring-ring"
+        >
           <Logo />
           <div className="min-w-0 leading-tight">
             <p className="text-sm font-semibold text-fg">Stand-in</p>
             <p className="truncate text-[11px] text-fg-faint">decoy keys for coding agents</p>
           </div>
-        </div>
+        </Link>
       </SidebarHeader>
 
       <SidebarContent className="px-1">
@@ -72,6 +82,24 @@ export function AppSidebar() {
                   </SidebarMenuItem>
                 );
               })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel className="text-[11px] text-fg-faint">Live on testnet</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {LIVE.map((n) => (
+                <SidebarMenuItem key={n.to}>
+                  <SidebarMenuButton asChild className="h-8 text-[13px] text-fg-muted hover:bg-ink-850 hover:text-fg">
+                    <Link to={n.to} onClick={() => setOpenMobile(false)}>
+                      <n.icon className="size-4 opacity-60" aria-hidden />
+                      <span>{n.label}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

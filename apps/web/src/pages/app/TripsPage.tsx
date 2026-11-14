@@ -10,17 +10,17 @@ export default function TripsPage() {
   if (!data) return null;
   const cols: Column<Trip>[] = [
     {
-      id: "tx", header: "Decoy tx", className: "w-[30%] sm:w-[22%]",
+      id: "tx", header: "Decoy tx", className: "w-[30%] @xl:w-[22%]",
       cell: (t) => <span className="font-mono text-fg">{shortHash(t.tx_hash)}</span>, sort: (t) => t.block_height,
     },
     {
-      id: "freeze", header: "Freeze", className: "w-[30%] sm:w-[18%]",
+      id: "freeze", header: "Freeze", className: "w-[30%] @xl:w-[18%]",
       cell: (t) => alreadyFrozen(t) ? <Tag>already frozen</Tag> : t.freeze.tx_hash ? <Tag tone="safe">{t.freeze.blocks_after_trip} blocks</Tag> : <Tag tone="warn">pending</Tag>,
       sort: (t) => (alreadyFrozen(t) ? 999 : t.freeze.blocks_after_trip),
     },
     { id: "attacker", header: "Attacker", hide: "md", cell: (t) => <span className="font-mono text-trip">{t.attacker_account}</span> },
     {
-      id: "leak", header: "Leaked by", className: "w-[40%] sm:w-auto",
+      id: "leak", header: "Leaked by", className: "w-[40%] @xl:w-auto",
       cell: (t) => (
         <span className="block truncate text-fg-muted">
           <span className="text-fg">{t.attributed_to.tool_name || "session env"}</span> · {agentName(t.attributed_to.agent)} · <span className="font-mono">{sessionLabel(data, t.attributed_to.session_id)}</span>

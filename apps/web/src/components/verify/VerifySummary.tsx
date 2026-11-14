@@ -14,20 +14,33 @@ export function VerifySummary({ checks, finishedAt, onRerun }: { checks: (ClaimC
   const pending = total - verified - mismatch - unreachable;
   const done = pending === 0;
   const when = finishedAt ? finishedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : null;
+  const at = when ? ` (${when})` : "";
+  const eyebrow = !done ? "Checking from chain" : unreachable === total ? "Could not reach NEAR RPC" : mismatch ? "Checked from chain · mismatch" : "Checked from chain";
+  const headline = !done
+    ? `Verified ${verified} of ${total} so far…`
+    : unreachable === total
+      ? `No public RPC node answered from this browser${at}`
+      : verified === total
+        ? `Verified ${verified} of ${total} from chain just now${at}`
+        : `Verified ${verified} of ${total} from chain${at}${mismatch ? ` · ${mismatch} do not match` : ""}${unreachable ? ` · ${unreachable} not reachable` : ""}`;
 
   return (
     <div className="overflow-hidden rounded-[14px] border border-line bg-ink-900/60 p-[3px]">
       <div className="flex flex-col gap-5 rounded-[10px] border border-line bg-ink-950 p-4 sm:p-5 md:flex-row md:items-end md:justify-between">
         <div className="min-w-0" aria-live="polite">
-          <p className="font-mono text-[11px] tracking-[0.14em] text-fg-muted uppercase">{done ? "Checked from chain" : "Checking from chain"}</p>
+          <p className={cn("font-mono text-[11px] tracking-[0.14em] uppercase", done && (mismatch || unreachable) ? (mismatch ? "text-trip" : "text-warn") : "text-fg-muted")}>{eyebrow}</p>
           <p className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <span className={cn("font-mono text-[44px] leading-none font-medium tracking-[-0.04em] tabular-nums", done && verified === total ? "text-safe" : "text-fg")}>
               {verified}<span className="text-fg-faint"> / {total}</span>
             </span>
-            <span className="text-[15px] text-fg">
-              {done ? `Verified ${verified} of ${total} from chain ${when ? `just now (${when})` : "just now"}` : `Verified ${verified} of ${total} so far…`}
-            </span>
+            <span className="text-[15px] text-fg">{headline}</span>
           </p>
+          {done && unreachable ? (
+            <p className="mt-2 max-w-xl text-[13px] leading-relaxed text-fg-muted">
+              Each check tried every node listed below the claims. Check your connection or any extension that blocks requests to RPC
+              hosts, then check again.
+            </p>
+          ) : null}
           <div className="mt-4 flex h-1.5 w-full max-w-md overflow-hidden rounded-full bg-ink-850" aria-hidden>
             <i className="bg-safe transition-[width] duration-500" style={{ width: `${(verified / total) * 100}%` }} />
             <i className="bg-trip transition-[width] duration-500" style={{ width: `${(mismatch / total) * 100}%` }} />

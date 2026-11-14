@@ -1,4 +1,4 @@
-// Public NEAR JSON-RPC from the browser, with endpoint fallback. All endpoints below answer CORS
+// Public NEAR JSON-RPC from the browser (/verify and the landing's blocklist check), with endpoint fallback. All endpoints below answer CORS
 // preflights from any origin (checked 14 Nov 2026). drpc first: it serves the days-old claimed txs and blocks
 // (checked 14 Nov, block 277,620,901), and FastNEAR's free tier answers 429 without CORS headers once an IP
 // is over its quota. Archival nodes follow; a "not found" moves on to the next endpoint.
@@ -54,7 +54,13 @@ const NOT_FOUND = new Set(["UNKNOWN_TRANSACTION", "UNKNOWN_BLOCK", "UNKNOWN_ACCO
  * limit, or a "not found" (a non-archival node may have pruned it). Returns not_found only when at least
  * one node answered "not found" and none had it; unreachable when no node answered at all.
  */
-export async function rpc<T>(network: Network, method: string, params: unknown): Promise<RpcResult<T>> {
+export async function rpc<T>(
+  network: Network,
+  method: string,
+  params: unknown,
+  /** authoritative: a "not found" from one node is final (current-state queries), so no other node is asked. */
+  opts: { authoritative?: boolean } = {},
+): Promise<RpcResult<T>> {
   const tried: string[] = [];
   let notFound = false;
   let message: string | undefined;
@@ -66,6 +72,7 @@ export async function rpc<T>(network: Network, method: string, params: unknown):
       const name = body.error?.cause?.name ?? body.error?.name ?? "";
       if (NOT_FOUND.has(name)) notFound = true;
       message = body.error?.message ?? name;
+      if (notFound && opts.authoritative) break;
     } catch {
       // Network error, CORS refusal or timeout: try the next endpoint.
     }

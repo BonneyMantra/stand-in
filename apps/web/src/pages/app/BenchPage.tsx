@@ -19,10 +19,19 @@ export default function BenchPage() {
   const baseline = data.recorded?.baseline_routes ?? [];
   const toolExact = routes.filter((r) => r.attributed_tool).length;
   const med = b.median_blocks_to_freeze > 0 ? b.median_blocks_to_freeze : null;
+  // With per-route results, score against the routes where a theft actually happened: a refused injection
+  // or a blocked payment left nothing to detect. The live bench summary has only route totals.
+  const thefts = routes.filter((r) => r.theft_succeeded);
+  const per = thefts.length > 0;
+  const caught = thefts.filter((r) => r.detected).length;
+  const named = thefts.filter((r) => r.attributed_session).length;
+  const det = per ? { value: caught, of: thefts.length } : { value: b.detected, of: b.routes };
+  const att = per ? { value: named, of: thefts.length } : { value: b.attributed, of: b.routes };
+  const unit = per ? "thefts" : "routes";
 
   const cols: Column<BenchRoute>[] = [
     {
-      id: "route", header: "Attack route", className: "w-[52%] sm:w-[36%]",
+      id: "route", header: "Attack route", className: "w-[52%] @xl:w-[36%]",
       cell: (r) => (
         <span className="block min-w-0">
           <span className="block truncate font-mono text-fg">{r.route}</span>
@@ -50,13 +59,15 @@ export default function BenchPage() {
         title="Benchmark"
         sub={data.recorded ? <>Attack suite against sandboxed sessions · results generated {fmtDate(data.recorded.bench_generated_at ?? data.recorded.recorded_at)}{notRun ? ` · ${notRun} route${notRun === 1 ? "" : "s"} not run` : ""}</> : "Summary from the watcher's bench events"}
       />
-      <div className="grid gap-4 md:grid-cols-3">
-        <BenchCard icon={Crosshair} title="Detection" sub="leak seen as exposure or trip" value={b.detected} target={b.routes} label="detected / routes" pass={b.routes ? b.detected === b.routes : null}
-          legend={[["detected", b.detected, "bg-safe"], ["missed", b.routes - b.detected]]}>
+      <div className="grid gap-4 xl:grid-cols-3">
+        <BenchCard icon={Crosshair} title="Detection" sub="theft seen as exposure or trip" value={det.value} target={det.of} label={`detected / ${unit}`} pass={det.of ? det.value === det.of : null}
+          legend={per
+            ? [["detected", caught, "bg-safe"], ["missed", thefts.length - caught], ["no theft to detect", routes.length - thefts.length]]
+            : [["detected", b.detected, "bg-safe"], ["not detected", b.routes - b.detected]]}>
           {routes.length ? <RouteCells routes={routes} pick={(r) => r.detected} /> : <p className="text-xs text-fg-faint">{b.routes} routes in the last bench event.</p>}
         </BenchCard>
-        <BenchCard icon={Fingerprint} title="Attribution" sub="session and exact tool call named" value={b.attributed} target={b.routes} label="session / routes" pass={b.routes ? b.attributed === b.routes : null}
-          legend={[["session named", b.attributed, "bg-safe"], ["tool call exact", routes.length ? toolExact : "–", "bg-decoy"]]}>
+        <BenchCard icon={Fingerprint} title="Attribution" sub="session and exact tool call named" value={att.value} target={att.of} label={`session / ${unit}`} pass={att.of ? att.value === att.of : null}
+          legend={[["session named", att.value, "bg-safe"], ["tool call exact", routes.length ? toolExact : "–", "bg-decoy"]]}>
           {routes.length ? <RouteCells routes={routes} pick={(r) => r.attributed_session} /> : null}
         </BenchCard>
         <BenchCard icon={Snowflake} title="Time to freeze" sub="decoy tx block → freeze tx block" value={med ?? "–"} target={`${TARGET_BLOCKS} blk`} label="median / target" pass={med === null ? null : med <= TARGET_BLOCKS}
@@ -77,7 +88,7 @@ export default function BenchPage() {
         {baseline.length ? (
           <div className="grid gap-3 sm:grid-cols-2">
             <div><p className="text-xs text-fg-faint">Off: thefts that succeeded</p><p className="mt-1 font-mono text-2xl text-trip">{baseline.filter((r) => r.theft_succeeded).length} / {baseline.length}</p></div>
-            <div><p className="text-xs text-fg-faint">On: leaks detected</p><p className="mt-1 font-mono text-2xl text-fg">{routes.filter((r) => r.detected).length} / {routes.length}</p></div>
+            <div><p className="text-xs text-fg-faint">On: thefts that froze the account</p><p className="mt-1 font-mono text-2xl text-fg">{thefts.filter((r) => r.blocks_to_freeze !== null).length} / {thefts.length}</p></div>
           </div>
         ) : (
           <EmptyState icon={Split} title={data.recorded ? "Baseline not run in this recording" : "Baseline not in the live API"} className="py-6">

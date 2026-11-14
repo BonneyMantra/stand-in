@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { Link, useLocation } from "react-router";
 import { History, Radio, RefreshCw, ServerCrash } from "lucide-react";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -36,14 +36,24 @@ function Header() {
   const { source, setPreferRecorded, data } = useStandin();
   const { pathname } = useLocation();
   const seg = pathname.split("/")[2];
-  const crumb = seg ? TITLES[seg] ?? seg : "Overview";
+  const crumb = seg ? TITLES[seg] ?? "Not found" : "Overview";
   const isTrip = pathname.startsWith("/app/trips/") && pathname.split("/")[3];
+  // The owner console works on the visitor's own account through their wallet, not on the recorded run.
+  const owner = seg === "owner";
+  useEffect(() => {
+    const tx = isTrip ? decodeURIComponent(pathname.split("/")[3]) : "";
+    document.title = `${tx ? `Trip ${tx.slice(0, 8)}…` : crumb} · Stand-in dashboard`;
+  }, [crumb, isTrip, pathname]);
   return (
     <header className="sticky top-0 z-20 flex h-12 items-center gap-2 border-b border-line bg-ink-950/85 px-3 backdrop-blur md:px-6">
       <SidebarTrigger className="-ml-1 text-fg-muted hover:text-fg md:hidden" aria-label="Open navigation" />
       <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5 text-[13px]">
-        <span className="hidden truncate font-mono text-xs text-fg-faint sm:inline">{data?.agent.account_id ?? "stand-in"}</span>
-        <span className="hidden text-fg-faint sm:inline" aria-hidden>/</span>
+        {!owner && (
+          <>
+            <span className="hidden truncate font-mono text-xs text-fg-faint lg:inline">{data?.agent.account_id ?? "stand-in"}</span>
+            <span className="hidden text-fg-faint lg:inline" aria-hidden>/</span>
+          </>
+        )}
         {isTrip ? (
           <>
             <Link to="/app/trips" className="text-fg-muted hover:text-fg">Trips</Link>
@@ -54,13 +64,13 @@ function Header() {
           <span className="text-fg" aria-current="page">{crumb}</span>
         )}
       </nav>
-      <div className="ml-auto flex items-center gap-2">
+      <div className={cn("ml-auto flex items-center gap-2", owner && "hidden")}>
         {source === "live" && (
           <>
             <span className="inline-flex h-6 items-center gap-1.5 rounded-md border border-safe/30 bg-safe-soft px-2 font-mono text-[11px] text-safe">
               <span className="size-1.5 animate-pulse rounded-full bg-safe" aria-hidden />live
             </span>
-            <button type="button" onClick={() => setPreferRecorded(true)} className="inline-flex h-6 items-center gap-1.5 rounded-md border border-line px-2 text-[11px] text-fg-muted hover:text-fg focus-visible:ring-2 focus-visible:ring-ring outline-none">
+            <button type="button" onClick={() => setPreferRecorded(true)} className="inline-flex h-6 items-center gap-1.5 rounded-md border border-line px-2 text-[11px] whitespace-nowrap text-fg-muted hover:text-fg focus-visible:ring-2 focus-visible:ring-ring outline-none">
               <History className="size-3" aria-hidden /><span className="hidden sm:inline">Recorded run</span>
             </button>
           </>
@@ -79,6 +89,19 @@ function SourcePill() {
   const unreachable = fallbackReason === "unreachable";
   const detail = `Recorded testnet run${when ? ` · ${when}` : ""}: real ledger events and tx hashes; values not yet measured carry a preview tag`;
   const action = unreachable ? "Retry live" : "Back to live";
+  if (fallbackReason === "none") {
+    // The hosted site has no watcher: the recorded run is what it serves, not a degraded state.
+    return (
+      <>
+        <span role="status" title={detail} className="inline-flex h-6 items-center gap-1.5 rounded-full border border-line-strong px-2.5 font-mono text-[11px] whitespace-nowrap text-fg-muted">
+          <History className="size-3" aria-hidden />
+          <span aria-hidden>recorded<span className="hidden sm:inline"> testnet run</span></span>
+          <span className="sr-only">This site has no watcher of its own. {detail}. Run pnpm standin dev up locally for live data.</span>
+        </span>
+        {when && <span className="hidden font-mono text-[11px] text-fg-faint lg:inline">{when}</span>}
+      </>
+    );
+  }
   return (
     <>
       <span
@@ -104,7 +127,7 @@ function SourcePill() {
         type="button"
         onClick={() => (unreachable ? retry() : setPreferRecorded(false))}
         aria-label={action}
-        className="inline-flex h-6 items-center gap-1.5 rounded-md border border-line px-2 text-[11px] text-fg-muted outline-none hover:text-fg focus-visible:ring-2 focus-visible:ring-ring"
+        className="inline-flex h-6 items-center gap-1.5 rounded-md border border-line px-2 text-[11px] whitespace-nowrap text-fg-muted outline-none hover:text-fg focus-visible:ring-2 focus-visible:ring-ring"
       >
         {unreachable ? <RefreshCw className="size-3" aria-hidden /> : <Radio className="size-3" aria-hidden />}
         <span className="hidden sm:inline">{action}</span>

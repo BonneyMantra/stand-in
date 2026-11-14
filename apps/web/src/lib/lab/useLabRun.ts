@@ -39,9 +39,15 @@ export function useLabRun() {
     setRun((r) => (r.runId === runId ? { ...r, relay: { state: ok ? "sent" : "failed", topic: p.topic } } : r));
   }, []);
 
+  // The server stores a run after its stream closes (and KV lists lag), so this visitor's finished run is
+  // shown from its own events until the stored copy appears in the list.
+  const own = useRef<RunRecord | null>(null);
   const refreshRuns = useCallback(async () => {
     const r = await fetchRuns(10);
-    setRuns(r.ok ? { status: "ok", runs: r.data.runs, mock: r.mock } : { status: "error", code: r.status });
+    if (!r.ok) return setRuns({ status: "error", code: r.status });
+    const mine = own.current;
+    const list = mine && !r.data.runs.some((x) => x.run_id === mine.run_id) ? [mine, ...r.data.runs].slice(0, 10) : r.data.runs;
+    setRuns({ status: "ok", runs: list, mock: r.mock });
   }, []);
 
   useEffect(() => {
@@ -73,7 +79,11 @@ export function useLabRun() {
     const c = new AbortController();
     ctl.current = c;
     setRun({ ...INITIAL, phase: "running" });
+    const seen: StepEvent[] = [];
+    let doneBlocks: number | null = null;
     const outcome = await startRun((e) => {
+      if (e.type === "step") seen.push(e.data);
+      if (e.type === "done") doneBlocks = e.data.blocks_to_freeze;
       if (e.type === "step" && e.data.step === "notify" && e.data.status === "fail" && e.data.ntfy) void relay(e.data.run_id, e.data.ntfy);
       setRun((r) => {
         if (e.type === "step") return { ...r, runId: e.data.run_id || r.runId, events: [...r.events, e.data] };
@@ -86,9 +96,15 @@ export function useLabRun() {
       case "streamed": {
         const phase = outcome.ended === "done" ? "done" : outcome.ended === "error" ? "failed" : "dropped";
         setRun((r) => ({ ...r, phase, mock: outcome.mock }));
+        const runId = seen[0]?.run_id;
+        if (phase !== "dropped" && runId && !outcome.mock) {
+          const freeze = seen.find((s) => s.step === "freeze" && s.status === "ok");
+          own.current = { run_id: runId, at: new Date().toISOString(), blocks_to_freeze: doneBlocks ?? freeze?.blocks_after_trip ?? null, steps: seen };
+        }
         // A dropped stream may still finish server-side; it shows up in Recent runs once stored.
         void refreshRuns();
-        if (phase === "dropped") later(15_000, () => void refreshRuns());
+        later(4_000, () => void refreshRuns());
+        later(15_000, () => void refreshRuns());
         break;
       }
       case "busy":

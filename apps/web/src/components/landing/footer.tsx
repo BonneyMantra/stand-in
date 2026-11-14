@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { fetchRuns } from "@/lib/lab/api";
 import { cn } from "@/lib/utils";
-import { DASHBOARD_PATH, PROBLEM_STATS, INCIDENT, REPO_URL } from "./content";
+import { PROBLEM_STATS, INCIDENT, REPO_URL } from "./content";
 import { AccentLink, lineBtn } from "./cta";
 import { BrandMark, GithubMark, focusRing } from "./nav";
 import { Reveal } from "./primitives";
@@ -14,7 +14,7 @@ function ClosingCta() {
         Watch a decoy trip, end to end.
       </h2>
       <div className="mt-8 flex flex-wrap justify-center gap-3">
-        <AccentLink to={DASHBOARD_PATH}>Open the live dashboard</AccentLink>
+        <AccentLink to="/lab">Leak a decoy in the lab</AccentLink>
         <a href={REPO_URL} target="_blank" rel="noreferrer" className={lineBtn}>
           <GithubMark className="size-3.5" />
           Read the code
@@ -48,7 +48,7 @@ const PRODUCT = [
   { to: "/app", label: "Dashboard" },
   { to: "/lab", label: "Lab" },
   { to: "/verify", label: "Verify" },
-  { to: "/app/owner", label: "Guardian" },
+  { to: "/app/owner", label: "Owner console" },
 ];
 
 const PAGE = [

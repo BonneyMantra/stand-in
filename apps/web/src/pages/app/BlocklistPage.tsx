@@ -11,11 +11,11 @@ export default function BlocklistPage() {
   if (!data) return null;
   const registry = data.recorded?.accounts.registry;
   const cols: Column<BlocklistEntry>[] = [
-    { id: "acct", header: "Account", className: "w-[48%] sm:w-[28%]", cell: (b) => <ExtLink href={accountUrl(b.account_id)} className="text-trip">{b.account_id}</ExtLink>, sort: (b) => b.account_id },
+    { id: "acct", header: "Account", className: "w-[48%] @xl:w-[28%]", cell: (b) => <ExtLink href={accountUrl(b.account_id)} className="text-trip">{b.account_id}</ExtLink>, sort: (b) => b.account_id },
     { id: "tx", header: "Evidence tx", hide: "sm", cell: (b) => <ExtLink href={txUrl(b.evidence_tx)}>{shortHash(b.evidence_tx)}</ExtLink> },
     { id: "key", header: "Decoy key", hide: "md", cell: (b) => <CopyText value={b.decoy_public_key} display={shortKey(b.decoy_public_key)} /> },
     {
-      id: "att", header: "Attestation", className: "w-[52%] sm:w-[36%]",
+      id: "att", header: "Attestation", className: "w-[52%] @xl:w-[36%]",
       cell: (b) => b.attested_at && !b.preview
         ? <span className="inline-flex items-center gap-2"><Tag tone="safe">attested</Tag><span className="hidden truncate font-mono text-[11px] text-fg-faint xl:inline">{fmtDate(b.attested_at)}</span></span>
         : <span className="inline-flex items-center gap-2"><Tag>pending</Tag><PreviewTag title="Real attacker and evidence tx; the registry report and OutLayer attestation have not run yet" /></span>,

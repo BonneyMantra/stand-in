@@ -76,7 +76,7 @@ export function AgentKeysPanel({ state }: { state: StandinState }) {
         <Registry title="Intents keys" where={intents} list={intentRows} />
       </div>
       <p className="border-t border-line px-3.5 py-2.5 text-[11px] leading-relaxed text-fg-faint">
-        The owner's full-access key is moved out of the agent's reach by <code>standin adopt</code> (into the macOS keychain with <code>--keychain</code>) and is never registered here; a freeze deletes every key above and leaves the owner key.
+        The owner's full-access key stays in the owner's wallet (<code>standin adopt --wallet</code>), or the keystore route moves it out of the agent's reach; it is never registered here, and a freeze deletes every key above and leaves the owner key.
       </p>
     </Panel>
   );

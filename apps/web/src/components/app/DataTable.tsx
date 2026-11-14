@@ -13,7 +13,8 @@ export interface Column<T> {
   hide?: "sm" | "md" | "lg";
 }
 
-const HIDE = { sm: "hidden sm:table-cell", md: "hidden md:table-cell", lg: "hidden lg:table-cell" };
+// Container widths, not the viewport: from md up the sidebar takes 256px, so a 768px window has a ~460px table.
+const HIDE = { sm: "hidden @xl:table-cell", md: "hidden @2xl:table-cell", lg: "hidden @3xl:table-cell" };
 
 /** Table styling adapted from ReUI data-grid (dense rows, sticky header, sortable headers),
  *  reduced to a semantic <table>: sort buttons expose aria-sort, rows with a link are
@@ -42,7 +43,7 @@ export function DataTable<T>({
     setSort((s) => (s?.id === id ? { id, dir: s.dir === "asc" ? "desc" : "asc" } : { id, dir: "desc" }));
 
   return (
-    <div className="overflow-hidden rounded-[10px] border border-line bg-ink-900/60">
+    <div className="@container overflow-hidden rounded-[10px] border border-line bg-ink-900/60">
       <table className="w-full table-fixed border-collapse text-left text-xs">
         <caption className="sr-only">{caption}</caption>
         <thead className="bg-ink-900">

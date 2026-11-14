@@ -118,7 +118,7 @@ export function Attribution() {
           id="attribution-title"
           title="One account, many keys."
           second="The key says where it leaked."
-          live={<LiveLink to="/app">See it live</LiveLink>}
+          live={<LiveLink to="/app/trips">See the recorded trips</LiveLink>}
           className="lg:pt-6"
         >
           <p>

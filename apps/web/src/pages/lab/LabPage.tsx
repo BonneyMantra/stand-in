@@ -85,9 +85,9 @@ export default function LabPage() {
         </p>
       </PageHead>
 
-      <div className="mt-10 grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+      <div className="mt-10 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
         <RunPanel run={run} steps={steps} latest={showLatest ? latest : undefined} onStart={start} />
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-1">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-1">
           <Frame>
             <FramePanel className="bg-ink-950">
               <LastFreeze n={last.n} when={last.when} />

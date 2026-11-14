@@ -31,7 +31,7 @@ The app is dark-only: in newly added primitives the `dark:` values are applied d
 | Chain-signatures mode picker | shadcn `toggle-group` | Radio semantics, roving focus, selects on arrow |
 | Freeze scrubber stops | shadcn `toggle-group` | No wrap; Home/End |
 | Freeze scrubber track and thumb | custom | ReUI `stepper` has no sliding thumb; the track animates on transform |
-| Blocklist "pay" field | shadcn `input-group` + `kbd` | Prefix, amount and Check button as addons |
+| Blocklist "pay" field | shadcn `input-group` + `kbd` | Prefix, amount and Check button as addons; Check reads the registry `check` view and `view_account` live from testnet (drpc first), `blocklist-check.ts` |
 | Dashboard CopyText, "+N more" | shadcn `button` (`bare`) | Drop-in, same look |
 | Dashboard shell and nav | shadcn `sidebar`, `sheet`, `tooltip`, `skeleton` | |
 | Dashboard status tags (`Tag`) | custom | Swapping to ReUI Badge would change the look; left as is |
@@ -40,7 +40,7 @@ The app is dark-only: in newly added primitives the `dark:` values are applied d
 | Freeze ledgers (two registries) | custom | Paired on-chain ledgers synced to the scrubber |
 | Blocklist receipt | custom | Printed-receipt motion; content is the TEE verdict |
 | Agent terminals and hook rail | custom | Scripted terminal replay |
-| Data tables | custom, styled after ReUI `data-grid` | A small table with no need for the full grid |
+| Data tables | custom, styled after ReUI `data-grid` | A small table with no need for the full grid; columns hide by the table's container width (`@container`), since the sidebar takes 256px from md up |
 | KPI strip | custom, after ReUI `card-38` | |
 | `/lab` run trace | ReUI `timeline` | `reui/timeline.tsx`; indicator and separator restyled (trip colour for theft, detect, freeze) |
 | `/lab` busy, rate-limit, dropped-stream and error notices | ReUI `alert` | `reui/alert.tsx`; warning/destructive variants toned to `warn`/`trip` |
@@ -48,7 +48,7 @@ The app is dark-only: in newly added primitives the `dark:` values are applied d
 | `/lab` phone QR code | custom SVG, matrix from `uqr` | Generated client-side; dark modules on a light tile for scanners |
 | `/lab` Recent runs, `/verify` claim cards and signature list | custom, styled after ReUI `frame` | Same 14px frame with 3px inset as the landing |
 | `/verify` summary bar | custom | Segmented verified/mismatch/unreachable bar |
-| `/lab`, `/verify` shell | landing `Nav` + `PublicShell` | Nav gains Lab and Verify links at every width |
+| `/lab`, `/verify` shell | landing `Nav` + `PublicShell` | Nav gains Lab and Verify links at every width; the 404 page (`pages/NotFoundPage.tsx`) uses the same shell, and unknown `/app/*` paths show an EmptyState inside the dashboard |
 | Nav CTA, stat strip, six-step grid | custom, adapted from ReUI blocks `navbar-12`, `stats-7`, `card-2` | |
 
 ## Libraries added for /lab and /verify

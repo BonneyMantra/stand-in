@@ -114,7 +114,7 @@ export function Agents() {
             Each session gets its own decoys at start, and every prompt, tool input and tool output is checked for them. No
             prompt changes; the agent keeps working with a key scoped to your contract.
           </p>
-            <LiveLink to="/app/sessions" className="mt-5">See it live</LiveLink>
+            <LiveLink to="/app/sessions" className="mt-5">See the recorded sessions</LiveLink>
           </div>
         </Reveal>
 
@@ -136,7 +136,7 @@ export function Agents() {
           {[
             { k: "Claude Code", lines: INSTALL.claude, p: "$" },
             { k: "Codex", lines: INSTALL.codex, p: "$" },
-            { k: "Adopt the account", lines: INSTALL.cli, p: "$" },
+            { k: "Adopt the account (your wallet signs)", lines: INSTALL.cli, p: "$" },
           ].map((g) => (
             <div key={g.k} className="min-w-0">
               <p className="mb-2.5 text-[13px] font-medium text-fg">{g.k}</p>
