@@ -1,0 +1,16 @@
+diff --git a/build/SandboxedWallet/executor.js b/build/SandboxedWallet/executor.js
+index 6e8bdc24a679cecb4ca23f0421ae9d50105b24d6..e7b6259087e9081d9078232b0341300feaf1bf66 100644
+--- a/build/SandboxedWallet/executor.js
++++ b/build/SandboxedWallet/executor.js
+@@ -227,7 +227,10 @@ class SandboxExecutor {
+                 success(null);
+                 return;
+             }
+-            const panel = window.open(event.data.params.url, "_blank", event.data.params.features);
++            // Stand-in patch: open web wallets as a tab in the same window. Popup features (width/height) force a
++            // separate window; without them "_blank" is a normal tab. The opener stays, so the wallet still replies
++            // through window.opener.postMessage and panel.closed still reports a cancelled request.
++            const panel = window.open(event.data.params.url, "_blank");
+             const panelId = panel ? (0, uuid_1.uuid4)() : null;
+             const handler = (ev) => {
+                 const url = (0, url_1.parseUrl)(event.data.params.url);

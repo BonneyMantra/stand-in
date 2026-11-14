@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  '@hot-labs/near-connect@0.12.0': 2dcfbb5932d8b05c5350f9a317fffd15b6c22c29d38ca103bf1aa05f5a6fd86a
+
 importers:
 
   .:
@@ -34,7 +37,7 @@ importers:
         version: 5.3.0
       '@hot-labs/near-connect':
         specifier: 0.12.0
-        version: 0.12.0
+        version: 0.12.0(patch_hash=2dcfbb5932d8b05c5350f9a317fffd15b6c22c29d38ca103bf1aa05f5a6fd86a)
       '@noble/curves':
         specifier: 2.4.0
         version: 2.4.0
@@ -2545,7 +2548,7 @@ snapshots:
 
   '@fontsource-variable/geist@5.3.0': {}
 
-  '@hot-labs/near-connect@0.12.0': {}
+  '@hot-labs/near-connect@0.12.0(patch_hash=2dcfbb5932d8b05c5350f9a317fffd15b6c22c29d38ca103bf1aa05f5a6fd86a)': {}
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:
