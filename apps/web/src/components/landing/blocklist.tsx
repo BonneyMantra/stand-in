@@ -1,113 +1,144 @@
-import { Cpu, FileCheck2, Link2, PenLine } from "lucide-react";
+import { useId, useRef, useState, type FormEvent } from "react";
+import { motion, useInView, useReducedMotion } from "motion/react";
+import { CornerDownLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Frame, FramePanel, PanelBar } from "./frame";
-import { Reveal, Section, SectionHead } from "./primitives";
+import { Frame, FramePanel } from "./frame";
+import { EASE_OUT, Reveal } from "./primitives";
+import { BLOCKLIST as B } from "./proof-data";
+import { Receipt, judge, type Verdict } from "./blocklist-receipt";
 
-const CHECKS = [
-  { icon: Link2, text: "Reads the transaction from NEAR RPC itself and checks the hash." },
-  { icon: FileCheck2, text: "Confirms the signer is the bait account and the key was one of its decoys at that block." },
-  { icon: PenLine, text: "Names the attacker from the transfer and signs the verdict with a key that never leaves the enclave." },
-  { icon: Cpu, text: "The blocklist contract verifies that signature against the pinned key before it adds an entry." },
+const TRY = [
+  { account: B.thief, note: "recorded thief" },
+  { account: "si-project-5289.testnet", note: "Stand-in demo contract" },
 ];
 
-type Verdict = "block" | "warn" | "allow";
-const RUNS: { cmd: string; verdict: Verdict; reason: string; outcome: string }[] = [
-  {
-    cmd: "standin pay kx-sweeper.testnet 2",
-    verdict: "block",
-    reason: "on Stand-in blocklist · TEE verdict",
-    outcome: "refused",
-  },
-  {
-    cmd: "standin pay new-vendor.testnet 1",
-    verdict: "warn",
-    reason: "account is younger than 7 days",
-    outcome: "needs --approve-warn",
-  },
-  {
-    cmd: "standin pay si-project.testnet record_deploy",
-    verdict: "allow",
-    reason: "no flags · earlier tool calls touched this account",
-    outcome: "sent",
-  },
-];
+const LADDER = [
+  { level: "block", rule: "on the Stand-in blocklist, with a TEE-signed verdict", tone: "trip" },
+  { level: "warn", rule: "younger than 7 days, missing, or its code changed in 72 h", tone: "warn" },
+  { level: "allow", rule: "none of the above", tone: "safe" },
+] as const;
 
-const PILL: Record<Verdict, string> = {
-  block: "border-trip/40 bg-trip-soft text-trip",
-  warn: "border-warn/40 bg-warn/10 text-warn",
-  allow: "border-safe/35 bg-safe-soft text-safe",
-};
+const DOT = { trip: "bg-trip", warn: "bg-warn", safe: "bg-safe" } as const;
+const TXT = { trip: "text-trip", warn: "text-warn", safe: "text-safe" } as const;
 
-function Checks() {
+function Ladder({ v }: { v: Verdict }) {
+  const lit = (level: string) => (v.kind === "block" ? level === "block" : v.kind === "clear" ? level !== "block" : false);
   return (
-    <Frame>
-      <FramePanel className="overflow-hidden">
-        <PanelBar right={<span className="text-safe">attested · Intel TDX</span>}>
-          counterparty <span className="text-fg-faint">/</span> <span className="text-fg">check before paying</span>
-        </PanelBar>
-        <ul className="divide-y divide-line">
-          {RUNS.map((r) => (
-            <li key={r.cmd} className="px-4 py-4 font-mono text-[12px]">
-              <p className="truncate text-fg">
-                <span className="mr-2 text-fg-faint select-none" aria-hidden>
-                  $
-                </span>
-                {r.cmd}
-              </p>
-              <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-2 pl-4">
-                <span className={cn("inline-flex w-14 justify-center rounded border py-0.5 text-[10.5px] uppercase", PILL[r.verdict])}>
-                  {r.verdict}
-                </span>
-                <span className="min-w-0 text-fg-muted">{r.reason}</span>
-                <span className={cn("ml-auto text-[11px]", r.verdict === "block" ? "text-trip" : "text-fg-muted")}>
-                  {r.outcome}
-                </span>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </FramePanel>
-    </Frame>
+    <ol className="mt-6 space-y-2" aria-label="Verdict rules">
+      {LADDER.map((l) => (
+        <li key={l.level} className={cn("flex items-baseline gap-3 text-[13px] transition-opacity duration-300", lit(l.level) ? "opacity-100" : "opacity-40")}>
+          <span className={cn("relative top-[-1px] size-1.5 shrink-0 rounded-full", DOT[l.tone])} aria-hidden />
+          <span className={cn("w-11 shrink-0 font-mono text-[11.5px]", TXT[l.tone])}>{l.level}</span>
+          <span className="text-fg-muted">{l.rule}</span>
+        </li>
+      ))}
+    </ol>
   );
 }
 
 export function Blocklist() {
+  const reduce = useReducedMotion();
+  const inputId = useId();
+  const [value, setValue] = useState<string>(B.thief);
+  const [verdict, setVerdict] = useState<Verdict>({ kind: "block" });
+  const [run, setRun] = useState(0);
+  const slot = useRef<HTMLDivElement>(null);
+  const printed = useInView(slot, { once: true, amount: 0.2 });
+
+  const check = (account: string) => {
+    setVerdict(judge(account));
+    setRun((n) => n + 1);
+  };
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    check(value);
+  };
+
   return (
-    <Section id="blocklist" labelledBy="blocklist-title">
-      <div className="grid grid-cols-1 gap-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
-        <div>
-          <SectionHead
-            id="blocklist-title"
-            eyebrow="Shared blocklist"
-            title="A blocklist you can verify."
-            muted="Proved in a TEE."
-          >
-            <p>
-              Every trip puts the thief's account on a shared blocklist. The entry is produced by a verdict app running
-              on OutLayer inside an Intel TDX enclave, so anyone can check the attestation instead of trusting us.
-            </p>
-          </SectionHead>
-          <Reveal delay={0.06}>
-            <ol className="mt-8 space-y-4">
-              {CHECKS.map((c, i) => (
-                <li key={i} className="flex gap-3 text-[14px] leading-relaxed text-fg-muted">
-                  <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md border border-line-strong bg-ink-900 text-fg">
-                    <c.icon className="size-3.5" aria-hidden />
-                  </span>
-                  {c.text}
-                </li>
-              ))}
-            </ol>
-          </Reveal>
-        </div>
-        <Reveal delay={0.1} className="lg:pt-20">
-          <Checks />
-          <p className="mt-4 text-[13px] leading-relaxed text-fg-muted">
-            Other agents run the same check before they pay: <span className="text-safe">allow</span>,{" "}
-            <span className="text-warn">warn</span> or <span className="text-trip">block</span>.
+    <section id="blocklist" aria-labelledby="blocklist-title" className="relative scroll-mt-20 border-t border-line/70">
+      <div className="mx-auto grid w-full max-w-[1200px] grid-cols-1 gap-12 px-4 py-20 sm:px-6 md:py-28 lg:grid-cols-[minmax(0,1fr)_minmax(0,440px)] lg:gap-20 lg:px-10">
+        <Reveal className="min-w-0">
+          <p className="mb-4 font-mono text-[11px] tracking-[0.14em] text-fg-muted uppercase">Shared blocklist</p>
+          <h2 id="blocklist-title" className="text-[30px] leading-[1.08] font-medium tracking-[-0.025em] text-balance sm:text-[40px]">
+            Ask before you pay.
+            <span className="block text-fg-muted">The thief is already on the list.</span>
+          </h2>
+          <p className="mt-5 max-w-[54ch] text-[15px] leading-relaxed text-pretty text-fg-muted">
+            Every trip reports the thief to a shared blocklist. The verdict is computed inside an Intel TDX enclave on
+            OutLayer, so any agent can check the attestation instead of trusting Stand-in.
           </p>
+
+          <form onSubmit={submit} className="mt-8">
+            <label htmlFor={inputId} className="mb-2 block font-mono text-[11px] text-fg-muted">
+              Try it: who is your agent about to pay?
+            </label>
+            <div className="flex items-center gap-2 rounded-lg border border-line-strong bg-ink-900 py-1.5 pr-1.5 pl-3.5 font-mono text-[13px] transition-colors focus-within:border-fg-faint sm:text-[14px]">
+              <span aria-hidden className="hidden shrink-0 text-fg-faint select-none sm:inline">
+                standin pay
+              </span>
+              <input
+                id={inputId}
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                spellCheck={false}
+                autoCapitalize="none"
+                autoComplete="off"
+                maxLength={64}
+                placeholder="account.testnet"
+                className="h-9 min-w-0 flex-1 bg-transparent text-fg outline-none placeholder:text-fg-faint"
+              />
+              <span aria-hidden className="hidden shrink-0 text-fg-faint select-none sm:inline">
+                0.5
+              </span>
+              <button
+                type="submit"
+                className="inline-flex h-9 shrink-0 items-center gap-2 rounded-md bg-fg px-3 text-[12.5px] font-medium text-ink-950 transition-[background-color,transform] duration-150 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fg-muted active:scale-[0.97]"
+              >
+                Check
+                <CornerDownLeft aria-hidden className="size-3.5" />
+              </button>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {TRY.map((t) => (
+                <button
+                  key={t.account}
+                  type="button"
+                  onClick={() => (setValue(t.account), check(t.account))}
+                  className="inline-flex max-w-full items-center gap-2 rounded-md border border-line px-2.5 py-1 font-mono text-[11px] text-fg-muted transition-colors hover:border-line-strong hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fg-muted"
+                >
+                  <span className="truncate">{t.account}</span>
+                  <span className="shrink-0 text-fg-faint">{t.note}</span>
+                </button>
+              ))}
+            </div>
+          </form>
+
+          <Ladder v={verdict} />
+        </Reveal>
+
+        <Reveal delay={0.08} className="min-w-0">
+          <Frame>
+            <FramePanel className="flex items-center justify-between gap-3 px-4 py-3 font-mono text-[10.5px] text-fg-muted">
+              <span className="truncate">verdict · {B.contract}</span>
+              <span className="flex shrink-0 items-center gap-1.5 text-safe">
+                <i aria-hidden className="size-1.5 rounded-full bg-safe" />
+                attested
+              </span>
+            </FramePanel>
+            <div aria-hidden className="mx-3 h-[3px] rounded-full bg-ink-950 shadow-[inset_0_1px_2px_rgba(0,0,0,0.9)]" />
+          </Frame>
+          <div ref={slot} className="relative -mt-[6px] overflow-hidden px-3 pt-[6px] lg:min-h-[640px]" aria-live="polite">
+            <motion.div
+              key={run}
+              initial={{ y: reduce ? 0 : "-104%", opacity: reduce ? 0 : 1 }}
+              animate={printed || run > 0 ? { y: 0, opacity: 1 } : undefined}
+              transition={{ duration: reduce ? 0.2 : 0.85, ease: EASE_OUT }}
+            >
+              <Receipt v={verdict} />
+            </motion.div>
+          </div>
         </Reveal>
       </div>
-    </Section>
+    </section>
   );
 }

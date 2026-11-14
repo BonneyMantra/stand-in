@@ -1,111 +1,159 @@
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useEffect, useRef, useState } from "react";
+import { useInView, useReducedMotion } from "motion/react";
+import { RotateCcw } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { INSTALL } from "./content";
-import { Frame, FramePanel } from "./frame";
-import { CommandLine, Reveal, Section, SectionHead } from "./primitives";
+import { Frame, FramePanel, PanelBar } from "./frame";
+import { CommandLine, Reveal } from "./primitives";
+import { BEATS, HOOKS, type Line } from "./agents-script";
 
-const TABS = [
-  {
-    id: "claude",
-    label: "Claude Code",
-    version: "v2.1.323",
-    lines: INSTALL.claude,
-    prompt: ">",
-    after: "Hooks watch every tool input and output for decoy keys. Each new session gets its own decoy.",
-  },
-  {
-    id: "codex",
-    label: "Codex",
-    version: "codex-cli 0.169.0",
-    lines: INSTALL.codex,
-    prompt: "$",
-    after: "Adds the same hooks to Codex. Sessions are told apart by their own decoy key.",
-  },
-  {
-    id: "cli",
-    label: "CLI",
-    version: "npx",
-    lines: INSTALL.cli,
-    prompt: "$",
-    after: "Moves the real full-access key out of the agent's reach and plants the decoys.",
-  },
-] as const;
+const STEP_MS = 1300;
 
-const POINTS = [
-  "The agent keeps working: it holds a function-call key scoped to your contract.",
-  "No prompt changes. Decoys sit where real keys used to be.",
-  "Tested against Claude Code 2.1.323 and codex-cli 0.169.0.",
-];
+const TONE: Record<Line["t"], string> = {
+  cmd: "text-fg",
+  out: "text-fg-muted",
+  hook: "text-decoy",
+  hit: "text-trip",
+  deny: "text-warn",
+};
 
-function InstallPanel() {
+function Terminal({ who, version, prompt, at }: { who: "claude" | "codex"; version: string; prompt: string; at: number }) {
+  const lines = BEATS.flatMap((b, bi) => b[who].map((l, li) => ({ ...l, bi, key: `${bi}-${li}` })));
+  const lastShown = lines.filter((l) => l.bi <= at).at(-1)?.key;
   return (
-    <Frame>
+    <Frame className="min-w-0">
       <FramePanel className="overflow-hidden">
-        <Tabs defaultValue="claude" className="gap-0">
-          <div className="flex items-center justify-between gap-3 border-b border-line px-3 py-2">
-            <TabsList variant="line" className="h-8 gap-1 bg-transparent p-0">
-              {TABS.map((t) => (
-                <TabsTrigger key={t.id} value={t.id} className="rounded-md !border-transparent px-2.5 font-mono text-[12px] data-[state=active]:!bg-ink-800">
-                  {t.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </div>
-          {TABS.map((t) => (
-            <TabsContent key={t.id} value={t.id} className="p-4 sm:p-5">
-              <div className="flex items-start gap-3">
-                <span aria-hidden className="mt-0.5 grid size-8 shrink-0 grid-cols-3 gap-px rounded-md bg-ink-950 p-1.5">
-                  {Array.from({ length: 9 }, (_, i) => (
-                    <i key={i} className={i === 4 ? "bg-trip" : i % 2 ? "bg-fg-faint" : "bg-fg-muted"} />
-                  ))}
+        <PanelBar right={<span className="text-fg-faint">{version}</span>}>
+          {who === "claude" ? "Claude Code" : "Codex"} <span className="text-fg-faint">·</span> ~/code/near-payments-agent
+        </PanelBar>
+        <ol className="space-y-0.5 px-4 py-4 font-mono text-[11.5px] leading-[1.55]">
+          {lines.map((l, i) => {
+            const shown = l.bi <= at;
+            return (
+              <li
+                key={l.key}
+                aria-hidden={!shown}
+                className={cn(
+                  i > 0 && lines[i - 1]!.bi !== l.bi && "pt-2.5",
+                  "flex min-w-0 gap-2 transition-[opacity,transform] duration-300 ease-[var(--ease-out-strong)]",
+                  shown ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0",
+                )}
+                style={{ transitionDelay: shown ? `${(i % 3) * 120}ms` : "0ms" }}
+              >
+                <span aria-hidden className="w-3 shrink-0 text-fg-faint select-none">
+                  {l.t === "cmd" ? prompt : l.hook ? "↳" : ""}
                 </span>
-                <div className="min-w-0 font-mono text-[12px] leading-relaxed">
-                  <p className="text-fg">
-                    {t.label} <span className="text-fg-muted">{t.version}</span>
-                  </p>
-                  <p className="truncate text-fg-muted">~/code/near-payments-agent</p>
-                </div>
-              </div>
-              <div className="mt-5 space-y-2">
-                {t.lines.map((l) => (
-                  <CommandLine key={l} command={l} prompt={t.prompt} />
-                ))}
-              </div>
-              <p className="mt-4 text-[13px] leading-relaxed text-fg-muted">{t.after}</p>
-            </TabsContent>
-          ))}
-        </Tabs>
-        <div className="flex items-center gap-2 border-t border-line px-4 py-3 font-mono text-[12px] text-fg-muted">
-          <span aria-hidden>&gt;</span>
-          <span className="truncate">Install Stand-in for this project and show me where the decoys went</span>
-          <span aria-hidden className="h-4 w-[7px] shrink-0 animate-pulse bg-fg-muted" />
-        </div>
+                <span className={cn("min-w-0 break-words", TONE[l.t])}>
+                  {l.hook ? <span className="mr-2 rounded-[3px] border border-current/30 px-1 text-[10px]">{l.hook}</span> : null}
+                  <span className={l.hook ? "text-fg-muted" : undefined}>{l.text}</span>
+                  {l.key === lastShown ? <span aria-hidden className="ml-1 inline-block h-3.5 w-[6px] translate-y-[2px] animate-pulse bg-fg-muted" /> : null}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
       </FramePanel>
     </Frame>
   );
 }
 
-export function Agents() {
+function HookRail({ at }: { at: number }) {
+  const current = BEATS[Math.max(0, at)]?.hook;
   return (
-    <Section id="agents" labelledBy="agents-title">
-      <div className="grid grid-cols-1 gap-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
-        <SectionHead id="agents-title" eyebrow="Install" title="Built for engineers" muted="and their agents.">
-          <p>
-            Stand-in ships as a Claude Code plugin, a Codex setup command and a CLI. Install it from inside the agent you
-            already use; it does the key work and tells you where every decoy went.
+    <ol aria-label="Hook sequence" className="relative grid grid-cols-2 gap-2 sm:grid-cols-4">
+      {HOOKS.map((h) => {
+        const idx = BEATS.findIndex((b) => b.hook === h);
+        const done = idx <= at;
+        const live = current === h;
+        return (
+          <li
+            key={h}
+            aria-current={live ? "step" : undefined}
+            className={cn(
+              "flex items-center gap-2 rounded-md border px-3 py-2 font-mono text-[11px] transition-[border-color,color,background-color] duration-300",
+              live ? "border-decoy/60 bg-decoy/10 text-fg" : done ? "border-line-strong text-fg-muted" : "border-line text-fg-faint",
+            )}
+          >
+            <i aria-hidden className={cn("size-1.5 shrink-0 rounded-full transition-colors", live ? "bg-decoy" : done ? "bg-fg-muted" : "bg-line-strong")} />
+            <span className="truncate">{h}</span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+export function Agents() {
+  const reduce = useReducedMotion();
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { once: true, amount: 0.35 });
+  const [at, setAt] = useState(-1);
+  const [run, setRun] = useState(0);
+
+  useEffect(() => {
+    if (!inView) return;
+    if (reduce) return setAt(BEATS.length - 1);
+    setAt(0);
+    const t = BEATS.slice(1).map((_, i) => setTimeout(() => setAt(i + 1), (i + 1) * STEP_MS));
+    return () => t.forEach(clearTimeout);
+  }, [inView, reduce, run]);
+
+  const done = at >= BEATS.length - 1;
+
+  return (
+    <section id="agents" aria-labelledby="agents-title" className="relative scroll-mt-20 border-t border-line/70">
+      <div className="mx-auto w-full max-w-[1200px] px-4 py-20 sm:px-6 md:py-28 lg:px-10">
+        <Reveal className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="mb-4 font-mono text-[11px] tracking-[0.14em] text-fg-muted uppercase">Install</p>
+            <h2 id="agents-title" className="text-[30px] leading-[1.08] font-medium tracking-[-0.025em] text-balance sm:text-[40px]">
+              Two agents. One set of hooks.
+            </h2>
+          </div>
+          <p className="max-w-[46ch] text-[15px] leading-relaxed text-pretty text-fg-muted">
+            Each session gets its own decoys at start, and every prompt, tool input and tool output is checked for them. No
+            prompt changes; the agent keeps working with a key scoped to your contract.
           </p>
-          <ul className="space-y-2 pt-2">
-            {POINTS.map((p) => (
-              <li key={p} className="flex gap-2.5">
-                <span aria-hidden className="mt-[9px] h-px w-3 shrink-0 bg-fg-faint" />
-                {p}
-              </li>
-            ))}
-          </ul>
-        </SectionHead>
-        <Reveal delay={0.08}>
-          <InstallPanel />
+        </Reveal>
+
+        <div ref={ref} className="mt-10 space-y-3">
+          <HookRail at={at} />
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            <Terminal who="claude" version="v2.1.325" prompt=">" at={at} />
+            <Terminal who="codex" version="codex-cli 0.169.0" prompt="$" at={at} />
+          </div>
+          <div className="flex flex-col gap-3 pt-1 sm:flex-row sm:items-center sm:justify-between">
+            <p className={cn("text-[13px] leading-relaxed text-fg-muted transition-opacity duration-500", done ? "opacity-100" : "opacity-0")}>
+              When a decoy later signs on-chain, the watcher matches its key to these exposures: this session, this tool call.
+            </p>
+            <button
+              type="button"
+              onClick={() => (setAt(-1), setRun((n) => n + 1))}
+              className="inline-flex h-8 shrink-0 items-center gap-2 self-start rounded-md border border-line-strong px-3 font-mono text-[11px] text-fg-muted transition-colors hover:bg-ink-800 hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fg-muted"
+            >
+              <RotateCcw aria-hidden className="size-3.5" />
+              Replay
+            </button>
+          </div>
+        </div>
+
+        <Reveal delay={0.05} className="mt-12 grid grid-cols-1 gap-6 border-t border-line pt-10 md:grid-cols-3">
+          {[
+            { k: "Claude Code", lines: INSTALL.claude, p: ">" },
+            { k: "Codex", lines: INSTALL.codex, p: "$" },
+            { k: "Adopt the account", lines: INSTALL.cli, p: "$" },
+          ].map((g) => (
+            <div key={g.k} className="min-w-0">
+              <p className="mb-2.5 text-[13px] font-medium text-fg">{g.k}</p>
+              <div className="space-y-2">
+                {g.lines.map((l) => (
+                  <CommandLine key={l} command={l} prompt={g.p} />
+                ))}
+              </div>
+            </div>
+          ))}
         </Reveal>
       </div>
-    </Section>
+    </section>
   );
 }

@@ -5,6 +5,7 @@ import { IntegrationsRow, Problem } from "@/components/landing/problem";
 import { HowItWorks } from "@/components/landing/how-it-works";
 import { Attribution } from "@/components/landing/attribution";
 import { Registries } from "@/components/landing/registries";
+import { ChainSignatures } from "@/components/landing/chain-signatures";
 import { Blocklist } from "@/components/landing/blocklist";
 import { Benchmark } from "@/components/landing/benchmark";
 import { Agents } from "@/components/landing/agents";
@@ -31,6 +32,7 @@ export default function LandingPage() {
         <HowItWorks />
         <Attribution />
         <Registries />
+        <ChainSignatures />
         <Blocklist />
         <Benchmark />
         <Agents />

@@ -1,96 +1,194 @@
-import { PROOF_TX, txUrl } from "./content";
-import { Frame, FramePanel, PanelBar } from "./frame";
-import { Reveal, Section, SectionHead, SourceLink } from "./primitives";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { motion, useInView, useReducedMotion } from "motion/react";
+import { RotateCcw } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { txUrl } from "./content";
+import { Frame, FramePanel } from "./frame";
+import { Reveal, SourceLink } from "./primitives";
+import { FREEZE, blockLabel, short } from "./proof-data";
+import { Scrubber } from "./scrubber";
 
-type Line = { op: string; arg: string; result: string; tone: "ok" | "keep" | "fail" };
-
-const PANELS: {
-  title: string;
-  path: string;
-  lines: Line[];
-  body: string;
-  tx: string;
-  txLabel: string;
-}[] = [
-  {
-    title: "NEAR account keys",
-    path: "si-agent.testnet / access keys",
-    lines: [
-      { op: "freeze", arg: "called by the watcher key", result: "sent", tone: "keep" },
-      { op: "DeleteKey", arg: "agent function-call key", result: "deleted", tone: "ok" },
-      { op: "DeleteKey", arg: "session function-call key", result: "deleted", tone: "ok" },
-      { op: "owner key", arg: "held outside the agent", result: "kept", tone: "keep" },
-    ],
-    body: "One DeleteKey receipt per agent key, so one failure cannot block the rest. The full-access owner key was never in the agent's reach and survives the freeze.",
-    tx: PROOF_TX.freeze,
-    txLabel: "Freeze signed by the watcher key",
-  },
-  {
-    title: "NEAR Intents registry",
-    path: "intents / public keys",
-    lines: [
-      { op: "remove_public_key", arg: "agent intents key", result: "removed", tone: "ok" },
-      { op: "execute_signed", arg: "intent signed before the freeze", result: "PublicKeyNotExist", tone: "fail" },
-    ],
-    body: "An intent signed before the freeze still carries a valid signature. The registry checks that the key is registered now, so the queued intent fails.",
-    tx: PROOF_TX.intentRejected,
-    txLabel: "Signed intent rejected after the freeze",
-  },
+const STOPS = [
+  { label: "before", sub: "keys live" },
+  { label: "freeze", sub: blockLabel(FREEZE.block) },
+  { label: "queued intent", sub: blockLabel(FREEZE.rejectedBlock) },
 ];
 
-const TONE = { ok: "text-safe", keep: "text-fg-muted", fail: "text-trip" } as const;
+/** Two stacked states in one grid cell, so swapping them never shifts layout. */
+function Swap({ on, off, onNode, className }: { on: boolean; off: ReactNode; onNode: ReactNode; className?: string }) {
+  const base = "col-start-1 row-start-1 transition-[opacity,transform] duration-300 ease-[var(--ease-out-strong)]";
+  return (
+    <span className={cn("grid justify-items-end", className)}>
+      <span className={cn(base, on ? "translate-y-1 opacity-0" : "opacity-100")} aria-hidden={on}>
+        {off}
+      </span>
+      <span className={cn(base, on ? "opacity-100" : "-translate-y-1 opacity-0")} aria-hidden={!on}>
+        {onNode}
+      </span>
+    </span>
+  );
+}
+
+function KeyRow({ k, role, struck, action, delay, keep }: { k: string; role: string; struck: boolean; action: string; delay: number; keep?: boolean }) {
+  return (
+    <li className="relative flex items-center justify-between gap-3 px-4 py-3.5 font-mono text-[11.5px]">
+      <span className={cn("relative min-w-0 transition-opacity duration-300", struck && "opacity-45")} style={{ transitionDelay: `${delay}ms` }}>
+        <span className="relative block max-w-full truncate text-fg sm:inline-block">
+          {k}
+          <span
+            aria-hidden
+            className="absolute inset-x-0 top-1/2 h-px origin-left bg-trip transition-transform duration-500 ease-[var(--ease-out-strong)]"
+            style={{ transform: `scaleX(${struck ? 1 : 0})`, transitionDelay: `${delay}ms` }}
+          />
+        </span>
+        <span className="block truncate text-fg-faint">{role}</span>
+      </span>
+      <Swap
+        on={struck}
+        off={<span className={keep ? "text-fg-muted" : "text-safe"}>{keep ? "held outside" : "live"}</span>}
+        onNode={<span className={keep ? "text-fg-muted" : "text-trip"}>{action}</span>}
+        className="shrink-0"
+      />
+    </li>
+  );
+}
+
+function Ledger({ account, kind, children }: { account: string; kind: string; children: ReactNode }) {
+  return (
+    <FramePanel className="overflow-hidden">
+      <div className="flex items-baseline justify-between gap-3 border-b border-line px-4 py-3">
+        <p className="truncate font-mono text-[12px] text-fg">{account}</p>
+        <p className="shrink-0 font-mono text-[10.5px] text-fg-faint">{kind}</p>
+      </div>
+      <ul className="divide-y divide-line">{children}</ul>
+    </FramePanel>
+  );
+}
 
 export function Registries() {
-  return (
-    <Section id="registries" labelledBy="registries-title">
-      <SectionHead
-        id="registries-title"
-        eyebrow="The freeze"
-        title="Both key registries."
-        muted="Queued intents die with the keys."
-      >
-        <p>
-          Deleting account keys is not enough when an agent also trades through NEAR Intents: a signed intent can sit in
-          a queue and settle later. The freeze removes the agent's keys from both places in the same call.
-        </p>
-      </SectionHead>
+  const reduce = useReducedMotion();
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { once: true, amount: 0.45 });
+  const [step, setStep] = useState(0);
+  const [touched, setTouched] = useState(false);
+  const [sweep, setSweep] = useState(0);
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-      <div className="mt-12 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {PANELS.map((p, i) => (
-          <Reveal key={p.title} delay={0.05 + i * 0.07}>
-            <Frame className="h-full">
-              <FramePanel className="flex h-full flex-col overflow-hidden">
-                <PanelBar>{p.path}</PanelBar>
-                <div className="px-5 pt-5">
-                  <h3 className="text-[17px] font-medium tracking-tight">{p.title}</h3>
-                  <p className="mt-2 text-[14px] leading-relaxed text-fg-muted">{p.body}</p>
-                </div>
-                <ul className="mx-5 mt-5 divide-y divide-line rounded-md border border-line bg-ink-950 font-mono text-[11.5px]">
-                  {p.lines.map((l, j) => (
-                    <li key={j} className="flex items-center justify-between gap-3 px-3 py-2.5">
-                      <span className="min-w-0 sm:truncate">
-                        <span className="text-fg">{l.op}</span>{" "}
-                        <span className="text-fg-muted">{l.arg}</span>
-                      </span>
-                      <span className={`shrink-0 ${TONE[l.tone]}`}>{l.result}</span>
-                    </li>
-                  ))}
-                </ul>
-                <div className="mt-auto flex flex-wrap items-center justify-between gap-2 px-5 pt-5 pb-5">
-                  <span className="text-[13px] text-fg">{p.txLabel}</span>
-                  <SourceLink href={txUrl(p.tx)}>
-                    {p.tx.slice(0, 6)}…{p.tx.slice(-4)} on nearblocks
-                  </SourceLink>
-                </div>
+  const stepRef = useRef(0);
+  const go = (i: number) => {
+    if (i >= 1 && stepRef.current < 1) setSweep((n) => n + 1);
+    stepRef.current = i;
+    setStep(i);
+  };
+  const clear = () => timers.current.forEach(clearTimeout);
+  const play = () => {
+    clear();
+    go(0);
+    if (reduce) return go(2);
+    timers.current = [setTimeout(() => go(1), 650), setTimeout(() => go(2), 2300)];
+  };
+
+  useEffect(() => {
+    if (inView && !touched) play();
+    return clear;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inView]);
+
+  const struck = step >= 1;
+  const rejected = step >= 2;
+
+  return (
+    <section id="registries" aria-labelledby="registries-title" className="relative scroll-mt-20 border-t border-line/70">
+      <div className="mx-auto w-full max-w-[1200px] px-4 py-20 sm:px-6 md:py-28 lg:px-10">
+        <Reveal className="grid grid-cols-1 items-end gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)] lg:gap-16">
+          <div>
+            <p className="mb-4 font-mono text-[11px] tracking-[0.14em] text-fg-muted uppercase">The freeze</p>
+            <h2 id="registries-title" className="text-[30px] leading-[1.08] font-medium tracking-[-0.025em] text-balance sm:text-[40px]">
+              One call strikes both ledgers.
+            </h2>
+            <p className="mt-4 max-w-[52ch] text-[15px] leading-relaxed text-pretty text-fg-muted">
+              A signed NEAR Intents order can wait in a queue and settle after the account keys are gone. So the freeze
+              removes the agent's key from the account and from the intents registry in the same transaction.
+            </p>
+          </div>
+          <div onPointerDown={() => (setTouched(true), clear())} onKeyDown={() => (setTouched(true), clear())}>
+            <Scrubber stops={STOPS} value={step} onChange={go} label="Freeze timeline" />
+          </div>
+        </Reveal>
+
+        <div ref={ref} className="mt-10">
+          <Frame>
+            <div className="relative grid grid-cols-1 gap-[3px] lg:grid-cols-[minmax(0,1fr)_200px_minmax(0,1fr)]">
+              <Ledger account={FREEZE.agent} kind="access keys">
+                <KeyRow k={short(FREEZE.agentKey, 10, 6)} role="function-call · agent" struck={struck} action="DeleteKey" delay={380} />
+                <KeyRow k="owner full-access key" role="never recorded by the guardian" struck={false} action="kept" delay={0} keep />
+              </Ledger>
+
+              <FramePanel className="flex flex-col items-center justify-center gap-2 px-4 py-5 text-center">
+                <span className="font-mono text-[10.5px] text-fg-faint">{blockLabel(FREEZE.block)}</span>
+                <span className={cn("font-mono text-[15px] transition-colors duration-300", struck ? "text-trip" : "text-fg")}>freeze()</span>
+                <span className="font-mono text-[10.5px] text-fg-muted">signed by {FREEZE.by}</span>
+                <SourceLink href={txUrl(FREEZE.tx)}>{short(FREEZE.tx)}</SourceLink>
               </FramePanel>
-            </Frame>
-          </Reveal>
-        ))}
+
+              <Ledger account={FREEZE.intents} kind="intents public keys">
+                <KeyRow k={short(FREEZE.intentsKey, 10, 6)} role={`registered for ${FREEZE.agent}`} struck={struck} action="remove_public_key" delay={380} />
+              </Ledger>
+
+              {sweep > 0 && !reduce ? (
+                <motion.div
+                  key={sweep}
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0 z-10"
+                  initial={{ y: "-2%", opacity: 0 }}
+                  animate={{ y: "100%", opacity: [0, 1, 1, 0] }}
+                  transition={{ duration: 1.1, ease: [0.77, 0, 0.175, 1], times: [0, 0.1, 0.85, 1] }}
+                >
+                  <span className="absolute inset-x-0 top-0 h-px bg-trip shadow-[0_0_16px_2px_rgba(255,74,61,0.55)]" />
+                </motion.div>
+              ) : null}
+            </div>
+
+            <FramePanel className="mt-[3px] flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0 font-mono text-[11.5px]">
+                <p className="text-fg">
+                  execute_signed <span className="text-fg-muted">· nonce 2 · transfer</span>
+                </p>
+                <p className="truncate text-fg-faint">"{FREEZE.rejectedNote}", signed before the freeze</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span
+                  className={cn(
+                    "inline-flex h-7 items-center rounded-md border px-2.5 font-mono text-[11px] transition-[color,border-color,background-color,transform] duration-300 ease-[var(--ease-out-strong)]",
+                    rejected ? "scale-100 border-trip/50 bg-trip-soft text-trip" : "border-line-strong text-fg-muted",
+                  )}
+                >
+                  {rejected ? "PublicKeyNotExist" : "waiting in queue"}
+                </span>
+                <SourceLink href={txUrl(FREEZE.rejectedTx)} className={cn("transition-opacity", rejected ? "opacity-100" : "opacity-40")}>
+                  {short(FREEZE.rejectedTx)}
+                </SourceLink>
+              </div>
+            </FramePanel>
+          </Frame>
+        </div>
+
+        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <p className="max-w-3xl text-[13px] leading-relaxed text-fg-muted">
+            The signature on the queued intent is still valid. The registry checks whether the key is registered for the
+            signer now, and it is not. On testnet the intents side is a replica of the near/intents key registry with the
+            same check order.
+          </p>
+          <button
+            type="button"
+            onClick={() => (setTouched(true), play())}
+            className="inline-flex h-8 shrink-0 items-center gap-2 self-start rounded-md border border-line-strong px-3 font-mono text-[11px] text-fg-muted transition-colors hover:bg-ink-800 hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fg-muted"
+          >
+            <RotateCcw aria-hidden className="size-3.5" />
+            Replay the freeze
+          </button>
+        </div>
       </div>
-      <p className="mt-5 max-w-3xl text-[13px] leading-relaxed text-fg-muted">
-        On testnet the Intents side runs against a replica of the near/intents account-key registry that keeps the
-        upstream check order: signature first, then "is this key registered for the signer now".
-      </p>
-    </Section>
+    </section>
   );
 }
