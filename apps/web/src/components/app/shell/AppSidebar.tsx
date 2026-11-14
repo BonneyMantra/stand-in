@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router";
-import { Activity, Ban, FlaskConical, Gauge, KeyRound, Snowflake, TerminalSquare, Zap } from "lucide-react";
+import { Activity, Ban, FlaskConical, Gauge, KeyRound, Snowflake, TerminalSquare, Wallet, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
@@ -16,6 +16,7 @@ const NAV = [
   { to: "/app/sessions", label: "Sessions", icon: TerminalSquare },
   { to: "/app/blocklist", label: "Blocklist", icon: Ban },
   { to: "/app/bench", label: "Benchmark", icon: FlaskConical },
+  { to: "/app/owner", label: "Owner console", icon: Wallet },
 ] as const;
 
 export function AppSidebar() {

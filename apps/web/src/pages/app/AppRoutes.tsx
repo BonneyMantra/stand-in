@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router";
 import { StandinProvider } from "@/data/useStandin";
 import { AppShell } from "@/components/app/shell/AppShell";
@@ -8,6 +9,9 @@ import DecoysPage from "./DecoysPage";
 import SessionsPage from "./SessionsPage";
 import BlocklistPage from "./BlocklistPage";
 import BenchPage from "./BenchPage";
+
+// Wallet code (NEAR Connect) loads only on this route; the other dashboard pages stay as they were.
+const OwnerPage = lazy(() => import("./OwnerPage"));
 
 export default function AppRoutes() {
   return (
@@ -21,6 +25,7 @@ export default function AppRoutes() {
           <Route path="sessions" element={<SessionsPage />} />
           <Route path="blocklist" element={<BlocklistPage />} />
           <Route path="bench" element={<BenchPage />} />
+          <Route path="owner" element={<Suspense fallback={null}><OwnerPage /></Suspense>} />
           <Route path="*" element={<Navigate to="/app" replace />} />
         </Routes>
       </AppShell>

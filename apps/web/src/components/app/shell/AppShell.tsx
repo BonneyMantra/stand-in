@@ -10,7 +10,7 @@ import { AppSidebar } from "./AppSidebar";
 import { EmptyState } from "../common";
 
 const TITLES: Record<string, string> = {
-  trips: "Trips", decoys: "Decoys", sessions: "Sessions", blocklist: "Blocklist", bench: "Benchmark",
+  trips: "Trips", decoys: "Decoys", sessions: "Sessions", blocklist: "Blocklist", bench: "Benchmark", owner: "Owner console",
 };
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -106,6 +106,8 @@ function SourceBanner() {
 /** Page-level loading and error states; pages render only with data. */
 function Gate({ children }: { children: ReactNode }) {
   const { source, error, retry } = useStandin();
+  // The owner console reads the chain through the wallet, not the watcher: it renders whatever the watcher state.
+  if (useLocation().pathname.startsWith("/app/owner")) return <>{children}</>;
   if (source === "loading") {
     return (
       <div className="space-y-4" aria-busy="true" aria-label="Loading watcher state">

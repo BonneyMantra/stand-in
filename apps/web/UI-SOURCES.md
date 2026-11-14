@@ -58,3 +58,16 @@ The app is dark-only: in newly added primitives the `dark:` values are applied d
 
 Landing controls use one focus treatment (`FOCUS` in `landing/primitives.tsx`): a 2px offset
 outline in `fg-muted`. Motion respects `prefers-reduced-motion` through `motion/react`.
+
+## Owner console (`/app/owner`)
+
+| UI | Source | Notes |
+|---|---|---|
+| Wallet picker and wallet windows | `@hot-labs/near-connect` 0.12.0 (its own modal) | Testnet wallets with `signAndSendTransaction`; wallet code runs in its sandboxed iframes |
+| Guardian, owner actions, approval request, session log | `Panel` (ReUI `frame`), `KV`, `Tag`, `EmptyState` from `app/common.tsx` | Same shell and tokens as the other dashboard pages |
+| Wallet error, wrong network | ReUI `alert` | destructive / warning |
+| Connect, disconnect, sign buttons | shadcn `button` | `invert`, `line`, `quiet` variants |
+| Freeze reason field | custom textarea in theme tokens | Byte counter against the guardian's 500-byte limit |
+
+`zod` 4.6.7 validates the approval link (`src/lib/wallet/deeplink.ts`). The page is lazy-loaded, so the wallet code
+is not in the other pages' bundle.

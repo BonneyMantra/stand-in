@@ -1,2 +1,2 @@
 import { defineConfig } from "vitest/config";
-export default defineConfig({ test: { include: ["packages/*/test/**/*.test.ts", "integrations/**/test/**/*.test.ts"], exclude: ["**/node_modules/**", ".sandbox/**"] } });
+export default defineConfig({ test: { include: ["packages/*/test/**/*.test.ts", "integrations/**/test/**/*.test.ts", "apps/web/test/**/*.test.ts"], exclude: ["**/node_modules/**", ".sandbox/**"] } });
