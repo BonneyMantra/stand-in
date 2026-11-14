@@ -1,0 +1,2 @@
+{ "name": "@standin/canary", "version": "0.1.0", "type": "module", "main": "./src/canary.mjs",
+  "exports": { ".": "./src/canary.mjs" } }

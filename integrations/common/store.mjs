@@ -39,7 +39,7 @@ export function readEvents(type) {
   } catch { return []; }
 }
 
-function repoDir() {
+export function repoDir() {
   if (process.env.STANDIN_REPO) return process.env.STANDIN_REPO;
   try { return JSON.parse(fs.readFileSync(new URL('./repo.json', import.meta.url), 'utf8')).repo; } catch { return ''; }
 }

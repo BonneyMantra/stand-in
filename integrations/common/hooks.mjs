@@ -7,6 +7,7 @@ import path from 'node:path';
 import { appendEvent, allDecoys, readSessions, renameSession, home, sessionsPath, secretHash } from './store.mjs';
 import { prepare, announce } from './plant.mjs';
 import { takeKey, saveSession } from './store.mjs';
+import { checkSupplyChain } from './supplychain/index.mjs';
 
 const strip = (k) => String(k).replace(/^ed25519:/, '');
 
@@ -82,7 +83,7 @@ function flag(agent, i, where, text, decoys, tool_name, tool_input) {
   }));
 }
 
-function pre(agent, i) {
+async function pre(agent, i) {
   const decoys = allDecoys();
   const base = { session_id: i.session_id, agent, tool_name: i.tool_name, tool_use_id: i.tool_use_id ?? null, tool_input_summary: summarize(i.tool_input, decoys) };
   const reason = denyReason(i.tool_input);
@@ -90,11 +91,17 @@ function pre(agent, i) {
     appendEvent('tool_call', { ...base, phase: 'pre', decision: 'deny', reason });
     return { out: { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: reason } }, code: 0 };
   }
+  const sc = await checkSupplyChain(agent, i); // package install/run: OSV malicious check, provenance notice
+  if (sc?.deny) {
+    appendEvent('tool_call', { ...base, phase: 'pre', decision: 'deny', reason: sc.deny });
+    return { out: { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: sc.deny } }, code: 0 };
+  }
   const targets = toolTargets(i.tool_input).join('\n');
   const touched = decoys.filter((d) => d.session_id === i.session_id && ((d.path && targets.includes(d.path)) || /\.near-credentials|\.env\b/.test(targets)));
   appendEvent('tool_call', { ...base, phase: 'pre', decision: 'allow', touches_decoy_location: touched.map((d) => d.kind) });
   // The agent is about to emit a decoy (e.g. in a curl command): earliest attributable point.
   flag(agent, i, 'tool_input', JSON.stringify(i.tool_input ?? {}), decoys, i.tool_name, i.tool_input);
+  if (sc?.warn) return { out: { systemMessage: sc.warn, hookSpecificOutput: { hookEventName: 'PreToolUse', additionalContext: sc.warn } }, code: 0 };
   return { out: null, code: 0 };
 }
 

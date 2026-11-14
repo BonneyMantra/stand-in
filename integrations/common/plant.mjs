@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { plantCanaries } from './canary-plant.mjs';
 import { takeKey, accountConfig, agentKey, saveSession, appendEvent } from './store.mjs';
 
 const MARK = '# standin-decoy';
@@ -44,6 +45,7 @@ export async function prepare(id, { agent, cwd, envFile }) {
   }
   const rec = { agent, cwd, network: cfg.network, source: kc.source, decoys };
   saveSession(id, rec);
+  plantCanaries(id, { agent, cwd }); // off-chain Canarytokens, ledgered as decoy_planted canary-*
   return rec;
 }
 
