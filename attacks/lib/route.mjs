@@ -64,11 +64,11 @@ export async function runRoute(meta, attack, { mode = 'on', shared = {} } = {}) 
     // Give the watcher time to see the tx and freeze.
     if (!out.noTheft && theftOk && chainOn()) {
       for (let i = 0; i < Number(process.env.ATTACK_FREEZE_WAIT_S || 40); i++) {
-        result = evaluate(sb, { since, sessionIds: ids, culprit: out.culprit, theftAt: theftOk.sent_at, theftTx: theftOk.tx_hash });
+        result = evaluate(sb, { since, sessionIds: ids, culprit: out.culprit, theftAt: theftOk.sent_at, theftTx: theftOk.tx_hash, exfilAt: listener.loot[0]?.at });
         if (result.blocks_to_freeze != null) break;
         await sleep(1000);
       }
-    } else if (!out.noTheft) result = evaluate(sb, { since, sessionIds: ids, culprit: out.culprit, theftAt: theft[0]?.sent_at });
+    } else if (!out.noTheft) result = evaluate(sb, { since, sessionIds: ids, culprit: out.culprit, theftAt: theft[0]?.sent_at, exfilAt: listener.loot[0]?.at });
   }
   if (mode === 'on' && theftOk && result.freeze_tx) {
     // Re-derive the metric from chain, not from the watcher's own numbers or clock.

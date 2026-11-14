@@ -64,21 +64,33 @@ export async function deleteBaselineAccount(b) {
   } catch { return false; }
 }
 
-/** After a freeze: unfreeze, then provision a fresh scoped function-call key and save it where hooks read it. */
+/**
+ * Leave the agent account unfrozen with EXACTLY ONE scoped agent key (saved where the hooks read it).
+ * The guardian has no per-key removal, so stale keys are cleared with an owner `freeze` (deletes every
+ * registered agent key) followed by `unfreeze`, then one fresh key is added. A single healthy key whose
+ * secret is already in this STANDIN_HOME is kept as is.
+ */
 export const resetAgent = (standinHome) => retry(() => resetAgentOnce(standinHome));
 async function resetAgentOnce(standinHome) {
   const { c, cfg } = await core();
   const agent = c.requireAccount(cfg, 'agent');
   const project = c.requireAccount(cfg, 'project');
   const owner = c.roleAccount(cfg, 'agent');
-  const st = await guardianState();
+  const keyFile = path.join(standinHome, 'agent-scoped-key.json');
+  let saved = null; try { saved = JSON.parse(fs.readFileSync(keyFile, 'utf8')); } catch { /* none */ }
+  let st = await guardianState();
+  if (!st?.frozen && st?.agent_keys?.length === 1 && saved?.public_key === st.agent_keys[0]) return { kept: saved.public_key, agent_keys: 1 };
+  if (!st?.frozen && st?.agent_keys?.length) {
+    await c.callMethod(owner, agent, 'freeze', { reason: 'bench reset: clearing stale agent keys', decoy_public_key: null, tx_hash: null }, { waitUntil: 'EXECUTED_OPTIMISTIC' });
+    st = await guardianState();
+  }
   if (st?.frozen) await c.callMethod(owner, agent, 'unfreeze', {}, { waitUntil: 'EXECUTED_OPTIMISTIC' });
   const scoped = c.generateKey();
   const methods = ['record_deploy'];
   await c.callMethod(owner, agent, 'add_agent_key', { public_key: scoped.public_key, receiver_id: project, method_names: methods, allowance: '1000000000000000000000000' }, { waitUntil: 'EXECUTED_OPTIMISTIC' });
   fs.mkdirSync(standinHome, { recursive: true });
-  fs.writeFileSync(path.join(standinHome, 'agent-scoped-key.json'), JSON.stringify({ account_id: agent, ...scoped, receiver_id: project, method_names: methods, created_at: new Date().toISOString() }, null, 2), { mode: 0o600 });
-  return scoped;
+  fs.writeFileSync(keyFile, JSON.stringify({ account_id: agent, ...scoped, receiver_id: project, method_names: methods, created_at: new Date().toISOString() }, null, 2), { mode: 0o600 });
+  return { added: scoped.public_key };
 }
 
 /** Legit use of the scoped FC key: record_deploy on the project contract. */
