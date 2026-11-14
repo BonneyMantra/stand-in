@@ -10,6 +10,17 @@ async function post(path, body) {
   return j;
 }
 
+// JSON cannot carry a Uint8Array: DeployContract code goes to the signer as base64 (and is hash-checked there).
+function b64(bytes) {
+  let s = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+function wire(p) {
+  const actions = (p.actions || []).map((a) => (a.type === "DeployContract" ? { type: a.type, params: { codeBase64: b64(new Uint8Array(a.params.code)) } } : a));
+  return { ...p, actions };
+}
+
 const wallet = {
   async signIn(p) {
     const j = await post("/signIn", p);
@@ -22,10 +33,10 @@ const wallet = {
     const a = window.localStorage.getItem("accounts");
     return a ? JSON.parse(a) : [];
   },
-  async signAndSendTransaction(p) { return post("/tx", p); },
+  async signAndSendTransaction(p) { return post("/tx", wire(p)); },
   async signAndSendTransactions(p) {
     const out = [];
-    for (const t of p.transactions) out.push(await post("/tx", { ...t, network: p.network, signerId: p.signerId }));
+    for (const t of p.transactions) out.push(await post("/tx", wire({ ...t, network: p.network, signerId: p.signerId })));
     return out;
   },
   async signMessage() { throw new Error("test wallet does not sign messages"); },

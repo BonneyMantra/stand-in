@@ -52,37 +52,87 @@ const Allowance = z.string().regex(/^(0|[1-9]\d{0,24})$/, "allowance must be a w
   return n;
 });
 
+const NotMainnet = AccountId.refine((v) => !v.endsWith(".near"), "is a mainnet (.near) account; this console works on testnet only");
+
+/**
+ * A key whose receiver is the guardian account itself is refused: on a self-hosted guardian owner == account, so such a
+ * key would call as the owner (unfreeze, add_agent_key, withdraw).
+ */
+const notSelf = <T extends { account: string; receiver: string }>(r: T, ctx: z.RefinementCtx) => {
+  if (r.receiver === r.account) ctx.addIssue({ code: "custom", path: ["receiver"], message: "the agent key may not call the guardian account itself" });
+};
+
 export const ApproveRequest = z.object({
-  op: z.literal("unfreeze", { error: "op must be unfreeze" }),
+  op: z.literal("unfreeze"),
   account: AccountId,
   agent_key: Ed25519Key,
   receiver: AccountId,
   methods: Methods,
   allowance: Allowance,
-});
+}).superRefine(notSelf);
 export type ApproveRequest = z.infer<typeof ApproveRequest>;
 
-const FIELDS = ["op", "account", "agent_key", "receiver", "methods", "allowance"] as const;
+/**
+ * The "adopt from wallet" deep link (contract with the CLI; do not change):
+ *   /app/owner?op=adopt&account=<id>&watcher=<id>&intents=<id>&agent_key=<ed25519:base58>&receiver=<id>&methods=<a,b|empty>&allowance=<yocto>
+ * Deploys the guardian on `account` when it has no code, then registers the agent key; on an existing guardian it only adds the key.
+ */
+export const AdoptRequest = z.object({
+  op: z.literal("adopt"),
+  account: NotMainnet,
+  watcher: AccountId,
+  intents: AccountId,
+  agent_key: Ed25519Key,
+  receiver: AccountId,
+  methods: Methods,
+  allowance: Allowance,
+}).superRefine(notSelf);
+export type AdoptRequest = z.infer<typeof AdoptRequest>;
+
+const FIELDS = {
+  unfreeze: ["op", "account", "agent_key", "receiver", "methods", "allowance"],
+  adopt: ["op", "account", "watcher", "intents", "agent_key", "receiver", "methods", "allowance"],
+} as const;
 
 export type DeepLink =
   | { kind: "none" }
   | { kind: "ok"; req: ApproveRequest }
-  | { kind: "invalid"; problems: string[] };
+  | { kind: "adopt"; req: AdoptRequest }
+  | { kind: "invalid"; op: "unfreeze" | "adopt" | null; problems: string[] };
 
 /** Parses the query string. No `op` at all means a plain visit to the console. */
 export function parseDeepLink(search: string): DeepLink {
   const q = new URLSearchParams(search);
   if (!q.has("op")) return { kind: "none" };
+  const ops = q.getAll("op");
+  const op = ops.length === 1 && (ops[0] === "unfreeze" || ops[0] === "adopt") ? ops[0] : null;
+  if (!op) {
+    const problems = ops.length > 1 ? [`op appears ${ops.length} times`] : [`op: must be unfreeze or adopt`];
+    return { kind: "invalid", op: null, problems };
+  }
   const problems: string[] = [];
   const raw: Record<string, string> = {};
-  for (const f of FIELDS) {
+  for (const f of FIELDS[op]) {
     const all = q.getAll(f);
     if (all.length > 1) problems.push(`${f} appears ${all.length} times`);
     if (all.length === 0) problems.push(`${f} is missing`);
     else raw[f] = all[0]!;
   }
-  if (problems.length) return { kind: "invalid", problems };
+  if (problems.length) return { kind: "invalid", op, problems };
+  const issues = (e: z.ZodError) => e.issues.map((i) => `${i.path.join(".") || "link"}: ${i.message}`);
+  if (op === "adopt") {
+    const r = AdoptRequest.safeParse(raw);
+    return r.success ? { kind: "adopt", req: r.data } : { kind: "invalid", op, problems: issues(r.error) };
+  }
   const r = ApproveRequest.safeParse(raw);
-  if (!r.success) return { kind: "invalid", problems: r.error.issues.map((i) => `${i.path.join(".") || "link"}: ${i.message}`) };
-  return { kind: "ok", req: r.data };
+  return r.success ? { kind: "ok", req: r.data } : { kind: "invalid", op, problems: issues(r.error) };
+}
+
+/** The unfreeze link for the same agent key, for an adopt link that lands on a frozen guardian. */
+export function unfreezeLinkFor(req: AdoptRequest): string {
+  const q = new URLSearchParams({
+    op: "unfreeze", account: req.account, agent_key: req.agent_key, receiver: req.receiver,
+    methods: req.methods.join(","), allowance: req.allowance.toString(),
+  });
+  return `/app/owner?${q.toString()}`;
 }

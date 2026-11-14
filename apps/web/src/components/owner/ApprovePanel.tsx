@@ -8,7 +8,7 @@ import { explorerTx, yoctoToNear, type AccessKeyView, type GuardianLookup } from
 
 export interface ApproveResult { hash: string; key: AccessKeyView | null }
 
-function Row({ k, children }: { k: string; children: ReactNode }) {
+export function Row({ k, children }: { k: string; children: ReactNode }) {
   return (
     <div className="grid grid-cols-[96px_1fr] items-baseline gap-3 py-1.5 text-xs sm:grid-cols-[120px_1fr]">
       <dt className="text-fg-faint">{k}</dt>
@@ -17,7 +17,7 @@ function Row({ k, children }: { k: string; children: ReactNode }) {
   );
 }
 
-function Decoded({ req }: { req: ApproveRequest }) {
+export function Decoded({ req }: { req: Pick<ApproveRequest, "account" | "agent_key" | "receiver" | "methods" | "allowance"> }) {
   return (
     <dl className="divide-y divide-line px-3.5 py-1" data-testid="approve-params">
       <Row k="account">{req.account}</Row>
@@ -33,7 +33,7 @@ function Decoded({ req }: { req: ApproveRequest }) {
 
 /** The CLI's "approve agent key" request: decoded, checked, and signed only when the owner presses the button. */
 export function ApprovePanel({ link, accountId, guardian, busy, result, onApprove }: {
-  link: Exclude<DeepLink, { kind: "none" }>; accountId: string | null; guardian: GuardianLookup | undefined;
+  link: Exclude<DeepLink, { kind: "none" } | { kind: "adopt" }>; accountId: string | null; guardian: GuardianLookup | undefined;
   busy: boolean; result: ApproveResult | null; onApprove: (req: ApproveRequest, unfreezeFirst: boolean) => void;
 }) {
   if (link.kind === "invalid") {
@@ -49,13 +49,14 @@ export function ApprovePanel({ link, accountId, guardian, busy, result, onApprov
   }
   const { req } = link;
   const g = guardian?.kind === "guardian" ? guardian.state : null;
-  const match = accountId === req.account;
+  // Self-hosted guardian: owner == account. Factory guardian: get_state.owner is another account (e.g. a 0x one).
+  const match = g ? accountId === g.owner : accountId === req.account;
   const steps = [...(g?.frozen ? ["unfreeze"] : []), "add_agent_key"];
   const already = g?.agent_keys.includes(req.agent_key);
 
   let gate: ReactNode = null;
   if (!accountId) gate = <>Connect the wallet that holds <span className="font-mono text-fg">{req.account}</span> to approve.</>;
-  else if (!match) gate = <>Connected as <span className="font-mono text-fg">{accountId}</span>. This request is for <span className="font-mono text-fg">{req.account}</span>: disconnect and connect that account.</>;
+  else if (!match) gate = <>Connected as <span className="font-mono text-fg">{accountId}</span>. This request is for <span className="font-mono text-fg">{req.account}</span>{g && g.owner !== req.account ? <>, owned by <span className="font-mono text-fg">{g.owner}</span></> : null}: disconnect and connect the owner's wallet.</>;
   else if (guardian && !g) gate = <>No guardian on <span className="font-mono text-fg">{req.account}</span>, so there is nothing to approve.</>;
   else if (already && !result) gate = <>This key is already registered on the guardian.</>;
 
@@ -81,7 +82,7 @@ export function ApprovePanel({ link, accountId, guardian, busy, result, onApprov
         ) : (
           <>
             <p className="text-xs text-fg-muted">
-              One transaction from <span className="font-mono text-fg">{req.account}</span> to itself:
+              One transaction from <span className="font-mono text-fg">{accountId}</span> to {accountId === req.account ? "itself" : <span className="font-mono text-fg">{req.account}</span>}:
               {steps.map((s, i) => <span key={s} className="ml-1.5 font-mono text-fg">{i + 1}. {s}</span>)}
             </p>
             <Button size="sm" variant="invert" disabled={busy || !g} onClick={() => onApprove(req, Boolean(g?.frozen))} className={cn("w-full sm:w-auto")}>

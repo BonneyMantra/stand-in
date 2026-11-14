@@ -1,0 +1,79 @@
+import { useCallback, useEffect, useState } from "react";
+import { Boxes, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ExtLink, Panel, Shimmer, Tag } from "@/components/app/common";
+import { cn } from "@/lib/utils";
+import { explorerAccount } from "@/lib/wallet/near";
+import { DEFAULT_WATCHER, nearShort } from "@/lib/wallet/guardianCode";
+import { FACTORY, GuardianName, guardiansOf, requiredDeposit } from "@/lib/wallet/factory";
+
+type Load = { status: "loading" } | { status: "error"; error: string } | { status: "ready"; deposit: bigint; guardians: string[] };
+
+/**
+ * "Create a guarded agent account": the factory makes <name>.guard.si-project-5289.testnet with a guardian whose owner is
+ * the connected account. Lists the owner's guardians (guardians_of) so the console can act on one.
+ */
+export function FactoryPanel({ ownerId, eth, busy, selected, reloadKey, onCreate, onSelect }: {
+  ownerId: string; eth: boolean; busy: boolean; selected: string | null; reloadKey: number;
+  onCreate: (name: string, deposit: bigint) => void; onSelect: (id: string | null) => void;
+}) {
+  const [load, setLoad] = useState<Load>({ status: "loading" });
+  const [name, setName] = useState("");
+  const reload = useCallback(async () => {
+    setLoad({ status: "loading" });
+    try {
+      const [deposit, guardians] = await Promise.all([requiredDeposit(), guardiansOf(ownerId)]);
+      setLoad({ status: "ready", deposit, guardians });
+    } catch (e) {
+      setLoad({ status: "error", error: e instanceof Error ? e.message : String(e) });
+    }
+  }, [ownerId]);
+  useEffect(() => { void reload(); }, [reload, reloadKey]);
+
+  const parsed = GuardianName.safeParse(name);
+  const nameError = name && !parsed.success ? parsed.error.issues[0]?.message : null;
+  const id = `${name || "name"}.${FACTORY}`;
+
+  return (
+    <Panel title="Create a guarded agent account" icon={Boxes} id="factory-title" meta={eth ? "for an Ethereum wallet owner" : "optional for a NEAR account"} bodyClassName="p-0"
+      actions={<Button variant="quiet" size="icon-xs" onClick={() => void reload()} aria-label="Read guardians again"><RefreshCw aria-hidden /></Button>}>
+      <div className="space-y-3 p-3.5 text-xs">
+        <p className="leading-relaxed text-fg-muted">
+          The factory <ExtLink href={explorerAccount(FACTORY)}>{FACTORY}</ExtLink> creates a new account for the agent with the guardian already
+          on it. Its owner is <span className="font-mono break-all text-fg">{ownerId}</span>; the account itself has no keys, so every owner call
+          is signed by this wallet. Watcher: <span className="font-mono text-fg">{DEFAULT_WATCHER}</span> (freeze only).
+        </p>
+        <div className="space-y-1.5">
+          <label htmlFor="guardian-name" className="font-medium text-fg">Name</label>
+          <input id="guardian-name" value={name} onChange={(e) => setName(e.target.value.trim())} placeholder="build-agent-1" maxLength={40}
+            aria-invalid={!!nameError} autoComplete="off" spellCheck={false}
+            className="block w-full rounded-md border border-line-strong bg-ink-900 px-2.5 py-1.5 font-mono text-[13px] text-fg outline-none placeholder:text-fg-faint focus-visible:ring-2 focus-visible:ring-ring aria-invalid:border-trip/60" />
+          <p className={cn("font-mono text-[11px] break-all", nameError ? "text-trip" : "text-fg-faint")} data-testid="factory-name-hint">{nameError ?? id}</p>
+        </div>
+        <div className="rounded-md border border-line bg-ink-900 px-2.5 py-2 text-[11px] leading-relaxed text-fg-muted" data-testid="factory-deposit">
+          {load.status === "ready" ? (
+            <>Deposit <span className="font-mono text-fg">{nearShort(load.deposit, 3)} NEAR</span> (the factory's required_deposit). It moves into the new
+              account: most is locked for the guardian's code and state, about 0.3 NEAR stays withdrawable by you.</>
+          ) : load.status === "error" ? <span className="text-trip">Could not read the factory: {load.error}</span> : <Shimmer className="h-4 w-48" />}
+        </div>
+        <Button size="sm" variant="invert" className="w-full sm:w-auto" data-testid="factory-create"
+          disabled={busy || !parsed.success || load.status !== "ready"} onClick={() => load.status === "ready" && parsed.success && onCreate(parsed.data, load.deposit)}>
+          <Boxes aria-hidden />{busy ? "Waiting for wallet…" : "Review and sign in wallet"}
+        </Button>
+      </div>
+      <div className="border-t border-line">
+        <p className="px-3.5 pt-2.5 text-[11px] text-fg-faint">Your guardians (guardians_of)</p>
+        {load.status === "ready" && load.guardians.length === 0 && <p className="px-3.5 py-2.5 text-xs text-fg-faint">None yet.</p>}
+        <ul className="divide-y divide-line" data-testid="factory-guardians">
+          {load.status === "ready" && load.guardians.map((g) => (
+            <li key={g} className="flex min-w-0 items-center gap-2 px-3.5 py-2">
+              <span className="min-w-0 flex-1 truncate font-mono text-xs text-fg" title={g}>{g}</span>
+              {selected === g ? <Tag tone="safe">open</Tag> : <Button variant="line" size="xs" onClick={() => onSelect(g)}>Open</Button>}
+            </li>
+          ))}
+        </ul>
+        {selected && <div className="px-3.5 pb-3"><Button variant="quiet" size="xs" onClick={() => onSelect(null)}>Back to {ownerId.length > 24 ? "my account" : ownerId}</Button></div>}
+      </div>
+    </Panel>
+  );
+}

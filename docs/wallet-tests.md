@@ -109,3 +109,83 @@ deployed URL (that needs the owner's own wallet).
   story is the guardian's Chain Signatures `sign_evm`, refused while frozen, already in the product.
 - **NEP-413 server login.** No server holds an owner session; every owner action is a wallet-signed transaction that
   proves control on chain. No server-side use was found.
+
+## 2026-11-14, 23:05–23:30 IST: protect from wallet, op=adopt, guardian factory, near-connect patch
+
+Code: `apps/web/src/components/owner/{ProtectPanel,AdoptPanel,DeployFacts,FactoryPanel,WithdrawPanel}.tsx`,
+`apps/web/src/lib/wallet/{guardianCode,factory,deeplink,connector}.ts`. Production build (`pnpm --filter ./apps/web build`)
+served by `vite preview` on 127.0.0.1:4402; headless agent-browser (`--mute-audio`); the scripted test wallet
+(`scripts/wallet-test/signer.ts` + `executor.js`) through NEAR Connect's own picker. RPC: drpc first (FastNEAR answered 429).
+
+Guardian code: `apps/web/public/guardian/standin_guardian.wasm`, `view_code` of `si-agent-5289.testnet`, 176,033 bytes,
+code hash `7PbHKsE6PhdvypoUrE179X5kPxjqgzfFJr7Z1kRr9ZuE` (pinned; the page and the test signer both re-hash it).
+
+### Funding (project-owned accounts only)
+| Step | Tx |
+|---|---|
+| 4 NEAR `si-watch-5289.testnet` → `si-project-5289.testnet` (parent was at 1.51 NEAR) | `8JbDKRj1EwQtcbBpPfyDuKDKxtTRe7VnywP2jP5c1PDg` |
+| create `protect-2307.si-project-5289.testnet`, 2.3 NEAR, no contract (`setup.ts --no-deploy`) | `Dw1kfS5Y6wW2WTRxNDMeSS66D4nxf22v77D9C2sZrmgQ` |
+| create `adopt-2307.si-project-5289.testnet`, 2.0 NEAR, no contract | `m5Jyf153PQs6RCxpM27oSag6t8Vd4LNruwPSqNLatRn` |
+| 2.7 NEAR `si-intents-5289.testnet` → `si-project-5289.testnet` | `D2CkDrqUS9Kgyww9bMkYdeWaCuw5XUVQybHrVGdoXAtT` |
+| create `fowner-2321.si-project-5289.testnet`, 2.55 NEAR, no contract | `C8sSFdh99Mmm2bySBz1eNEbufyTkQjdGh3xkNLsH2qAa` |
+
+### a. Protect this account (connect → Protect → freeze → unfreeze), `protect-2307.si-project-5289.testnet`
+| # | What the page did | Result | Tx |
+|---|---|---|---|
+| 1 | Protect: one tx `DeployContract` + `new {watcher: si-watch-5289.testnet, intents_contract: si-intents-5289.testnet}` | landed; page re-read `get_state`: owner = the account, watcher si-watch-5289.testnet, active | `Da1b5X47Aq4VF248Pousm7TGf2J6mGyrmcdXwhTSGRiT` |
+| 2 | Freeze ("Protect-from-wallet test: freeze after deploy") | frozen | `2ZRxDAFKBD31KdXHz7FrL3S65hhisv2MSznKB5xgUjMS` |
+| 3 | Unfreeze | active | `7iFNQmjJX7iRqfiKgF1HLXKhzGTSoz1nRRoBoK7pNEuF` |
+
+Independent readback (curl, drpc): `view_account.code_hash` = `7PbHKs…9ZuE`, storage 176,472 bytes; `get_state` owner
+`protect-2307…`, watcher `si-watch-5289.testnet`, frozen false, 1 freeze record by the owner. Before signing the page
+showed the code, its hash ("checked here"), byte-identity with si-agent-5289.testnet, owner, watcher (freeze only),
+about 1.77 NEAR locked, balance 2.300 vs 1.822 NEAR needed.
+
+### b. op=adopt on a fresh no-contract account, `adopt-2307.si-project-5289.testnet`
+Link: `op=adopt&account=adopt-2307…&watcher=si-watch-5289.testnet&intents=si-intents-5289.testnet&agent_key=ed25519:4sMsyUrWXYgZZRFLkYB1bWCSiAwwizpMFteFzGVXUYXf&receiver=si-project-5289.testnet&methods=record_deploy,ping&allowance=250000000000000000000000`.
+One tx `DeployContract` + `new` + `add_agent_key`: `FqZrZGznfEEby97PpCNsfCbTUhk3D65xxM1qVhShomaF`.
+`view_access_key` → `FunctionCall {receiver_id: si-project-5289.testnet, method_names: [record_deploy, ping], allowance: 250000000000000000000000}`;
+`get_state` owner = the account, watcher si-watch-5289.testnet, agent_keys = [that key].
+
+### Guardian factory (`guard.si-project-5289.testnet`), owner `fowner-2321.si-project-5289.testnet`
+| # | What the page did | Result | Tx |
+|---|---|---|---|
+| 1 | Create a guarded agent account `agent-2321`, deposit = required_deposit 2.13924 NEAR | `agent-2321.guard.si-project-5289.testnet`; guardians_of lists it; get_state.owner = fowner-2321 | `Bp25A4ZyJu2EKzv8HBEQaEjsWZxv3b1jMu4KUt39kMMq` |
+| 2 | op=adopt link `account=agent-2321.guard…`, agent key `ed25519:DzEhdSDEPbXBkv2J1kNNoPPgkw7G6dkK98c1t5JhuLJ3`, `record_deploy`, 0.1 NEAR; signer = owner, receiver = guardian; add_agent_key only | `view_access_key`: FunctionCall, si-project-5289.testnet, [record_deploy], 100000000000000000000000 | `CupFUmR4auuAggCXCquDMPtbSeySzE2mbPArax5wKPp` |
+| 3 | Freeze (from the owner) | frozen; 1 agent key deleted | `AMGkWCsvXy6E5erhHxhAo1FcZMva26gdKVr7Jt6m6i77` |
+| 4 | Unfreeze | active | `5K9c7eVCdcnJmspBXJjTHvMy8tFRx5wWeGxHnwMKm3ET` |
+| 5 | Withdraw 0.2 NEAR (withdrawable shown: 0.3057) | guardian 2.139 → 1.939 NEAR (readback) | `MbFYYQJmasCUEbVMe24zf4PmkWx4sNo1pZKiHRBaCfv` |
+
+Entering 5 NEAR in the withdraw field shows "More than the withdrawable balance." and disables the button (no tx).
+
+### c. Refusals (no transaction sent)
+| State | How | Seen |
+|---|---|---|
+| Wrong connected account | adopt link for adopt-2307 while connected as protect-2307 | names both accounts, "only the owner's wallet can sign it", Switch account button |
+| Invalid link | bad account, 1-char watcher, short key, repeated method, allowance 0 | "Adopt link refused" listing all five problems |
+| Duplicate field | `watcher` twice | "watcher appears 2 times" |
+| Existing non-guardian contract | connected as `si-project-5289.testnet` (signer mode `account:`) | Protect refused ("already runs a contract that is not a Stand-in guardian…"); an adopt link for it refused |
+| Watcher mismatch | adopt link with `watcher=si-attacker-5289.testnet` on adopt-2307's guardian | "This guardian's watcher is si-watch-5289.testnet; the link asks for si-attacker-5289.testnet. The key is not added" |
+| Low balance | connected as `lab-thief.si-project-5289.testnet` (0.299 NEAR) | "Short by 1.522864 NEAR", faucet link, sign button disabled |
+| 0x account | signer mode `account:0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266` (simulated id, read-only) | no Protect offer ("would overwrite that contract"); Create a guarded agent account with the 2.139 NEAR deposit |
+
+Widths 390 / 1024 / 1440: no horizontal scroll (scrollWidth = viewport) on the Protect, adopt and 0x screens.
+Unit tests: `apps/web/test/adopt-link.test.ts` (op=adopt grammar, receiver == account refused for both ops, pinned
+wasm hash, storage quote). Root `pnpm test`: 19 files, 147 tests passed; `pnpm typecheck` clean.
+
+### NEAR Connect patch: `window.open(url, "_blank")` with no features
+`node --import tsx apps/web/scripts/wallet-test/open-spy.ts http://127.0.0.1:4402` (init script `open-spy.init.js`
+wraps `window.open`). Connect → "Meteor Wallet" → "Meteor Web" in Meteor's NEAR Connect iframe; nothing entered on
+Meteor's site. Recorded call: `argc 2`, url `https://wallet.meteorwallet.app/connect/testnet/login?connectionUid=…&pageUri=about%253Asrcdoc&source=wpm`,
+target `"_blank"`, features `undefined`. The new page is a normal tab (toolbar/menubar/locationbar visible; 2 tabs in the
+session). Closing that tab without approving: the console shows "The wallet window was closed before it answered.
+Nothing was sent." (Meteor's own text, "User closed the window before completing the action", is now mapped.) Exit 0.
+
+### Ethereum Wallets (EIP-1193) path: not completed
+The `ethereum-wallets` executor (`https://evm-on-near.dev/executor.js`) never reads `window.ethereum`: it runs in NEAR
+Connect's sandboxed iframe and opens its sign page on `evm-on-near.dev` as a tab, where Reown AppKit looks for the
+provider. A provider injected into the console page is therefore invisible to it, and agent-browser's `--init-script`
+did not reach that window.open'd tab (`window.ethereum` undefined there). Injected at run time into the tab, the scripted
+provider (`scripts/wallet-test/eth-provider.init.js`: EIP-6963 announce, no key, signs nothing) appeared in AppKit as
+"Stand-in test EVM wallet INSTALLED", but selecting it made no provider request within 6 s. A browser extension with a
+MAIN-world content script would reach every tab; not tried in time.

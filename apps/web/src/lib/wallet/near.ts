@@ -2,7 +2,8 @@ import { z } from "zod";
 
 /** The owner console is testnet-only: every read and every wallet request names this network. */
 export const NETWORK = "testnet" as const;
-export const RPC_URLS = ["https://rpc.testnet.fastnear.com", "https://near-testnet.drpc.org", "https://rpc.testnet.near.org"];
+// drpc first: FastNEAR answers HTTP 429 to some IPs (2026-11-14); it stays last as a fallback.
+export const RPC_URLS = ["https://near-testnet.drpc.org", "https://rpc.testnet.near.org", "https://rpc.testnet.fastnear.com"];
 export const TGAS = 10n ** 12n;
 export const YOCTO_PER_NEAR = 10n ** 24n;
 
@@ -99,6 +100,11 @@ export async function accountExists(accountId: string): Promise<boolean> {
 /** Implicit (64 hex) and 0x accounts carry no network suffix; named accounts end in .testnet or .near. */
 export function looksMainnet(accountId: string): boolean {
   return accountId.endsWith(".near");
+}
+
+/** An Ethereum Wallets (NEAR Connect) account: 0x + 20 bytes hex. It already runs NEAR's Ethereum wallet contract. */
+export function isEthAccount(accountId: string): boolean {
+  return /^0x[0-9a-f]{40}$/.test(accountId);
 }
 
 export const yoctoToNear = (yocto: bigint): string => {
