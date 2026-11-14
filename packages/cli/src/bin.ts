@@ -8,6 +8,7 @@ import { attackDrain } from "./attack.ts";
 import { devUp } from "./devup.ts";
 import { pay } from "./pay.ts";
 import { unfreeze } from "./unfreeze.ts";
+import { unfreezeWallet } from "./unfreeze-wallet.ts";
 import { err, out, parse, short } from "./util.ts";
 
 setLogSink((l) => process.stderr.write(l + "\n"));
@@ -18,6 +19,8 @@ const USAGE = `standin <command>
   status [--json]                        agent/decoy/trips from the watcher API
   freeze [reason]                        manual guardian freeze
   unfreeze [--keychain]                  Touch ID gate, owner-key unfreeze, re-provision the agent key
+  unfreeze --wallet [--timeout SEC]      no local owner key: prints an owner-console link, owner approves in their NEAR wallet, CLI waits for the new agent key (exit 6 on timeout)
+  unfreeze --wallet --resume [--timeout SEC]   keep waiting for the pending key from an earlier --wallet run
   pay <receiver> <amount|method> [--args JSON] [--approve-warn]   (a warned receiver also needs Touch ID)
   attack drain --key FILE [--reserve NEAR]   scripted thief (demo): drain a planted decoy to the attacker account`;
 
@@ -57,7 +60,13 @@ async function main(argv: string[]): Promise<number> {
       return 0;
     }
     case "unfreeze": {
-      const { values } = parse(rest, { keychain: { type: "boolean" } });
+      const { values } = parse(rest, { keychain: { type: "boolean" }, wallet: { type: "boolean" }, resume: { type: "boolean" }, timeout: { type: "string" } });
+      if (values.wallet) {
+        const t = values.timeout === undefined ? undefined : Number(values.timeout);
+        if (t !== undefined && !(t > 0)) { err("--timeout must be a positive number of seconds"); return 1; }
+        return unfreezeWallet({ resume: values.resume, timeoutSec: t });
+      }
+      if (values.resume || values.timeout) { err("--resume and --timeout need --wallet"); return 1; }
       return unfreeze({ keychain: values.keychain });
     }
     case "pay": {
