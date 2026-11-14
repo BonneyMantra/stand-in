@@ -134,3 +134,24 @@ it("external owner (factory guardian): --owner is the one checked, default stays
   expect(await run(chain(keyView, guard({ owner: ext }, pk)), { owner: ext })).toBe(0);
   expect(await run(chain(keyView, guard({ owner: ext }, pk)), { resume: true })).toBe(1);
 });
+
+it("a checkout without the decoy account's key: exit 1, says why, pending kept for --resume, no scoped key", async () => {
+  const errs: string[] = [];
+  const w = process.stderr.write.bind(process.stderr);
+  process.stderr.write = ((s: string) => { errs.push(String(s)); return true; }) as any;
+  let code = -1;
+  try {
+    code = await run(chain(keyView, guard({}, pk)), { takeDecoy: async () => { throw new Error("no dev key for decoy.testnet in /x/.secrets (tried decoy.testnet.json)"); } });
+  } finally { process.stderr.write = w; }
+  expect(code).toBe(1);
+  const text = errs.join("");
+  expect(text).toContain("no decoy was planted");
+  expect(text).toContain(`--account ${ACCT}`);
+  expect(text).toContain("--resume");
+  expect(loadScopedKey(home)).toBeNull();
+  expect(fs.existsSync(adoptPendingPath(home))).toBe(true);
+});
+
+it("names testnet, not one command, when refusing a mainnet account", () => {
+  expect(validateTestnetAccount("alice.near")).toBe("alice.near is a mainnet account; Stand-in runs on testnet only");
+});

@@ -40,7 +40,7 @@ export function loadAdoptPending(home = standinHome()): AdoptPending | null {
 
 /** Testnet named account only: a.b.testnet; no .near, no 64-hex implicit account. */
 export function validateTestnetAccount(id: string): string | null {
-  if (id.endsWith(".near") || id === "near") return `${id} is a mainnet account; adopt --wallet supports testnet only`;
+  if (id.endsWith(".near") || id === "near") return `${id} is a mainnet account; Stand-in runs on testnet only`;
   if (!/^(?:[a-z\d]+[-_])*[a-z\d]+(?:\.(?:[a-z\d]+[-_])*[a-z\d]+)*\.testnet$/.test(id) || id.length > 64) return `${id} is not a valid testnet named account (expected name.testnet)`;
   return null;
 }
@@ -110,6 +110,7 @@ function liveChain(cfg: NetworkConfig): AdoptChain {
 
 const sameSet = (a: string[], b: string[]) => a.length === b.length && [...a].sort().join("\0") === [...b].sort().join("\0");
 const realSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+const resumeCmd = (o: AdoptWalletOpts) => `standin adopt --wallet --account ${o.account}${o.owner ? ` --owner ${o.owner}` : ""} --home ${o.home} --resume`;
 const explorer = (cfg: NetworkConfig, id: string) => `https://${cfg.network === "mainnet" ? "" : cfg.network + "."}nearblocks.io/address/${id}`;
 
 /** Exit codes: 0 protected, 6 timed out (pending kept, resume with --resume), 1 error or refusal. */
@@ -179,7 +180,7 @@ export async function adoptWallet(o: AdoptWalletOpts): Promise<number> {
       }
     }
     if (now() >= deadline) {
-      err(`timed out after ${timeout}s; the pending key is kept. Approve the link above, then run \`standin adopt --wallet --account ${pending.account_id} --home ${o.home} --resume\``);
+      err(`timed out after ${timeout}s; the pending key is kept. Approve the link above, then run \`${resumeCmd(o)}\``);
       return 6;
     }
     await sleep(o.pollMs ?? 3000);
@@ -190,7 +191,17 @@ async function finish(cfg: NetworkConfig, p: AdoptPending, o: AdoptWalletOpts, h
   // Decoy first: a failure here keeps the pending key, so `--resume` can finish the job (the chain side is already done).
   const decoy = requireAccount(cfg, "decoy");
   const take = o.takeDecoy ?? (async (h: string) => { await refillPool(1, cfg, h); return takeDecoy({ cfg, home: h }); });
-  const d = await take(home);
+  let d: { public_key: string; secret_key: string };
+  try {
+    d = await take(home);
+  } catch (e) {
+    const msg = (e as Error).message;
+    const dash = o.dashboard ?? process.env.STANDIN_DASHBOARD_URL ?? DEFAULT_DASHBOARD;
+    // A fresh clone has no .secrets/: decoys are new keys on the shared decoy account, which only its operator can add.
+    if (/no dev key/.test(msg)) err(`the agent key is registered on ${p.account_id}, but no decoy was planted: decoys are new keys on ${decoy}, and this checkout has no key for it (${msg}). The guardian is live: freeze, unfreeze and withdraw from your wallet at ${dash}/app/owner. With that key in STANDIN_SECRETS, finish with \`${resumeCmd(o)}\`.`);
+    else err(`the agent key is registered on ${p.account_id}, but planting the decoy failed: ${msg}. The pending key is kept; finish with \`${resumeCmd(o)}\`.`);
+    return 1;
+  }
   const target = credentialsPath(o.home, cfg.network, decoy);
   plantDecoy({ kind: "near-credentials", path: target, decoyAccountId: decoy, key: d, agent: "manual", cwd: o.home, network: cfg.network, home });
   const raw = cfg.raw as { accounts?: Record<string, unknown> };
@@ -206,7 +217,8 @@ async function finish(cfg: NetworkConfig, p: AdoptPending, o: AdoptWalletOpts, h
   out(`${p.account_id} is protected: guardian active, scoped agent key registered, decoy planted at ${target}`);
   out(`guardian: ${explorer(cfg, p.account_id)}`);
   out(`config for this home: ${cfgFile} (agent = ${p.account_id})`);
-  out(`start the watcher for it:  STANDIN_HOME=${home} STANDIN_CONFIG=${cfgFile} standin dev up`);
+  out(`start the watcher for it:  standin dev up --home ${o.home}`);
+  out(`after a freeze, get the agent a new key from your wallet:  standin unfreeze --wallet --home ${o.home}`);
   out(`(dev up only checks accounts, tops up the decoy pool and starts the watcher; it never deploys or signs as ${p.account_id}. Add STANDIN_WATCHER_PORT=<port> if :4317 is taken.)`);
   return 0;
 }

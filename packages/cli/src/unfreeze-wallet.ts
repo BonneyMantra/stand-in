@@ -51,6 +51,8 @@ export interface KeyView { receiver_id: string; method_names: string[]; full_acc
 export interface WalletChain {
   viewKey(account: string, publicKey: string): Promise<KeyView | null>;
   frozen(account: string): Promise<boolean>;
+  /** get_state.agent_keys; optional so older test doubles keep working (treated as none). */
+  agentKeys?(account: string): Promise<string[]>;
 }
 export interface UnfreezeWalletOpts {
   resume?: boolean;
@@ -85,6 +87,10 @@ function liveChain(): WalletChain {
       const st: any = await prov.callFunction({ contractId: account, method: "get_state", args: {} } as any);
       return !!st.frozen;
     },
+    async agentKeys(account) {
+      const st: any = await prov.callFunction({ contractId: account, method: "get_state", args: {} } as any);
+      return (st.agent_keys ?? []).map(String);
+    },
   };
 }
 
@@ -97,7 +103,29 @@ export async function unfreezeWallet(o: UnfreezeWalletOpts = {}): Promise<number
   const agent = requireAccount(cfg, "agent");
   const timeout = o.timeoutSec ?? 600;
   if (!Number.isFinite(timeout) || timeout <= 0) { err("--timeout must be a positive number of seconds"); return 1; }
+  const chain = o.chain ?? liveChain();
   let pending: PendingKey;
+  if (!o.resume) {
+    // Read the guardian first, as the keystore unfreeze does: a live agent key on an unfrozen guardian needs no link.
+    try {
+      const frozen = await chain.frozen(agent);
+      const prev = loadScopedKey();
+      const keys = frozen || !chain.agentKeys ? [] : await chain.agentKeys(agent);
+      if (!frozen && prev?.account_id === agent && keys.includes(prev.public_key)) {
+        out(`${agent} is not frozen and agent key ${prev.public_key} is still active; nothing to do`);
+        appendEvent("tool_call", { tool_name: "standin unfreeze", outcome: "not_frozen", via: "wallet" });
+        return 0;
+      }
+      if (!frozen) out(`${agent} is not frozen; the link below only adds a new agent key`);
+    } catch (e) {
+      const msg = (e as Error).message;
+      if (/CodeDoesNotExist|no contract|MethodNotFound|MethodResolveError|does not exist/i.test(msg)) {
+        err(`${agent} has no Stand-in guardian (${msg.slice(0, 160)}); run \`standin adopt --wallet --account ${agent} --home DIR\` first`);
+        return 1;
+      }
+      err(`could not read ${agent}'s guardian (${msg.slice(0, 160)}); printing the link anyway`);
+    }
+  }
   if (o.resume) {
     const p = loadPendingKey();
     if (!p) { err(`no pending key in ${pendingKeyPath()}; run \`standin unfreeze --wallet\` first`); return 1; }
@@ -113,12 +141,11 @@ export async function unfreezeWallet(o: UnfreezeWalletOpts = {}): Promise<number
     savePendingKey(pending);
   }
   const dash = o.dashboard ?? process.env.STANDIN_DASHBOARD_URL ?? DEFAULT_DASHBOARD;
-  out(`Open this link and approve in your NEAR wallet (owner of ${pending.account_id}):`);
+  out(`Open this link and approve in the NEAR wallet that owns ${pending.account_id}'s guardian:`);
   out(ownerUrl(dash, pending));
   out(`new agent key ${pending.public_key}  receiver ${pending.receiver_id}  methods ${pending.method_names.join(",") || "(any)"}  allowance ${pending.allowance} yoctoNEAR`);
   out(`waiting up to ${timeout}s for the transaction...`);
 
-  const chain = o.chain ?? liveChain();
   const sleep = o.sleep ?? realSleep, now = o.now ?? Date.now;
   const deadline = now() + timeout * 1000;
   for (;;) {

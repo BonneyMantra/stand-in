@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { beforeEach, expect, it } from "vitest";
-import { loadScopedKey } from "@standin/core";
+import { loadScopedKey, saveScopedKey } from "@standin/core";
 import {
   loadPendingKey, ownerUrl, pendingKeyPath, unfreezeWallet, type KeyView, type PendingKey, type WalletChain,
 } from "../src/unfreeze-wallet.ts";
@@ -83,4 +83,23 @@ it("refuses a key that appears with a different scope or full access (exit 1)", 
 it("--resume without a pending key is an error; bad timeout is rejected", async () => {
   expect(await unfreezeWallet({ resume: true, chain: chain(null), ...clock })).toBe(1);
   expect(await unfreezeWallet({ timeoutSec: -3, chain: chain(null), ...clock })).toBe(1);
+});
+
+it("not frozen with the agent key still active: nothing to do, no link, no pending key", async () => {
+  saveScopedKey({ account_id: "si-test.testnet", public_key: KEY.public_key, secret_key: KEY.secret_key, receiver_id: "proj.testnet", method_names: ["record_deploy"], created_at: "now" });
+  const c: WalletChain = { viewKey: async () => null, frozen: async () => false, agentKeys: async () => [KEY.public_key] };
+  expect(await unfreezeWallet({ chain: c, timeoutSec: 3, ...clock })).toBe(0);
+  expect(fs.existsSync(pendingKeyPath())).toBe(false);
+});
+
+it("not frozen but the agent key is gone: still prints a link that adds a new key", async () => {
+  const c: WalletChain = { viewKey: async () => null, frozen: async () => false, agentKeys: async () => [] };
+  expect(await unfreezeWallet({ chain: c, timeoutSec: 3, ...clock })).toBe(6);
+  expect(fs.existsSync(pendingKeyPath())).toBe(true);
+});
+
+it("no guardian on the account: exit 1 before printing a link", async () => {
+  const c: WalletChain = { viewKey: async () => null, frozen: async () => { throw new Error("CodeDoesNotExist: si-test.testnet"); } };
+  expect(await unfreezeWallet({ chain: c, timeoutSec: 3, ...clock })).toBe(1);
+  expect(fs.existsSync(pendingKeyPath())).toBe(false);
 });
