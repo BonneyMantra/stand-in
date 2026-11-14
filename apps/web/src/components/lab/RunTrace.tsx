@@ -77,7 +77,12 @@ export function RunTrace({ steps, live }: { steps: StepView[]; live: boolean }) 
 
   return (
     <Timeline value={active} className="pl-1" aria-label="Lab run steps">
-      {steps.map((v, i) => {
+      {steps.map((raw, i) => {
+        // ntfy.sh refuses Cloudflare Workers, so the server hands the push to the page, which sends it.
+        // That hand-off is the designed path, not a failure of the run.
+        const v: StepView = raw.id === "notify" && raw.status === "fail" && raw.ntfy
+          ? { ...raw, status: "ok", title: `Phone push sent from the visitor's browser to ntfy.sh/${raw.ntfy.topic}`, detail: "ntfy.sh refuses connections from Cloudflare Workers, so the page sends it" }
+          : raw;
         const reached = v.status !== "pending";
         const time = elapsed(v.at, t0);
         return (

@@ -1,4 +1,4 @@
-import cfg from "../../../config/lab.json";
+import cfg from "../../../config/lab.json" with { type: "json" };
 import { runLab, type LabEnv, type Step } from "./lab.ts";
 import { listRuns, rateOk, releaseLock, saveRun, takeLock, type KV } from "./store.ts";
 
