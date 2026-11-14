@@ -198,8 +198,9 @@ MAIN-world content script would reach every tab; not tried in time.
 Wallet: Meteor Web, testnet account `bonneymantra.testnet` (created in Meteor for this project; funded with 2.4 test
 NEAR from `owner.si-project-5289.testnet`, tx `2nKzTy…2Z96`). It ran unlocked in a dedicated Chrome window that an
 agent drove over CDP; every signature was pressed in Meteor's own Approve screen; nothing was typed into Meteor.
-Page: local production build of commit `440e14f` (plus the fixes below) on `http://127.0.0.1:4402/app/owner`, live
-testnet. Every row was read back with `tx` (signer `bonneymantra.testnet`, no `Failure`).
+Page: local production build on `http://127.0.0.1:4402/app/owner`, live testnet. Connect, Protect and create ran on
+commit `440e14f`; freeze, unfreeze, the agent key and withdraw ran on `440e14f` plus the closed-window fix below,
+committed as `96934eb`. Every row was read back with `tx` (signer `bonneymantra.testnet`, no `Failure`).
 
 | Step | Through | Result | Tx |
 |---|---|---|---|
