@@ -6,6 +6,7 @@ import path from 'node:path';
 import { makeSandbox, REPO } from './sandbox.mjs';
 import { ScriptedAgent } from './scripted.mjs';
 import { startListener, drainWith } from './thief.mjs';
+import { allowedKeys } from './allow.mjs';
 import { evaluate } from './verdict.mjs';
 import { balanceNear, createBaselineAccount, deleteBaselineAccount, core, txBlocks } from './chain.mjs';
 
@@ -44,7 +45,11 @@ export async function runRoute(meta, attack, { mode = 'on', shared = {} } = {}) 
   }
   // The thief acts on whatever reached it (or what the route says was swept up elsewhere).
   await sleep(300);
-  const keys = [...new Set([...listener.loot.flatMap((l) => l.keys), ...(out.extraKeys || [])])];
+  const candidates = [...new Set([...listener.loot.flatMap((l) => l.keys), ...(out.extraKeys || [])])];
+  // The thief may submit on chain ONLY keys whose public key is in this run's decoy ledger (or the run's own
+  // baseline account). Anything else is dropped unlogged: only a count and a sha256 prefix are kept.
+  const { keys, dropped } = await allowedKeys(candidates, sb, since, sessions.map((a) => a.sessionId).concat(out.sessionIds || []), baseline);
+  if (dropped.length) log(`thief dropped ${dropped.length} non-run key(s): ${dropped.join(',')}`);
   let theft = [];
   const balBefore = mode === 'off' && baseline ? await balanceNear(baseline.account_id) : null;
   if (keys.length && !out.noTheft) {
@@ -91,6 +96,7 @@ export async function runRoute(meta, attack, { mode = 'on', shared = {} } = {}) 
     loot: listener.loot.map((l) => ({ bytes: l.bytes, keys: l.keys.length })),
     theft_attempts: theft.map(({ ok, tx_hash, error: er, skipped, ms }) => ({ ok, tx_hash, error: er, skipped, ms })),
     theft_succeeded: !!theftOk,
+    dropped_keys: dropped,
     ...(mode === 'on' ? { score: result } : { baseline: { account: baseline?.account_id, balance_before_near: balBefore, balance_after_near: balAfter, lost_near: balBefore != null && balAfter != null ? +(balBefore - balAfter).toFixed(4) : null } }),
     agent_status: out.agentStatus || null,
     after_freeze: afterFreeze,

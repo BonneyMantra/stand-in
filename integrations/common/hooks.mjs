@@ -67,6 +67,7 @@ export function scan(text, decoys) {
 }
 
 const redact = (s, decoys) => {
+  s = s.replace(/sk-ant-[A-Za-z0-9_-]+/g, '<redacted-token>');
   const hashes = new Set(decoys.map((d) => d.secret_hash));
   return s.replace(TOKEN, (t) => (hashes.has(secretHash(t)) ? '<decoy-secret>' : t));
 };
