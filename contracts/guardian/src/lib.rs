@@ -81,6 +81,28 @@ impl Guardian {
         }
     }
 
+    /// Owner is an external account (e.g. an Ethereum-wallet 0x account) that cannot host a
+    /// contract. This account then holds no full-access key, so the owner calls through its own
+    /// account and `withdraw` is the only way to move this account's NEAR out.
+    #[init]
+    pub fn new_owned(owner: AccountId, watcher: AccountId, intents_contract: AccountId) -> Self {
+        require!(owner != env::current_account_id(), "owner must be an external account");
+        Self { owner, ..Self::new(watcher, intents_contract) }
+    }
+
+    /// Owner only. Transfers `amount` yoctoNEAR to the owner, never below the storage reserve.
+    /// Allowed while frozen: a freeze only cuts agent access, and an owner reacting to a compromise
+    /// must still be able to pull funds out (the agent keys are gone and cannot call this).
+    pub fn withdraw(&mut self, amount: U128) -> Promise {
+        self.assert_owner();
+        require!(amount.0 > 0, "amount must be positive");
+        let reserve = env::storage_byte_cost().as_yoctonear() * u128::from(env::storage_usage());
+        let free = env::account_balance().as_yoctonear().saturating_sub(reserve);
+        require!(amount.0 <= free, "amount exceeds balance above the storage reserve");
+        event("withdraw", &format!(r#"{{"to":"{}","amount":"{}"}}"#, self.owner, amount.0));
+        Promise::new(self.owner.clone()).transfer(NearToken::from_yoctonear(amount.0))
+    }
+
     fn assert_owner(&self) {
         require!(env::predecessor_account_id() == self.owner, "owner only");
     }

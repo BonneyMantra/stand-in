@@ -125,6 +125,8 @@ export async function adoptWallet(o: AdoptWalletOpts): Promise<number> {
   if (cfg.network !== "testnet") { err(`config network is ${cfg.network}; adopt --wallet supports testnet only`); return 1; }
   const watcher = requireAccount(cfg, "watcher");
   const intents = requireAccount(cfg, "intents");
+  // A key whose receiver is the guardian account itself could call its owner methods on a self-hosted guardian.
+  if (requireAccount(cfg, "project") === o.account) { err(`the agent key's receiver may not be the guardian account ${o.account} itself`); return 1; }
   const home = standinHome();
   let pending: AdoptPending;
   if (o.resume) {
