@@ -1,5 +1,5 @@
 // Isolated run sandbox: HOME, CLAUDE_CONFIG_DIR, CODEX_HOME, STANDIN_HOME all inside
-// <repo>/.sandbox/<run-id>. Gabriel's real ~/.claude, ~/.codex and ~/.near-credentials are never used.
+// <repo>/.sandbox/<run-id>. The developer's real ~/.claude, ~/.codex and ~/.near-credentials are never used.
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';

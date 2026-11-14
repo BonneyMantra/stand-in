@@ -3,7 +3,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 
 /**
- * Hard spend guard for every mainnet transaction. Gabriel funded 0.5 NEAR for the whole product.
+ * Hard spend guard for every mainnet transaction. The owner funded 0.5 NEAR for the whole product.
  * Every mainnet tx must go through `spend()` (or `reserve()` + `commit()`); both THROW before anything is
  * sent when amount + gas would push a purpose, or the whole product, over its cap.
  * The ledger is append-only NDJSON (`.secrets/mainnet-spend.ndjson`), one line per event, grouped by `id`:

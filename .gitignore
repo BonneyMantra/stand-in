@@ -10,3 +10,6 @@ dist/
 .standin/
 .sandbox/
 .secrets/
+
+# demo planning docs stay local (production notes)
+demo/*.md

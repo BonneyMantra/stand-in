@@ -5,7 +5,7 @@
 /* The product is always dark: dark: variants follow the .dark class on <html>, not the viewer's OS setting. */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* Stand-in theme. Derived from Gabriel's picks: Axiom (landing), Edge Infrastructure Dashboard
+/* Stand-in theme. Derived from the picked references: Axiom (landing), Edge Infrastructure Dashboard
    (framework), Agent Trace Waterfall (trip detail), RAG Analytics (benchmark numbers).
    Near-black, monochrome, one alarm colour. Red means tripped/frozen only; green means safe. */
 @theme {

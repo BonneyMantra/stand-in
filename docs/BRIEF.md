@@ -10,13 +10,13 @@ of the real account within ~2 blocks, names the session and tool call that leake
 thief to a shared blocklist with an OutLayer TEE-attested proof that other agents check before paying.
 
 ## Hard constraints
-- Never touch Gabriel's real agent configs: `~/.claude`, `~/.codex`, `~/.near-credentials`.
+- Never touch the developer's real agent configs: `~/.claude`, `~/.codex`, `~/.near-credentials`.
   Every test uses an isolated sandbox home: `HOME=<repo>/.sandbox/<run-id>` plus
   `CLAUDE_CONFIG_DIR` / `CODEX_HOME` inside it. `.sandbox/` is gitignored.
 - Dev keys for our own testnet accounts live in `<repo>/.secrets/` (gitignored), never in git.
 - Networks: everything on **testnet** except (a) the live public bait decoy and (b) one real
   `intents.near` add/remove key test. Mainnet budget for the whole product: 0.5 NEAR total
-  (Gabriel). Never spend mainnet funds without the coordinator.
+  (owner). Never spend mainnet funds without the coordinator.
 - Commits: git identity is preconfigured (BonneyMantra). No AI attribution lines in commits.
 - Honest claims only: anything not run says "planned"; no invented numbers.
 

@@ -25,7 +25,7 @@ whether the tx reached the chain). Limit: the guard governs code in this repo; i
 
 | role | account |
 |---|---|
-| funding (Gabriel) | `7aa26dbb3bf025d1335b0f950abb3d14bae01006370d8b8894609cafb443c93e` |
+| funding (owner) | `7aa26dbb3bf025d1335b0f950abb3d14bae01006370d8b8894609cafb443c93e` |
 | agent (the "real" account) | `standin-agent-5705.near` (owner full-access key + one FC key + one intents key) |
 | decoy (bait) | `standin-decoy-1701.near` (admin key + 3 decoy full-access keys: `public-repo-env`, `seed-phrase`, `demo-scripted-thief`) |
 | attacker-test (we control it) | `b320c619c4a15bacdf6302a58345800ee9c878f5d7a910fba7fb24791fe41728` (implicit: no registrar fee) |
