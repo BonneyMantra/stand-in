@@ -19,3 +19,7 @@ demo/*.json
 demo/voiceover/
 demo/audio/
 demo/generated/
+demo/film/
+demo/footage/
+demo/out/
+demo/capture/
