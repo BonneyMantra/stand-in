@@ -20,7 +20,7 @@ to type the word `approve` at a terminal (no terminal means it fails). A timeout
 - `standin pay ... ` on a **warn** receiver: `--approve-warn` (or a typed yes) is not enough, the fingerprint must pass
   too. A **block** receiver is refused outright, nothing can approve it.
 
-## Try it (Gabriel, on the Mac; this shows the real prompt)
+## Try it (on a Mac with Touch ID; this shows the real prompt)
 
 ```
 cd ~/Documents/hackathons/near-standin
