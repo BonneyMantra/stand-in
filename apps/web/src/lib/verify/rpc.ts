@@ -1,20 +1,22 @@
 // Public NEAR JSON-RPC from the browser, with endpoint fallback. All endpoints below answer CORS
-// preflights from any origin (checked 14 Nov 2026). Archival first: the claimed txs are days old.
+// preflights from any origin (checked 14 Nov 2026). drpc first: it serves the days-old claimed txs and blocks
+// (checked 14 Nov, block 277,620,901), and FastNEAR's free tier answers 429 without CORS headers once an IP
+// is over its quota. Archival nodes follow; a "not found" moves on to the next endpoint.
 
 export type Network = "testnet" | "mainnet";
 
 export const ENDPOINTS: Record<Network, string[]> = {
   testnet: [
-    "https://archival-rpc.testnet.fastnear.com",
-    "https://rpc.testnet.fastnear.com",
     "https://near-testnet.drpc.org",
+    "https://archival-rpc.testnet.fastnear.com",
     "https://archival-rpc.testnet.near.org",
+    "https://rpc.testnet.fastnear.com",
   ],
   mainnet: [
-    "https://archival-rpc.mainnet.fastnear.com",
-    "https://rpc.mainnet.fastnear.com",
     "https://near.drpc.org",
+    "https://archival-rpc.mainnet.fastnear.com",
     "https://archival-rpc.mainnet.near.org",
+    "https://rpc.mainnet.fastnear.com",
   ],
 };
 
