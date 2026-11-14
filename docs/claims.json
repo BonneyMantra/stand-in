@@ -1,0 +1,206 @@
+{
+ "generated_at": "2026-11-14T08:59:15.717Z",
+ "claims": [
+  {
+   "id": "guardian-freeze",
+   "title": "The watcher's function-call key freezes the agent account",
+   "network": "testnet",
+   "txs": [
+    {
+     "hash": "EFrvBZmt53PYB9cD1AuZ3hYQvdVpatuMqMCCqTmJwzXv",
+     "expect": "success",
+     "role": "freeze",
+     "signer": "si-watch-5289.testnet",
+     "receiver": "si-agent-5289.testnet",
+     "block": 277548916,
+     "status": "success"
+    }
+   ]
+  },
+  {
+   "id": "intent-after-freeze",
+   "title": "A signed intent with a removed key is rejected (PublicKeyNotExist)",
+   "network": "testnet",
+   "txs": [
+    {
+     "hash": "2CNYoa89ey8Sguv3JyqGjNuYCBLmfVE1vu9NdP57rHYZ",
+     "expect": "failure",
+     "match": "PublicKeyNotExist",
+     "role": "rejected intent",
+     "signer": "si-watch-5289.testnet",
+     "receiver": "si-intents-5289.testnet",
+     "block": 277548944,
+     "status": "failure"
+    }
+   ]
+  },
+  {
+   "id": "watcher-3-blocks",
+   "title": "Decoy use to freeze in 3 blocks (watcher proof run)",
+   "network": "testnet",
+   "blocks": {
+    "from": 0,
+    "to": 1,
+    "expect": 3
+   },
+   "txs": [
+    {
+     "hash": "8wxyGxQPeqGpEyRYnDJ3m9WYY2fYDYbK5DGAvv5EbLZo",
+     "expect": "success",
+     "role": "decoy used",
+     "signer": "si-decoy-5289.testnet",
+     "receiver": "si-attacker-5289.testnet",
+     "block": 277548954,
+     "status": "success"
+    },
+    {
+     "hash": "oVRDRGAR64Pb6vS2YTy5zzej4HixWVEpm1jbtWgZEWy",
+     "expect": "success",
+     "role": "freeze",
+     "signer": "si-watch-5289.testnet",
+     "receiver": "si-agent-5289.testnet",
+     "block": 277548957,
+     "status": "success"
+    }
+   ]
+  },
+  {
+   "id": "real-claude-supply-chain",
+   "title": "Real Claude Code + compromised npm reporter: frozen 3 blocks after the theft",
+   "network": "testnet",
+   "blocks": {
+    "from": 0,
+    "to": 1,
+    "expect": 3
+   },
+   "txs": [
+    {
+     "hash": "3A9ERiLXgkyC52u6FFVB2iJnMh7ecnZxXM7ikSRqLKai",
+     "expect": "success",
+     "role": "decoy used",
+     "signer": "si-decoy-5289.testnet",
+     "receiver": "si-attacker-5289.testnet",
+     "block": 277620901,
+     "status": "success"
+    },
+    {
+     "hash": "9KeXDxzzvHK4ZjCh5bJkorXTUjKcYkQxEwAJcgVqhrMz",
+     "expect": "success",
+     "role": "freeze",
+     "signer": "si-watch-5289.testnet",
+     "receiver": "si-agent-5289.testnet",
+     "block": 277620904,
+     "status": "success"
+    }
+   ]
+  },
+  {
+   "id": "tee-blocklist",
+   "title": "OutLayer TEE verdict adds the thief to the blocklist",
+   "network": "testnet",
+   "link": "https://testnet-api.outlayer.ai/attestations/by-tx/51t83JuRDeXbptzxR857rqcKav8BevJsBDgkShQMZpBX",
+   "txs": [
+    {
+     "hash": "51t83JuRDeXbptzxR857rqcKav8BevJsBDgkShQMZpBX",
+     "expect": "success",
+     "role": "report",
+     "signer": "si-w2atk-25769.testnet",
+     "receiver": "blocklist.si-ol-25769.testnet",
+     "block": 277550036,
+     "status": "success"
+    }
+   ],
+   "view": {
+    "network": "testnet",
+    "account": "blocklist.si-ol-25769.testnet",
+    "method": "check",
+    "args": {
+     "account_id": "si-w2atk-25769.testnet"
+    },
+    "expect_contains": "block"
+   }
+  },
+  {
+   "id": "chain-signatures",
+   "title": "Chain Signatures: the agent signs while active; refused after a freeze",
+   "network": "testnet",
+   "txs": [
+    {
+     "hash": "86J721R72GArAgs7CphqL3q5qc5WtRkuxNqFnrfjJDDU",
+     "expect": "success",
+     "role": "signed",
+     "signer": "si-agent-5289.testnet",
+     "receiver": "si-agent-5289.testnet",
+     "block": 277611749,
+     "status": "success"
+    },
+    {
+     "hash": "CTWWW5C4XFedNYaToMWsAvJQBc2zTCGZJPeyrwGPsHYy",
+     "expect": "success",
+     "role": "freeze",
+     "signer": "si-watch-5289.testnet",
+     "receiver": "si-agent-5289.testnet",
+     "block": 277611781,
+     "status": "success"
+    },
+    {
+     "hash": "7vj8xXr8WCVzEdd7gum5R5yu9D3zsVt8uXUvoBySSfLd",
+     "expect": "failure",
+     "match": "frozen",
+     "role": "refused",
+     "signer": "si-agent-5289.testnet",
+     "receiver": "si-agent-5289.testnet",
+     "block": 277611798,
+     "status": "failure"
+    }
+   ]
+  },
+  {
+   "id": "mainnet-intents",
+   "title": "Mainnet: freeze removes the agent's key from intents.near, 3 blocks after the theft",
+   "network": "mainnet",
+   "blocks": {
+    "from": 1,
+    "to": 2,
+    "expect": 3
+   },
+   "txs": [
+    {
+     "hash": "6bx5kvosQrmc8mPP2gCh4cFB3HqH5QX8aPWjEUmcAndg",
+     "expect": "success",
+     "role": "intents key added",
+     "signer": "standin-agent-5705.near",
+     "receiver": "intents.near",
+     "note": "signer from packages/mainnet/README.md; explorer indexer lookup was rate-limited"
+    },
+    {
+     "hash": "9xzjaXMPWuZonnsrwdZoRASNb13ohA56P1PVXLhseTbV",
+     "expect": "success",
+     "role": "decoy used",
+     "signer": "standin-decoy-1701.near",
+     "receiver": "b320c619c4a15bacdf6302a58345800ee9c878f5d7a910fba7fb24791fe41728",
+     "block": 224473777,
+     "status": "success"
+    },
+    {
+     "hash": "7u6CFZBjujxsBS2RqLJEXSEWgaU3XY5oNpK22uAN6NWx",
+     "expect": "success",
+     "role": "agent key deleted",
+     "signer": "standin-agent-5705.near",
+     "receiver": "standin-agent-5705.near",
+     "block": 224473780,
+     "status": "success"
+    },
+    {
+     "hash": "DEePEBTr3LQ2QkDYj2pCJ2vhpq4ytqMU7qmsQULYR58Y",
+     "expect": "success",
+     "role": "intents key removed",
+     "signer": "standin-agent-5705.near",
+     "receiver": "intents.near",
+     "block": 224473780,
+     "status": "success"
+    }
+   ]
+  }
+ ]
+}
