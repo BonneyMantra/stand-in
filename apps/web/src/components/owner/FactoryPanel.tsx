@@ -3,7 +3,7 @@ import { Boxes, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ExtLink, Panel, Shimmer, Tag } from "@/components/app/common";
 import { cn } from "@/lib/utils";
-import { explorerAccount } from "@/lib/wallet/near";
+import { accountExists, explorerAccount } from "@/lib/wallet/near";
 import { DEFAULT_WATCHER, nearShort } from "@/lib/wallet/guardianCode";
 import { FACTORY, GuardianName, guardiansOf, requiredDeposit } from "@/lib/wallet/factory";
 
@@ -24,6 +24,8 @@ export function FactoryPanel({ ownerId, eth, busy, selected, reloadKey, onCreate
     try {
       const [deposit, guardians] = await Promise.all([requiredDeposit(), guardiansOf(ownerId)]);
       setLoad({ status: "ready", deposit, guardians });
+      // A name that is now one of this owner's guardians was just created: clear it so it is not offered again.
+      setName((n) => (n && guardians.includes(`${n}.${FACTORY}`) ? "" : n));
     } catch (e) {
       setLoad({ status: "error", error: e instanceof Error ? e.message : String(e) });
     }
@@ -31,8 +33,21 @@ export function FactoryPanel({ ownerId, eth, busy, selected, reloadKey, onCreate
   useEffect(() => { void reload(); }, [reload, reloadKey]);
 
   const parsed = GuardianName.safeParse(name);
-  const nameError = name && !parsed.success ? parsed.error.issues[0]?.message : null;
   const id = `${name || "name"}.${FACTORY}`;
+  // Ask the chain whether the account exists before offering to sign: a taken name only costs gas and a refund.
+  const [taken, setTaken] = useState<{ id: string; exists: boolean | null } | null>(null);
+  useEffect(() => {
+    if (!parsed.success) return;
+    let alive = true;
+    const t = setTimeout(() => {
+      setTaken({ id, exists: null });
+      accountExists(id).then((exists) => alive && setTaken({ id, exists }), () => alive && setTaken(null));
+    }, 350);
+    return () => { alive = false; clearTimeout(t); };
+  }, [id, parsed.success]);
+  const isTaken = taken?.id === id && taken.exists === true;
+  const checking = parsed.success && (taken?.id !== id || taken.exists === null);
+  const nameError = name && !parsed.success ? parsed.error.issues[0]?.message : isTaken ? `${id} already exists on testnet: pick another name` : null;
 
   return (
     <Panel title="Create a guarded agent account" icon={Boxes} id="factory-title" meta={eth ? "for an Ethereum wallet owner" : "optional for a NEAR account"} bodyClassName="p-0"
@@ -57,7 +72,7 @@ export function FactoryPanel({ ownerId, eth, busy, selected, reloadKey, onCreate
           ) : load.status === "error" ? <span className="text-trip">Could not read the factory: {load.error}</span> : <Shimmer className="h-4 w-48" />}
         </div>
         <Button size="sm" variant="invert" className="w-full sm:w-auto" data-testid="factory-create"
-          disabled={busy || !parsed.success || load.status !== "ready"} onClick={() => load.status === "ready" && parsed.success && onCreate(parsed.data, load.deposit)}>
+          disabled={busy || !parsed.success || isTaken || checking || load.status !== "ready"} onClick={() => load.status === "ready" && parsed.success && onCreate(parsed.data, load.deposit)}>
           <Boxes aria-hidden />{busy ? "Waiting for wallet…" : "Review and sign in wallet"}
         </Button>
       </div>

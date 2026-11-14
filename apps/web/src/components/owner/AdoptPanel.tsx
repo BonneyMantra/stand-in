@@ -6,6 +6,7 @@ import { ExtLink, Panel, Tag } from "@/components/app/common";
 import { unfreezeLinkFor, type AdoptRequest, type DeepLink } from "@/lib/wallet/deeplink";
 import { explorerTx, isEthAccount, yoctoToNear, type GuardianLookup } from "@/lib/wallet/near";
 import type { GuardianCode } from "@/lib/wallet/guardianCode";
+import { FACTORY } from "@/lib/wallet/factory";
 import { Decoded, Row, type ApproveResult } from "./ApprovePanel";
 import { DeployFacts } from "./DeployFacts";
 import { useDeployPlan } from "./useDeployPlan";
@@ -86,6 +87,14 @@ export function AdoptPanel({ link, accountId, guardian, busy, result, onAdopt, o
               One transaction from {mono(accountId ?? req.account)} to {accountId === req.account ? "itself" : mono(req.account)}:
               {steps.map((s, i) => <span key={s} className="ml-1.5 font-mono text-fg">{i + 1}. {s}</span>)}
             </p>
+            {deploy && (
+              <p className="text-[11px] leading-relaxed text-fg-faint" data-testid="adopt-meteor-note">
+                Meteor refuses contract deployment from apps. With Meteor, create a guarded agent account on{" "}
+                <Link to="/app/owner" className="text-fg-muted underline underline-offset-4">/app/owner</Link>, then run{" "}
+                <code className="font-mono break-all text-fg-muted">standin adopt --wallet --account &lt;name&gt;.{FACTORY} --owner {req.account} --home DIR</code>;
+                its link only adds the agent key.
+              </p>
+            )}
             <Button size="sm" variant="invert" disabled={busy || !ready} className="w-full sm:w-auto" data-testid="adopt-sign"
               onClick={() => onAdopt(req, deploy && plan.status === "ready" ? plan.code : null)}>
               <ShieldPlus aria-hidden />{busy ? "Waiting for wallet…" : "Review and sign in wallet"}

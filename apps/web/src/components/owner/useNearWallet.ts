@@ -69,7 +69,9 @@ export function useNearWallet() {
     } catch (e) {
       const msg = String((e as Error)?.message ?? e);
       // Closing the wallet picker is a choice, not an error.
-      setInfo({ ...IDLE, error: msg === "User rejected" ? null : readableError(e) });
+      const text = readableError(e);
+      // Not connected yet, so the generic "disconnect and connect again" hint does not apply here.
+      setInfo({ ...IDLE, error: msg === "User rejected" ? null : /rejected in the wallet/.test(text) ? "The sign-in was rejected in the wallet. Nothing was shared or sent." : text });
     }
   }, [adopt]);
 

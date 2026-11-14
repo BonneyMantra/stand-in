@@ -60,6 +60,16 @@ describe("wallet outcomes and errors", () => {
     expect(closed).not.toMatch(/Nothing was sent/);
     expect(readableError("already frozen")).toBe("The guardian is already frozen.");
   });
+  it("names a receipt ActionError instead of showing its JSON (create_guardian with a taken name, live 15 Nov)", () => {
+    const o = {
+      transaction: { hash: "Anopy4iQQeWwADJyNjzHiUAaJ8FN6DRW87bT3y3PoWio" }, status: { SuccessValue: "bnVsbA==" },
+      receipts_outcome: [{ outcome: { status: { Failure: { ActionError: { index: 0, kind: { AccountAlreadyExists: { account_id: "agent-2321.guard.si-project-5289.testnet" } } } } } } }],
+    };
+    const msg = readableError(readOutcome(o).failure);
+    expect(msg).toBe("agent-2321.guard.si-project-5289.testnet already exists on testnet: pick another name. A failed create refunds the deposit; only gas was spent.");
+    expect(msg).not.toContain("{");
+    expect(readableError('{"Failure":{"ActionError":{"index":0,"kind":{"DeleteKeyDoesNotExist":{}}}}}')).toBe("The transaction failed on chain (DeleteKeyDoesNotExist). Nothing else changed.");
+  });
 });
 
 describe("link built the way the CLI builds it (standin unfreeze --wallet ownerUrl)", () => {

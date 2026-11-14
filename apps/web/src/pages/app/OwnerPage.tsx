@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 import { Wallet } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert";
@@ -44,6 +44,14 @@ export default function OwnerPage() {
   const [approved, setApproved] = useState<ApproveResult | null>(null);
   const [deployed, setDeployed] = useState<string | null>(null);
   const nextId = useRef(1);
+  // Everything this page remembers belongs to the connected account: a switch (or disconnect) starts clean, so another
+  // account's selected guardian, deploy notice or transactions never show under the new one.
+  const seenAccount = useRef(w.accountId);
+  useEffect(() => {
+    if (seenAccount.current === w.accountId) return;
+    seenAccount.current = w.accountId;
+    setPicked(null); setDeployed(null); setApproved(null); setLog([]);
+  }, [w.accountId]);
 
   const lookup = read.status === "ready" ? read.lookup : read.status === "loading" ? read.previous : undefined;
   const guardian = lookup?.kind === "guardian" ? lookup.state : null;
@@ -141,7 +149,7 @@ export default function OwnerPage() {
       {w.error && (
         <Alert variant="destructive" data-testid="wallet-error">
           <AlertTitle>Wallet</AlertTitle>
-          <AlertDescription>{w.error}</AlertDescription>
+          <AlertDescription><p>{w.error}</p></AlertDescription>
         </Alert>
       )}
 
@@ -154,9 +162,9 @@ export default function OwnerPage() {
 
       {deployed && (
         <Alert variant="success" data-testid="deployed">
-          <AlertTitle>Guardian deployed</AlertTitle>
+          <AlertTitle>{picked ? "Guarded agent account created" : "Guardian deployed"}</AlertTitle>
           <AlertDescription>
-            {picked ? <>Guarded agent account <span className="font-mono">{picked}</span> created; the console below is read back from chain.</> : "The account is protected; the console below is read back from chain."} Transaction <ExtLink href={explorerTx(deployed)}>{deployed.slice(0, 12)}…</ExtLink>
+            <p>{picked ? <><span className="font-mono break-all">{picked}</span> is yours; the console below is read back from chain.</> : "The account is protected; the console below is read back from chain."} Transaction <ExtLink href={explorerTx(deployed)}>{deployed.slice(0, 12)}…</ExtLink></p>
           </AlertDescription>
         </Alert>
       )}
@@ -173,34 +181,36 @@ export default function OwnerPage() {
           <Alert variant="warning" data-testid="wrong-network">
             <AlertTitle>Wrong network</AlertTitle>
             <AlertDescription>
-              <span className="font-mono">{w.accountId}</span> is a mainnet account. This console signs on testnet only: switch the wallet
-              to testnet, then disconnect and connect again. The guardian is not deployed on mainnet accounts from here.
+              <p><span className="font-mono break-all">{w.accountId}</span> is a mainnet account. This console signs on testnet only: switch the wallet
+              to testnet, then disconnect and connect again. The guardian is not deployed on mainnet accounts from here.</p>
             </AlertDescription>
           </Alert>
         ) : (
+          // Below xl the two columns dissolve (display: contents) into one ordered column: the guardian and its owner
+          // actions come before the optional factory panel, so Freeze is never below the fold of an unrelated form.
           <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-            <div className="min-w-0 space-y-4">
+            <div className="contents xl:block xl:min-w-0 xl:space-y-4">
               {lookup && lookup.kind !== "guardian" && link.kind !== "adopt" && target === w.accountId && (
-                <ProtectPanel accountId={w.accountId} lookup={lookup} busy={busy} onDeploy={(c, i) => void protect(c, i)} />
+                <div className="order-1 min-w-0"><ProtectPanel accountId={w.accountId} lookup={lookup} busy={busy} onDeploy={(c, i) => void protect(c, i)} /></div>
               )}
-              {eth && link.kind === "none" && factory}
-              <GuardianPanel accountId={target ?? w.accountId} read={read} onRefresh={() => void refresh()} />
-              {!eth && link.kind === "none" && factory}
+              {eth && link.kind === "none" && <div className="order-2 min-w-0">{factory}</div>}
+              <div className="order-3 min-w-0"><GuardianPanel accountId={target ?? w.accountId} read={read} onRefresh={() => void refresh()} /></div>
+              {!eth && link.kind === "none" && <div className="order-6 min-w-0">{factory}</div>}
             </div>
-            <div className="space-y-4">
-              {guardian && isOwner && <OwnerActions state={guardian} busy={busy} onFreeze={freeze} onUnfreeze={unfreeze} />}
+            <div className="contents xl:block xl:space-y-4">
+              {guardian && isOwner && <div className="order-4 min-w-0"><OwnerActions state={guardian} busy={busy} onFreeze={freeze} onUnfreeze={unfreeze} /></div>}
               {guardian && isOwner && target && isFactoryGuardian(target) && (
-                <WithdrawPanel guardianId={target} ownerId={w.accountId} busy={busy} reloadKey={factoryKey} onWithdraw={withdraw} />
+                <div className="order-5 min-w-0"><WithdrawPanel guardianId={target} ownerId={w.accountId} busy={busy} reloadKey={factoryKey} onWithdraw={withdraw} /></div>
               )}
               {guardian && !isOwner && (
-                <Alert variant="warning" data-testid="not-owner">
+                <Alert variant="warning" data-testid="not-owner" className="order-4">
                   <AlertTitle>Not this guardian's owner</AlertTitle>
                   <AlertDescription>
-                    Its owner is <span className="font-mono">{guardian.owner}</span>; connected as <span className="font-mono">{w.accountId}</span>. Owner actions need the owner's wallet.
+                    <p>Its owner is <span className="font-mono break-all">{guardian.owner}</span>; connected as <span className="font-mono break-all">{w.accountId}</span>. Owner actions need the owner's wallet.</p>
                   </AlertDescription>
                 </Alert>
               )}
-              <ActivityLog entries={log} />
+              <div className="order-7 min-w-0"><ActivityLog entries={log} /></div>
             </div>
           </div>
         )
@@ -212,7 +222,7 @@ export default function OwnerPage() {
 }
 
 const STEPS: [string, string][] = [
-  ["The guardian lives on your account", "Connect, then Protect this account: your wallet deploys it on the account itself, so it can delete that account's agent keys."],
+  ["The guardian lives on your account", "Connect, then Protect this account: your wallet deploys it on the account itself, so it can delete that account's agent keys. Meteor refuses contract deployment and a MetaMask (0x) account already runs NEAR's wallet contract: with either, create a guarded agent account instead (one function call)."],
   ["Its owner is the account", "Unfreeze and adding agent keys need a transaction signed by the account's own full-access key, the one your wallet holds."],
   ["Your wallet signs; this page never holds a key", `Wallets run in NEAR Connect's sandbox. Offered on testnet: ${TESTNET_WALLETS}.`],
 ];

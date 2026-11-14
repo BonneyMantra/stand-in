@@ -94,6 +94,11 @@ export function readableError(e: unknown): string {
   const raw = typeof e === "string" ? e : e instanceof Error ? e.message : (() => { try { return JSON.stringify(e); } catch { return String(e); } })();
   const text = raw ?? "";
   for (const [re, msg] of CONTRACT_MESSAGES) if (re.test(text)) return msg;
+  // Receipt ActionErrors arrive as JSON: name the failure instead of showing it raw.
+  const exists = text.match(/AccountAlreadyExists[^}]*?account_id\W+([\w.-]+)/);
+  if (exists) return `${exists[1]} already exists on testnet: pick another name. A failed create refunds the deposit; only gas was spent.`;
+  const action = text.match(/ActionError\W+index\W+\d+\W+kind\W+(\w+)/);
+  if (action) return `The transaction failed on chain (${action[1]}). Nothing else changed.`;
   // A closed window is not proof that nothing was sent: the wallet may have broadcast first (run() then reads the chain).
   if (/wallet closed|closed the window|window (was )?closed/i.test(text)) return "The wallet window closed before it reported a result.";
   if (/reject|denied|declin|cancel/i.test(text)) return "The request was rejected in the wallet. Nothing was sent. If the wallet does not open next time, disconnect and connect again.";

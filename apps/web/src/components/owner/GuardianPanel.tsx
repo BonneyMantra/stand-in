@@ -17,7 +17,7 @@ export function NoGuardian({ accountId, lookup }: { accountId: string; lookup: E
       <p data-testid="no-guardian">{NO_GUARDIAN[lookup.kind]}{lookup.kind === "not-guardian" ? ` (${lookup.detail})` : ""}</p>
       <p className="mt-2">
         {lookup.kind === "no-contract"
-          ? "Protect this account (above) deploys the guardian on it from your wallet. Agents then get scoped keys, and the full-access key stays in your wallet."
+          ? "The panel above deploys the guardian on it from your wallet. Agents then get scoped keys, and the full-access key stays in your wallet."
           : "The guardian runs on the guarded account itself, so it can only be deployed on an account with no other contract."}
       </p>
       <p className="mt-2">
