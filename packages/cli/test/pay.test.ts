@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { saveScopedKey } from "@standin/core";
 import { pay } from "../src/pay.ts";
 import { scanHome } from "../src/scan.ts";
 
@@ -13,12 +14,14 @@ const verdict = (decision: "allow" | "warn" | "block") => async (id: string) => 
 describe("standin pay (mocked registry)", () => {
   it("refuses a blocklisted receiver with exit 3", async () => {
     process.env.STANDIN_HOME = fs.mkdtempSync(path.join(os.tmpdir(), "si-"));
-    expect(await pay({ receiver: "thief.testnet", what: "1", check: verdict("block") })).toBe(3);
+    saveScopedKey({ account_id: "agent.testnet", public_key: "ed25519:pk", secret_key: "ed25519:sk", receiver_id: "new.testnet", method_names: ["record_deploy"], created_at: "now" });
+    expect(await pay({ receiver: "thief.testnet", what: "record_deploy", check: verdict("block") })).toBe(3);
   });
   it("asks on warn and sends nothing when declined (exit 4)", async () => {
     process.env.STANDIN_HOME = fs.mkdtempSync(path.join(os.tmpdir(), "si-"));
+    saveScopedKey({ account_id: "agent.testnet", public_key: "ed25519:pk", secret_key: "ed25519:sk", receiver_id: "new.testnet", method_names: ["record_deploy"], created_at: "now" });
     let asked = 0;
-    const code = await pay({ receiver: "new.testnet", what: "1", check: verdict("warn"), ask: async () => { asked++; return false; } });
+    const code = await pay({ receiver: "new.testnet", what: "record_deploy", check: verdict("warn"), ask: async () => { asked++; return false; } });
     expect(code).toBe(4);
     expect(asked).toBe(1);
   });

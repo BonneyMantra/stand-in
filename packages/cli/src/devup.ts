@@ -9,14 +9,16 @@ import { out, table } from "./util.ts";
 
 const EMPTY = "11111111111111111111111111111111";
 
-async function watcherUp(port: number): Promise<boolean> {
+/** The ledger path the watcher on `port` reads, or null when nothing answers there. */
+async function watcherLedger(port: number): Promise<string | null> {
   try {
     const r = await fetch(`http://127.0.0.1:${port}/api/health`, { signal: AbortSignal.timeout(800) });
-    return r.ok;
+    return r.ok ? String(((await r.json()) as { ledger?: string }).ledger ?? "?") : null;
   } catch {
-    return false;
+    return null;
   }
 }
+const watcherUp = async (port: number) => (await watcherLedger(port)) !== null;
 
 /** Idempotent: check accounts and deployments, top the decoy pool up, start the watcher if it is not running. */
 export async function devUp(opts: { noWatcher?: boolean; pool?: number } = {}): Promise<boolean> {
@@ -49,7 +51,16 @@ export async function devUp(opts: { noWatcher?: boolean; pool?: number } = {}): 
 
   const port = Number(process.env.STANDIN_WATCHER_PORT ?? 4317);
   if (opts.noWatcher) return ok;
-  if (await watcherUp(port)) { out(`watcher already running on 127.0.0.1:${port}`); return ok; }
+  const running = await watcherLedger(port);
+  if (running !== null) {
+    if (running !== path.join(home, "ledger.ndjson")) {
+      out(`port ${port} is taken by a watcher for another home (ledger ${running}); it would not see this home's decoys. Start this one on a free port: STANDIN_WATCHER_PORT=<port> standin dev up`);
+      return false;
+    }
+    fs.writeFileSync(path.join(home, "watcher.port"), String(port));
+    out(`watcher already running on 127.0.0.1:${port}`);
+    return ok;
+  }
   const main = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../watcher/src/main.ts");
   const logFile = path.join(home, "watcher.log");
   const fd = fs.openSync(logFile, "a");
@@ -59,7 +70,7 @@ export async function devUp(opts: { noWatcher?: boolean; pool?: number } = {}): 
   child.unref();
   fs.writeFileSync(path.join(home, "watcher.pid"), String(child.pid));
   for (let i = 0; i < 40; i++) {
-    if (await watcherUp(port)) { out(`watcher started (pid ${child.pid}), log ${logFile}`); return ok; }
+    if (await watcherUp(port)) { fs.writeFileSync(path.join(home, "watcher.port"), String(port)); out(`watcher started (pid ${child.pid}), log ${logFile}`); return ok; }
     await new Promise((r) => setTimeout(r, 250));
   }
   out(`watcher did not come up; see ${logFile}`);

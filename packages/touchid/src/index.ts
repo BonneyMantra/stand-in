@@ -70,9 +70,10 @@ export async function requireFingerprint(reason: string, o: GateOpts = {}): Prom
   }
   const word = o.typed ?? "approve";
   process.stderr.write(`Touch ID is not available here (${avail}); explicit typed confirmation required.\n`);
+  let timer: ReturnType<typeof setTimeout> | undefined;
   const got = await Promise.race([
     (o.confirm ?? ((p) => askTyped(p)))(`${reason}. Type "${word}" to confirm: `, word),
-    new Promise<string>((r) => setTimeout(() => r(""), timeoutMs)),
-  ]);
+    new Promise<string>((r) => { timer = setTimeout(() => r(""), timeoutMs); }),
+  ]).finally(() => clearTimeout(timer)); // a pending timer would keep the CLI alive for the full timeout after the answer
   return got.trim() === word;
 }

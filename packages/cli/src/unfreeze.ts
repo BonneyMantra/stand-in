@@ -29,7 +29,13 @@ export async function unfreeze(o: UnfreezeOpts = {}): Promise<number> {
     out(`unfrozen: ${explorerTx(cfg, r.tx_hash)}`);
   } else out("guardian was not frozen");
   // Re-provision the agent's scoped key (the freeze deleted the old one): same scope as the previous key (guardian.add_agent_key).
+  // A key that is still on the guardian (nothing was frozen) stays: a second one would only widen the agent's access.
   const prev = loadScopedKey();
+  if (!st.frozen && prev && (st.agent_keys ?? []).includes(prev.public_key)) {
+    out(`agent key ${prev.public_key} is still active; nothing to re-provision`);
+    appendEvent("tool_call", { tool_name: "standin unfreeze", outcome: "not_frozen" });
+    return 0;
+  }
   const scope = {
     receiver: prev?.receiver_id ?? requireAccount(cfg, "project"), methods: prev?.method_names ?? ["record_deploy"],
     allowance: "250000000000000000000000",

@@ -1,7 +1,8 @@
 #!/usr/bin/env -S node --import tsx
+import fs from "node:fs";
 import path from "node:path";
 import {
-  callMethod, explorerTx, loadNetworkConfig, requireAccount, roleAccount, setLogSink,
+  callMethod, explorerTx, loadNetworkConfig, requireAccount, roleAccount, setLogSink, standinHome,
 } from "@standin/core";
 import { adopt } from "./adopt.ts";
 import { adoptWallet } from "./adopt-wallet.ts";
@@ -16,7 +17,8 @@ setLogSink((l) => process.stderr.write(l + "\n"));
 
 const USAGE = `standin <command>
   dev up [--no-watcher] [--pool N]       check accounts/contracts, mint decoy pool, start watcher
-  adopt --home DIR [--keychain]          move real NEAR keys out of DIR, plant decoys, provision scoped key
+  adopt --home DIR [--account ID.testnet] [--keychain]
+                                         move real NEAR keys out of DIR, deploy the guardian if the account has none, plant decoys, provision a scoped key, print the watcher command
   adopt --wallet --account ID.testnet [--owner ID.testnet] --home DIR [--timeout SEC] [--resume]
                                          owner key stays in your NEAR wallet: prints an owner-console link, the wallet signs one tx (guardian + scoped agent key), CLI waits, then plants a decoy in DIR (exit 6 on timeout)
   status [--json]                        agent/decoy/trips from the watcher API
@@ -27,8 +29,41 @@ const USAGE = `standin <command>
   pay <receiver> <amount|method> [--args JSON] [--approve-warn]   (a warned receiver also needs Touch ID)
   attack drain --key FILE [--reserve NEAR]   scripted thief (demo): drain a planted decoy to the attacker account`;
 
+const COMMANDS = ["dev", "adopt", "status", "freeze", "unfreeze", "pay", "attack"];
+
+/** The usage block of one command (its first line and any indented continuation lines). */
+function helpFor(cmd: string): string {
+  const hit: string[] = [];
+  let on = false;
+  for (const l of USAGE.split("\n").slice(1)) {
+    if (/^ {2}\S/.test(l)) on = l.trim().split(/\s+/)[0] === cmd;
+    if (on) hit.push(l);
+  }
+  return `${hit.join("\n")}\n\nEvery command except adopt also takes --home DIR (the home you adopted) to find that home's ledger, scoped key and config.`;
+}
+
+/** --home DIR on any command but adopt (which handles its own): selects an adopted home's ledger, scoped key and config. */
+function applyHome(cmd: string, rest: string[]): string[] {
+  if (cmd === "adopt") return rest;
+  const i = rest.findIndex((a) => a === "--home" || a.startsWith("--home="));
+  if (i < 0) return rest;
+  const eq = rest[i]!.startsWith("--home=");
+  const v = eq ? rest[i]!.slice(7) : rest[i + 1];
+  if (!v || v.startsWith("--")) throw new Error("--home needs a DIR");
+  const home = path.resolve(v);
+  if (!fs.existsSync(home)) throw new Error(`--home ${home} does not exist`);
+  process.env.STANDIN_HOME = path.join(home, ".standin");
+  const cfg = path.join(process.env.STANDIN_HOME, "config.json");
+  if (!process.env.STANDIN_CONFIG && fs.existsSync(cfg)) process.env.STANDIN_CONFIG = cfg;
+  return rest.filter((_, j) => j !== i && (eq || j !== i + 1));
+}
+
 async function main(argv: string[]): Promise<number> {
-  const [cmd, ...rest] = argv;
+  const [cmd, ...rest0] = argv;
+  if (cmd === "help" || cmd === "--help" || cmd === "-h") { out(rest0[0] && COMMANDS.includes(rest0[0]) ? helpFor(rest0[0]) : USAGE); return 0; }
+  if (cmd && !COMMANDS.includes(cmd)) { err(`unknown command: ${cmd}`); out(USAGE); return 1; }
+  if (cmd && rest0.some((a) => a === "--help" || a === "-h")) { out(helpFor(cmd)); return 0; }
+  const rest = cmd ? applyHome(cmd, rest0) : rest0;
   switch (cmd) {
     case "dev": {
       if (rest[0] !== "up") { out(USAGE); return 1; }
@@ -46,17 +81,20 @@ async function main(argv: string[]): Promise<number> {
         if (!process.env.STANDIN_HOME) process.env.STANDIN_HOME = path.join(home, ".standin");
         return adoptWallet({ account: values.account, owner: values.owner, home, resume: values.resume, timeoutSec: t });
       }
-      if (values.account || values.owner || values.resume || values.timeout) { err("--account, --owner, --resume and --timeout need --wallet"); return 1; }
+      if (values.owner || values.resume || values.timeout) { err("--owner, --resume and --timeout need --wallet"); return 1; }
       if (!values.home) { err("adopt needs --home DIR"); return 1; }
       await adopt({
         home: path.resolve(values.home), store: values.keychain ? "keychain" : "dev",
         scopedMethods: (values.methods ?? "record_deploy").split(","), allowance: values.allowance ?? "250000000000000000000000",
+        account: values.account,
       });
       return 0;
     }
     case "status": {
       const { values } = parse(rest, { json: { type: "boolean" } });
-      const port = process.env.STANDIN_WATCHER_PORT ?? "4317";
+      // the port `dev up` recorded for this home, else :4317
+      const recorded = (() => { try { return fs.readFileSync(path.join(standinHome(), "watcher.port"), "utf8").trim(); } catch { return ""; } })();
+      const port = process.env.STANDIN_WATCHER_PORT ?? (recorded || "4317");
       const s: any = await (await fetch(`http://127.0.0.1:${port}/api/state`)).json().catch(() => null);
       if (!s) { err(`watcher not reachable on :${port}; run \`standin dev up\``); return 2; }
       if (values.json) { out(JSON.stringify(s, null, 2)); return 0; }
