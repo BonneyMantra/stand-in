@@ -1,6 +1,7 @@
 import { LogOut, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Shimmer } from "@/components/app/common";
+import { looksMainnet } from "@/lib/wallet/near";
 import type { WalletInfo } from "./useNearWallet";
 
 export function WalletIcon({ src, name }: { src: string | null; name: string | null }) {
@@ -23,7 +24,7 @@ export function WalletControl({ info, onConnect, onDisconnect }: { info: WalletI
       <WalletIcon src={info.walletIcon} name={info.walletName} />
       <div className="min-w-0 leading-tight">
         <p className="truncate font-mono text-xs text-fg" data-testid="connected-account">{info.accountId}</p>
-        <p className="truncate text-[10.5px] text-fg-faint">{info.walletName} · testnet</p>
+        <p className="truncate text-[10.5px] text-fg-faint">{info.walletName} · {info.accountId && looksMainnet(info.accountId) ? "mainnet" : "testnet"}</p>
       </div>
       <Button variant="quiet" size="xs" onClick={onDisconnect} aria-label="Disconnect wallet" className="ml-1">
         <LogOut aria-hidden /><span className="hidden sm:inline">Disconnect</span>
