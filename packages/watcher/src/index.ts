@@ -2,6 +2,7 @@ import { loadNetworkConfig, logger, standinHome } from "@standin/core";
 import { followBlocks, followKeyChanges } from "./stream.ts";
 import { TripHandler } from "./trip.ts";
 import { startServer } from "./server.ts";
+import { startAlerts } from "./alerts.ts";
 
 export { followBlocks, followKeyChanges } from "./stream.ts";
 export { TripHandler, attackerOf } from "./trip.ts";
@@ -17,6 +18,7 @@ export async function startWatcher(opts: { port?: number; mode?: "optimistic" | 
   const handler = new TripHandler(cfg, home);
   await handler.init();
   const server = startServer(cfg, { port: opts.port, home });
+  const alerts = startAlerts({ cfg, home, handler }); // optional phone layer; inert without STANDIN_NTFY_TOPIC
   const ac = new AbortController();
   const detectors: Promise<void>[] = [
     // primary: low-latency access-key change detector (RPC, ~4 req/s)
@@ -33,7 +35,7 @@ export async function startWatcher(opts: { port?: number; mode?: "optimistic" | 
   }
   const done = Promise.all(detectors).then(() => undefined);
   return {
-    stop: async () => { ac.abort(); handler.stop(); server.close(); await done; },
+    stop: async () => { ac.abort(); alerts.stop(); handler.stop(); server.close(); await done; },
     done,
   };
 }

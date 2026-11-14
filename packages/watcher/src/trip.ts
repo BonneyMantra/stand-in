@@ -40,6 +40,7 @@ export class TripHandler {
   readonly agent: string;
   readonly registry: string;
   private submittedAt = 0;
+  private frozenCheckedAt = 0;
   private ownerExtra?: { intents_tx_hash: string; deleted_keys: string[]; intents_keys_removed: string[] };
   constructor(private cfg: NetworkConfig, private home?: string) {
     this.decoy = requireAccount(cfg, "decoy");
@@ -142,15 +143,43 @@ export class TripHandler {
     void import("@standin/nearai").then((m) => m.reportInBackground(tripTx, this.home)).catch(() => {});
   }
 
-  /** Exactly one freeze tx per process (and none if already frozen on chain). */
-  private async freezeOnce(publicKey: string, txHash: string | undefined, attacker: string) {
+  /**
+   * Manual / off-chain freeze path (phone "Freeze now" button, Canarytokens hit): the same single pre-warmed freeze,
+   * no decoy key involved. Writes a `freeze` ledger event marked manual. Returns null when already frozen.
+   */
+  async manualFreeze(reason: string): Promise<{ tx_hash: string; block_height: number } | null> {
+    if (this.frozenAt) {
+      const st = this.owner ? { frozen: true } : await this.guardianState().catch(() => ({ frozen: true }));
+      if (st.frozen) return null;
+      this.frozenAt = null; this.inflight = null;
+    } else if (!this.owner) {
+      const st = await this.guardianState().catch(() => null);
+      if (st?.frozen) return null;
+    }
+    const f = await this.freezeOnce("", undefined, "", reason);
+    const detail = await this.freezeDetail(f.tx_hash).catch(() => ({ deleted: [] as string[], intents: [] as string[], executed_height: 0 }));
+    appendEvent("freeze", {
+      trip_tx_hash: "", manual: true, reason,
+      freeze: { tx_hash: f.tx_hash, block_height: f.block_height, blocks_after_trip: 0, deleted_keys: detail.deleted, intents_keys_removed: detail.intents },
+      executed_block_height: detail.executed_height,
+    }, this.home);
+    return { tx_hash: f.tx_hash, block_height: f.block_height };
+  }
+
+  /** Exactly one freeze tx per process (and none if already frozen on chain). After an owner unfreeze the cached state is dropped. */
+  private async freezeOnce(publicKey: string, txHash: string | undefined, attacker: string, manualReason?: string) {
+    if (this.frozenAt && !this.owner && Date.now() - this.frozenCheckedAt > 5000) {
+      this.frozenCheckedAt = Date.now();
+      const st = await this.guardianState().catch(() => null);
+      if (st && !st.frozen) { this.frozenAt = null; this.inflight = null; }
+    }
     if (this.frozenAt) return { ...this.frozenAt, submitted_ms: Date.now() };
     if (!this.inflight) {
-      const reason = `decoy key ${publicKey} signed a transaction${txHash ? ` (${txHash})` : ""}; value to ${attacker || "unknown"}`;
+      const reason = manualReason ?? `decoy key ${publicKey} signed a transaction${txHash ? ` (${txHash})` : ""}; value to ${attacker || "unknown"}`;
       this.inflight = (async () => {
         const o = this.owner ? await this.owner.freeze() : null;
         if (o) this.ownerExtra = o.extra;
-        const hash = o ? o.tx_hash : await this.sender!.call(this.agent, "freeze", { reason, decoy_public_key: publicKey, tx_hash: txHash ?? null });
+        const hash = o ? o.tx_hash : await this.sender!.call(this.agent, "freeze", { reason, decoy_public_key: publicKey || null, tx_hash: txHash ?? null });
         this.submittedAt = Date.now();
         log.info(`freeze submitted ${hash}`);
         return { tx_hash: hash, block_height: await this.inclusionHeight(hash) };

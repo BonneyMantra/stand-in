@@ -3,6 +3,7 @@ import {
   actions, appendEvent, checkCounterparty, explorerTx, loadNetworkConfig, loadScopedKey, makeAccount, parseNearAmountSafe,
   type CounterpartyResult,
 } from "@standin/core";
+import { requireFingerprint } from "@standin/touchid";
 import { err, out } from "./util.ts";
 
 export interface PayOpts {
@@ -14,6 +15,7 @@ export interface PayOpts {
   /** test seam */
   check?: (id: string) => Promise<CounterpartyResult>;
   ask?: (q: string) => Promise<boolean>;
+  gate?: (reason: string) => Promise<boolean>;
 }
 
 async function askTty(q: string): Promise<boolean> {
@@ -37,8 +39,10 @@ export async function pay(o: PayOpts): Promise<number> {
   }
   if (r.decision === "warn") {
     const ok = o.approveWarn ? true : await (o.ask ?? askTty)(`Stand-in warns about ${o.receiver}. Proceed?`);
-    if (!ok) {
-      err("not approved; nothing sent");
+    // Owner presence: --approve-warn or a typed yes never approves a warned receiver on its own; the fingerprint must pass too.
+    const present = ok && (await (o.gate ?? requireFingerprint)(`Approve warned payment of ${o.what} to ${o.receiver}`));
+    if (!present) {
+      err("not approved (owner fingerprint required for a warned receiver); nothing sent");
       appendEvent("tool_call", { tool_name: "standin pay", receiver: o.receiver, outcome: "warn_declined" });
       return 4;
     }

@@ -7,6 +7,7 @@ import { adopt } from "./adopt.ts";
 import { attackDrain } from "./attack.ts";
 import { devUp } from "./devup.ts";
 import { pay } from "./pay.ts";
+import { unfreeze } from "./unfreeze.ts";
 import { err, out, parse, short } from "./util.ts";
 
 setLogSink((l) => process.stderr.write(l + "\n"));
@@ -16,7 +17,8 @@ const USAGE = `standin <command>
   adopt --home DIR [--keychain]          move real NEAR keys out of DIR, plant decoys, provision scoped key
   status [--json]                        agent/decoy/trips from the watcher API
   freeze [reason]                        manual guardian freeze
-  pay <receiver> <amount|method> [--args JSON] [--approve-warn]
+  unfreeze [--keychain]                  Touch ID gate, owner-key unfreeze, re-provision the agent key
+  pay <receiver> <amount|method> [--args JSON] [--approve-warn]   (a warned receiver also needs Touch ID)
   attack drain --key FILE [--reserve NEAR]   scripted thief (demo): drain a planted decoy to the attacker account`;
 
 async function main(argv: string[]): Promise<number> {
@@ -53,6 +55,10 @@ async function main(argv: string[]): Promise<number> {
       const res = await callMethod(roleAccount(cfg, "watcher"), requireAccount(cfg, "agent"), "freeze", { reason: rest.join(" ") || "manual freeze via standin CLI" });
       out(`frozen: ${explorerTx(cfg, res.tx_hash)}`);
       return 0;
+    }
+    case "unfreeze": {
+      const { values } = parse(rest, { keychain: { type: "boolean" } });
+      return unfreeze({ keychain: values.keychain });
     }
     case "pay": {
       const { values, positionals } = parse(rest, { args: { type: "string" }, "approve-warn": { type: "boolean" }, json: { type: "boolean" } });
