@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 import {
-  appendEvent, generateKey, loadNetworkConfig, loadScopedKey, makeProvider, requireAccount, saveScopedKey, standinHome,
+  appendEvent, eachEndpoint, generateKey, loadNetworkConfig, loadScopedKey, makeProvider, requireAccount, saveScopedKey, standinHome,
 } from "@standin/core";
 import { err, out } from "./util.ts";
 
@@ -63,14 +63,17 @@ export interface UnfreezeWalletOpts {
 }
 
 function liveChain(): WalletChain {
-  const prov = makeProvider(loadNetworkConfig());
+  const cfg = loadNetworkConfig();
+  const prov = makeProvider(cfg);
+  const missing = (e: unknown) => /does not exist|UnknownAccessKey|AccessKeyDoesNotExist/i.test(String((e as Error)?.message ?? e) + String((e as Error)?.name ?? ""));
   return {
     async viewKey(account, publicKey) {
       let k: any;
       try {
-        k = await prov.viewAccessKey({ accountId: account, publicKey } as any);
+        // eachEndpoint rethrows "key does not exist" at once instead of the failover provider's noisy wrapping
+        k = await eachEndpoint(cfg, false, (p) => p.viewAccessKey({ accountId: account, publicKey } as any), missing);
       } catch (e) {
-        if (/does not exist|UnknownAccessKey|doesn't exist/i.test(String((e as Error).message ?? e))) return null;
+        if (missing(e)) return null;
         throw e;
       }
       const p = k.permission;
