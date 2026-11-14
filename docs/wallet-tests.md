@@ -97,14 +97,13 @@ deployed URL (that needs the owner's own wallet).
 
 ## Not built, and why
 
-- **NEAR Auth / FastAuth sign-in.** A FastAuth account could only act as an owner here if the guardian were deployed
-  on that account (the guardian's owner is `current_account_id`). That needs an "adopt from wallet" flow: deploy
-  176 KB of guardian code (about 1.8 NEAR of storage) and call `new` from the FastAuth account, then move the agent
-  onto a scoped key. That flow does not exist yet, so a FastAuth button would sign in to an account the console can
-  only show as "no guardian". Not built rather than shipped as a shim.
-- **Ethereum Wallets executor as owner.** It is listed (NEAR Connect marks it testnet-capable) but untested. An
-  Ethereum-wallet NEAR account already runs the wallet contract, so the guardian cannot be deployed on it; such an
-  account can connect and will see the "not a guardian" state.
+- **NEAR Auth / FastAuth (Google or email) sign-in.** Left out by decision (14 Nov): owner sign-in is external
+  wallets only, through NEAR Connect.
+- **Ethereum Wallets executor as owner** (superseded 14 Nov, 23:30 IST). An Ethereum-wallet NEAR account (0x…)
+  already runs NEAR's wallet contract, so the guardian cannot be deployed on it; the console says so and never offers
+  "Protect this account" to a 0x account. Such an owner uses the guardian factory instead (section below): the 0x
+  account calls `create_guardian` and owns a keyless guardian account. The contract path is proven with a NEAR owner;
+  a real MetaMask connection is not (see "Ethereum Wallets (EIP-1193) path").
 - **HOT Kit for external EVM/Solana accounts.** The guardian cannot freeze a key it does not control. The honest EVM
   story is the guardian's Chain Signatures `sign_evm`, refused while frozen, already in the product.
 - **NEP-413 server login.** No server holds an owner session; every owner action is a wallet-signed transaction that
@@ -180,6 +179,10 @@ Meteor's site. Recorded call: `argc 2`, url `https://wallet.meteorwallet.app/con
 target `"_blank"`, features `undefined`. The new page is a normal tab (toolbar/menubar/locationbar visible; 2 tabs in the
 session). Closing that tab without approving: the console shows "The wallet window was closed before it answered.
 Nothing was sent." (Meteor's own text, "User closed the window before completing the action", is now mapped.) Exit 0.
+Re-run against the deployed site (`… open-spy.ts https://stand-in-44e.pages.dev`, deploy 2357ff7c, 14 Nov 23:28 IST):
+every check passed (no features argument, a normal tab, 2 tabs in the session, the cancelled state shown). The served
+`/guardian/standin_guardian.wasm` hashes to `7PbHKsE6PhdvypoUrE179X5kPxjqgzfFJr7Z1kRr9ZuE`, the code hash of
+`si-agent-5289.testnet`.
 
 ### Ethereum Wallets (EIP-1193) path: not completed
 The `ethereum-wallets` executor (`https://evm-on-near.dev/executor.js`) never reads `window.ethereum`: it runs in NEAR

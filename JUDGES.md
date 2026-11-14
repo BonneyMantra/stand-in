@@ -1,6 +1,7 @@
 # Judging Stand-in in five minutes
 
-Everything below can be checked without installing anything or holding any key.
+Sections 1 to 3 can be checked without installing anything or holding any key (the no-wallet route). With a NEAR
+testnet wallet, the owner's main path is the owner console (section after 3).
 
 ## 1. Run an attack yourself (1 minute)
 Open **https://stand-in-44e.pages.dev/lab** and press **Leak a decoy**. On NEAR testnet, the lab:
@@ -33,14 +34,18 @@ enclave's attested signing address. No server of ours is involved.
 | 20 attack routes, real Claude Code and Codex included; 11 of 11 thefts frozen, median 3 blocks; Stand-in off lost 2.4016 NEAR | `bench/README.md`, `bench/results.json` |
 | Known npm malware denied before it runs (OSV); off-chain canary decoys reach the phone | `integrations/common/supplychain/README.md` |
 | Phone push with Freeze now / Ignore; unfreezing needs Touch ID | `packages/notify/README.md`, `packages/touchid/README.md` |
-| Owner console (wallet): freeze, unfreeze and the CLI's approve-agent-key link signed through NEAR Connect; five testnet txs read back on chain (test-only executor, no third-party wallet) | `docs/wallet-tests.md`, `/app/owner` |
+| Owner console (wallet first): protect an account from the wallet, `op=adopt` / `op=unfreeze` links from the CLI, freeze, unfreeze, and factory guardians for MetaMask owners (create to withdraw); every tx read back on chain (scripted wallet in NEAR Connect's picker, no third-party wallet) | `docs/wallet-tests.md`, `docs/guardian-factory.md`, `/app/owner` |
 
-## Owner console (wallet)
-Open **https://stand-in-44e.pages.dev/app/owner** and press Connect wallet: NEAR Connect lists the testnet wallets
-(Meteor, Intear, Ledger, Nightly, NEAR CLI, Ethereum Wallets). Any testnet account shows its guardian state, or an
-honest "no guardian" explanation; Freeze and Unfreeze need a wallet holding the guarded account's full-access key.
-What we tested, and how (a test-only executor inside NEAR Connect's sandbox, not a third-party wallet), is in
-[`docs/wallet-tests.md`](docs/wallet-tests.md).
+## With your own testnet wallet (the owner's main path)
+Open **https://stand-in-44e.pages.dev/app/owner** and press Connect wallet. NEAR Connect lists the testnet wallets
+(Meteor, Intear, Ledger, Nightly, NEAR CLI, Ethereum Wallets); there is no Google or email sign-in.
+- A fresh named testnet account with about 2 NEAR: **Protect this account** deploys the guardian from your wallet
+  (code hash shown and checked), then Freeze and Unfreeze are one wallet transaction each.
+- A MetaMask (0x) account, or any account you would rather not deploy on: **Create a guarded agent account** asks the
+  factory for a keyless guardian account you own; Freeze, Unfreeze and Withdraw work from your wallet.
+- `standin adopt --wallet --account <id> --home DIR` prints a link that gives an agent its scoped key from your wallet.
+What we tested, and how (a scripted wallet inside NEAR Connect's own picker, not a third-party wallet), is in
+[`docs/wallet-tests.md`](docs/wallet-tests.md) and [`docs/guardian-factory.md`](docs/guardian-factory.md).
 
 ## 4. Run it locally
 See [README.md](README.md#run-it). `pnpm test` runs the TypeScript suite; contract tests run with `cargo test` in each

@@ -2,8 +2,9 @@
 
 **Your agent can read your keys. Make sure they're fake.**
 
-Stand-in moves the real NEAR full-access key out of reach of AI coding agents (Claude Code, Codex) and
-plants unique decoy keys everywhere a key used to live: `~/.near-credentials`, `.env` files, the session
+Stand-in keeps the owner's NEAR key out of reach of AI coding agents (Claude Code, Codex): it stays in the owner's
+own wallet, which approves a scoped key for the agent, or the CLI moves it out of the files agents read. It then
+plants unique decoy keys everywhere a key would live: `~/.near-credentials`, `.env` files, the session
 environment. Every decoy belongs to one bait account. The moment any decoy signs a transaction, a watcher
 freezes the real account through a guardian contract. The freeze deletes the agent's keys, removes its
 keys from NEAR Intents, and cuts off its Chain Signatures on every other chain. The dashboard names the
@@ -20,7 +21,7 @@ from chain at https://stand-in-44e.pages.dev/verify, and see the guide for judge
 
 | Step | What happens | Where |
 |---|---|---|
-| Adopt | The real full-access key leaves the agent's reach. The agent gets a function-call key scoped to your contract. | `packages/cli` (`standin adopt`) |
+| Adopt | The owner's key stays in their own wallet (NEAR Connect); the wallet deploys the guardian and approves a function-call key for the agent, scoped to your contract. Without a wallet, the CLI moves the real key out of the agent's reach instead. | `apps/web` (`/app/owner`), `packages/cli` (`standin adopt --wallet`, `standin adopt`) |
 | Plant | Each agent session gets its own decoy keys, written where agents look for keys. | `integrations/claude-code`, `integrations/codex` |
 | Watch | Claude Code and Codex hooks check every prompt, tool input and tool output for decoys and log each tool call. | `integrations/common` |
 | Trip | A decoy signs a transaction on chain. The watcher sees the decoy account's key in use. | `packages/watcher` |
@@ -31,7 +32,7 @@ from chain at https://stand-in-44e.pages.dev/verify, and see the guide for judge
 | Prevent | Before the agent installs or runs packages, the hook checks OSV.dev and denies known malware; a provenance downgrade is flagged. | `integrations/common/supplychain` |
 | Canary | Each session also gets Canarytokens decoys (DNS, URL, MCP config) that alert even if the thief never touches NEAR. | `packages/canary` |
 | Alert | The owner's phone gets an ntfy push with Freeze now and Ignore buttons; a fired canary can freeze before any theft. | `packages/notify`, `packages/watcher` |
-| Recover | Unfreezing, or approving a payment that only warns, needs the owner's fingerprint (Touch ID). | `packages/touchid`, `packages/cli` |
+| Recover | Unfreezing is an owner transaction from the owner's wallet, or, on the keystore route, needs the owner's fingerprint (Touch ID). Approving a payment that only warns needs Touch ID. | `/app/owner`, `packages/touchid`, `packages/cli` |
 
 ## NEAR technology used
 
@@ -77,32 +78,47 @@ agents and 12 scripted through the real hook entry point.
 cost); the watcher freezes with the owner key instead. Every mainnet transaction goes through a spend guard
 that refuses anything over its cap.
 
-## Owner console (wallet)
+## Owner console (wallet first)
 
-`/app/owner` lets the owner sign the guardian's owner-only calls from their own NEAR wallet instead of the CLI.
-It uses [NEAR Connect](https://github.com/hot-dao/near-selector) (`@hot-labs/near-connect` 0.12.0, testnet): wallets
-run in NEAR Connect's sandboxed iframes and the page never holds a key. The guardian's owner is the account itself,
-so the connected wallet must hold that account's full-access key.
+The owner's own wallet is the main owner path: **https://stand-in-44e.pages.dev/app/owner**. Sign-in is an external
+wallet through [NEAR Connect](https://github.com/hot-dao/near-selector) (`@hot-labs/near-connect` 0.12.0, testnet);
+there is no Google or email sign-in, and the page never holds an owner key.
 
-- Connect, disconnect, session restore on reload; the header shows the account and wallet.
-- Reads `get_state` over testnet RPC: active, frozen, no contract, not a guardian, missing account, loading, RPC error, wrong network.
-- Freeze (reason up to 500 bytes) and Unfreeze, each one wallet-signed transaction from the account to itself, with
-  the explorer link and a fresh read of the state.
-- `standin unfreeze --wallet` prints an approval link
-  (`/app/owner?op=unfreeze&account=…&agent_key=…&receiver=…&methods=…&allowance=…`). The page validates every value
-  (zod: account grammar, ed25519 key, method names, allowance 1 yocto to 1 NEAR; 0 is refused because the guardian
-  reads it as unlimited), shows the decoded request, and offers one transaction: `unfreeze` (when frozen) then
-  `add_agent_key`. It signs only when the owner presses the button, then reads the key back with `view_access_key`.
+Two ways to own a guardian, each one wallet transaction:
+- **Protect this account** (a named NEAR account in Meteor, Intear, Ledger, Nightly or NEAR CLI). The wallet signs
+  `DeployContract` + `new(watcher, intents)` from the account to itself. The code is `/guardian/standin_guardian.wasm`,
+  pinned to code hash `7PbHKsE6…9ZuE` (the guardian on `si-agent-5289.testnet`); the page re-hashes it before signing.
+  About 1.9 NEAR is locked for storage, and the page shows any shortfall.
+- **Guarded agent account** (any wallet; the route for Ethereum Wallets / MetaMask). A 0x account already runs NEAR's
+  Ethereum wallet contract, so it cannot host the guardian. Its owner calls `create_guardian` on the factory
+  `guard.si-project-5289.testnet` (deposit from about 2.14 NEAR). The factory creates
+  `<name>.guard.si-project-5289.testnet` with the guardian, owned by the caller and with no access keys at all;
+  `withdraw` returns its NEAR to the owner. Evidence: [`docs/guardian-factory.md`](docs/guardian-factory.md).
 
-Wallets offered on testnet (NEAR Connect's manifest): Meteor, Intear, Ledger, Nightly, NEAR CLI, Ethereum Wallets.
-HOT, MyNearWallet, NEAR Mobile and OKX do not declare testnet in that manifest, so NEAR Connect hides them here.
+From the wallet the owner then freezes, unfreezes and withdraws, each with an explorer link and a fresh `get_state`
+read. The CLI gives the agent its key without touching an owner key:
+- `standin adopt --wallet --account <id> [--owner <id>] --home DIR` prints an `op=adopt` link (deploy + `new` +
+  `add_agent_key`, or `add_agent_key` alone on an existing guardian), then plants a decoy and writes the watcher config;
+- `standin unfreeze --wallet` prints an `op=unfreeze` link.
 
-Tested: the full flow ran through NEAR Connect's own picker with a test-only debug-wallet executor that signs with a
-testnet key on 127.0.0.1 (five testnet transactions, every state above, 390/1024/1440 px), then the deployed page
-was checked headless without a wallet. No third-party wallet has been connected by us; that is a manual check.
-Evidence and tx links: [`docs/wallet-tests.md`](docs/wallet-tests.md).
+Each command activates the key only when the chain shows it with exactly the requested receiver, methods and allowance.
+The page validates every link value with zod and refuses an agent key whose receiver is the guardian account itself.
 
-Not built: NEAR Auth / FastAuth sign-in and HOT Kit for EVM/Solana wallets (reasons in the evidence file).
+Wallets offered on testnet: Meteor, Intear, Ledger, Nightly, NEAR CLI and Ethereum Wallets. Web wallets open as a tab in
+the same window (a one-line pnpm patch to near-connect drops the popup size from `window.open`). WalletConnect and Unity
+need a WalletConnect project id, which we do not have, so NEAR Connect hides them; HOT, MyNearWallet, NEAR Mobile and OKX
+do not declare testnet.
+
+Tested on testnet with a scripted wallet inside NEAR Connect's own picker. No third-party wallet has been connected by
+us; that is the owner's manual check. Covered: protect, freeze and unfreeze; an `op=adopt` link on a fresh account; the
+factory route from create to withdraw; `standin adopt --wallet`, then a decoy theft that the watcher froze three blocks
+later; refusals (wrong account, bad link, foreign contract, watcher mismatch, low balance, 0x account). The deployed page
+passed the `window.open` check. Every transaction: [`docs/wallet-tests.md`](docs/wallet-tests.md).
+Not completed: a scripted MetaMask connection (the Ethereum Wallets sign page runs on its own site, out of reach of an
+injected provider).
+
+No wallet: [`/lab`](https://stand-in-44e.pages.dev/lab), [`/verify`](https://stand-in-44e.pages.dev/verify) and the
+keystore CLI (`standin adopt`, Touch ID `standin unfreeze`) remain the no-wallet route; the film shows that route.
 
 ## Run it
 
@@ -111,12 +127,13 @@ Tested with Node 24 and pnpm 11; the contracts need Rust with `cargo-near`.
 ```sh
 git clone https://github.com/BonneyMantra/stand-in && cd stand-in && pnpm install
 pnpm standin dev up                         # check testnet accounts and contracts, decoy pool, watcher on 127.0.0.1:4317
-pnpm standin adopt --home ~                 # move the real key out, plant decoys
+pnpm standin adopt --wallet --account you.testnet --home ~   # owner key stays in your wallet: approve the printed link
+pnpm standin adopt --home ~                 # no wallet: move the real key out, plant decoys
 pnpm standin:claude --home .sandbox/me      # Claude Code plugin into an isolated config dir
 pnpm standin:codex                          # Codex with decoys and hooks
 pnpm standin pay <account> <amount>         # counterparty check: allow / warn / block
 cd apps/web && pnpm exec vite               # dashboard and landing page on 127.0.0.1:4173
-pnpm test                                   # TypeScript tests (114)
+pnpm test                                   # TypeScript tests (147)
 ```
 
 The dashboard reads the live watcher; with no watcher it falls back to a recorded testnet run
@@ -126,7 +143,8 @@ The dashboard reads the live watcher; with no watcher it falls back to a recorde
 
 | Path | What |
 |---|---|
-| `contracts/guardian` | Freeze, agent and intents key management, `sign_evm` (Rust, near-sdk) |
+| `contracts/guardian` | Freeze, agent and intents key management, `sign_evm`, external owner and `withdraw` (Rust, near-sdk) |
+| `contracts/factory` | Creates keyless guardian accounts owned by the caller (for owners whose account cannot host a contract) |
 | `contracts/intents-replica` | Source-faithful replica of the `intents.near` key registry for testnet |
 | `contracts/blocklist`, `outlayer/verdict` | TEE-attested blocklist |
 | `packages/core`, `packages/watcher`, `packages/cli` | RPC, decoy ledger, watcher and API, `standin` CLI |
