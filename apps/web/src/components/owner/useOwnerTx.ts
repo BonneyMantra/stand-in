@@ -63,6 +63,8 @@ export function useOwnerTx(wallet: RefObject<NearWalletBase | null>, accountId: 
       if (e instanceof BatchStopped) outs = e.done;
     }
     const msg = error ? readableError(error instanceof BatchStopped ? error.reason : error) : "";
+    // Per part, a rejection only speaks for that part: earlier ones in the same request may have landed.
+    const why = /rejected in the wallet/.test(msg) ? "Rejected in the wallet." : msg;
     const result: (TxOutcome | null)[] = [];
     for (let i = 0; i < labels.length; i++) {
       const o = outs[i];
@@ -73,7 +75,7 @@ export function useOwnerTx(wallet: RefObject<NearWalletBase | null>, accountId: 
       }
       const on = await landed[i]!().catch(() => false);
       if (on) patch(ids[i]!, { status: "ok", message: "Landed on testnet: confirmed by reading the chain (the wallet gave no result for it)." });
-      else patch(ids[i]!, { status: "failed", message: error ? `${msg} Not on chain.` : "The wallet did not send this one. Not on chain." });
+      else patch(ids[i]!, { status: "failed", message: error ? `${why} Not on chain.` : "The wallet did not send this one. Not on chain." });
       result.push(on ? { hash: "" } : null);
     }
     setBusy(false);

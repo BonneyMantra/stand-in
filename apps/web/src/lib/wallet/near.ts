@@ -87,9 +87,10 @@ export async function readGuardian(accountId: string): Promise<GuardianLookup> {
   }
 }
 
-export async function accountExists(accountId: string): Promise<boolean> {
+/** `optimistic` sees an account a moment after its creating transaction executes; `final` lags by a few blocks. */
+export async function accountExists(accountId: string, finality: "final" | "optimistic" = "final"): Promise<boolean> {
   try {
-    await rpc("query", { request_type: "view_account", finality: "final", account_id: accountId });
+    await rpc("query", { request_type: "view_account", finality, account_id: accountId });
     return true;
   } catch (e) {
     if (e instanceof Definitive) return false;

@@ -24,7 +24,11 @@ export function useHomeAccounts(req: AdoptRequest | null, signerId: string | nul
     setRead((r) => (r.status === "ready" ? r : { status: "loading" }));
     try {
       const [accounts, signer] = await Promise.all([Promise.all(wanted.map(readHomeAccount)), signerId ? viewAccount(signerId) : Promise.resolve(null)]);
-      if (n === seq.current) setRead({ status: "ready", accounts, signer });
+      // An account never stops existing: one already seen ready stays ready if a lagging node misses it.
+      if (n === seq.current) setRead((r) => {
+        const seen = new Set(r.status === "ready" ? r.accounts.filter((a) => a.status === "ready").map((a) => a.accountId) : []);
+        return { status: "ready", accounts: accounts.map((a) => (seen.has(a.accountId) ? { ...a, status: "ready" } : a)), signer };
+      });
     } catch (e) {
       if (n === seq.current) setRead({ status: "error", error: e instanceof Error ? e.message : String(e) });
     }

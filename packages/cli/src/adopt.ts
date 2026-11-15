@@ -83,7 +83,15 @@ export async function adopt(o: AdoptOpts): Promise<void> {
   let scopedPk = "";
   if (ownerSecret) {
     const owner = makeAccount(cfg, agent, ownerSecret);
-    if (selfServe) cfg = await setUpHomeAccounts(cfg, agent, owner, ledgerHome, rows);
+    if (selfServe) {
+      try {
+        cfg = await setUpHomeAccounts(cfg, agent, owner, ledgerHome, rows);
+      } catch (e) {
+        const why = e instanceof HomeRefusal ? e.message.replace(/\s*Nothing was sent\.$/, "").replace(/\.$/, "") : "";
+        if (e instanceof HomeRefusal) throw new HomeRefusal(`${why}. Nothing was sent and no file under ${home} was changed (a copy of the real key is at ${kept.get(ownerSecret)}).`);
+        throw e;
+      }
+    }
     const g = await ensureGuardian(cfg, agent, owner);
     if (g.deployed) {
       rows.push([short(publicKeyOf(ownerSecret)), agent, "(guardian)", `guardian deployed, watcher ${requireAccount(cfg, "watcher")}`, `deploy tx ${g.tx_hash}`]);

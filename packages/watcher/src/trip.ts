@@ -237,6 +237,16 @@ export class TripHandler {
     const w = makeAccount(this.cfg, requireAccount(this.cfg, "watcher"), loadDevKey(this.cfg, "watcher").secret_key);
     const deposit = BigInt(process.env.STANDIN_REPORT_DEPOSIT_YOCTO ?? "50000000000000000000000"); // registry min 0.01 NEAR; unused part refunded
     const args = { tx_hash: tx.hash, decoy_account_id: this.decoy, sender_id: this.decoy, admin_public_key: this.adminPk };
+    // A report prepays 300 TGas plus the deposit (about 0.36 NEAR, mostly refunded). A home's own watcher starts with 0.2
+    // NEAR for freezes, so it says once why it skips instead of failing the same transaction twice.
+    const upfront = deposit + 310_000_000_000_000_000_000_000n;
+    const acct: any = await makeProvider(this.cfg).viewAccount({ accountId: requireAccount(this.cfg, "watcher") } as any).catch(() => null);
+    const spendable = acct ? BigInt(acct.amount) - BigInt(acct.storage_usage) * 10n ** 19n : upfront;
+    if (spendable < upfront) {
+      log.warn(`blocklist report skipped: ${requireAccount(this.cfg, "watcher")} can spend ${(Number(spendable / 10n ** 21n) / 1000).toFixed(3)} NEAR and a report needs about ${(Number(upfront / 10n ** 21n) / 1000).toFixed(2)} NEAR up front (unused gas and deposit come back). Send it NEAR to report thieves to ${this.registry}. The freeze does not depend on it.`);
+      appendEvent("tool_call", { tool_name: "standin watcher", outcome: "report_skipped_low_balance", trip_tx_hash: tx.hash }, this.home);
+      return;
+    }
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
         const res = await callMethod(w, this.registry, "report", args, { deposit, gas: 300_000_000_000_000n, waitUntil: "INCLUDED" });

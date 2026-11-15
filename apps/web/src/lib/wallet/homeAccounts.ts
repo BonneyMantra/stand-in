@@ -33,7 +33,8 @@ export function homeAccountsOf(req: AdoptRequest): HomeAccountReq[] {
 }
 
 export async function readHomeAccount(a: HomeAccountReq): Promise<HomeAccountState> {
-  if (!(await accountExists(a.accountId))) return { ...a, status: "missing" };
+  // Optimistic: read right after the owner's transaction, a final read can still miss the new account.
+  if (!(await accountExists(a.accountId, "optimistic"))) return { ...a, status: "missing" };
   const k = await viewAccessKey(a.accountId, a.publicKey);
   return { ...a, status: k?.permission === "FullAccess" ? "ready" : "conflict" };
 }

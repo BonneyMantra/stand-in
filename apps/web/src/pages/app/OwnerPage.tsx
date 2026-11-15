@@ -88,6 +88,7 @@ export default function OwnerPage() {
     }
     const outs = await runBatch(labels, (wallet, id) => sendTransactions(wallet, id, txs), landed);
     setHomeKey((k) => k + 1);
+    window.setTimeout(() => setHomeKey((k) => k + 1), 4000); // a second read once every node has the new accounts
     if (!guardianDone && outs[0]) setApproved({ hash: outs[0].hash, key: await viewAccessKey(req.account, req.agent_key).catch(() => null) });
   };
   const create = async (name: string, deposit: bigint) => {
