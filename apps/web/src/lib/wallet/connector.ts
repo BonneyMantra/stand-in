@@ -137,6 +137,11 @@ export function readableError(e: unknown): string {
   // Receipt ActionErrors arrive as JSON: name the failure instead of showing it raw.
   const exists = text.match(/AccountAlreadyExists[^}]*?account_id\W+([\w.-]+)/);
   if (exists) return `${exists[1]} already exists on testnet: pick another name. A failed create refunds the deposit; only gas was spent.`;
+  // Refused by the network before it ran: for this console's requests, nearly always a deposit plus gas above what the
+  // account can spend (its storage stays locked).
+  if (/INVALID_TRANSACTION|InvalidTransaction/.test(text)) {
+    return "The network refused the transaction before it ran, most often because the account cannot pay its deposit and gas. It did not land.";
+  }
   const action = text.match(/ActionError\W+index\W+\d+\W+kind\W+(\w+)/);
   if (action) return `The transaction failed on chain (${action[1]}). Nothing else changed.`;
   // A closed window is not proof that nothing was sent: the wallet may have broadcast first (run() then reads the chain).

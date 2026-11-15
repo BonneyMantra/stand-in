@@ -4,11 +4,11 @@ import { Button } from "@/components/ui/button";
 import { ExtLink, Panel, Shimmer, Tag } from "@/components/app/common";
 import { cn } from "@/lib/utils";
 import { accountExists, explorerAccount } from "@/lib/wallet/near";
-import { nearShort } from "@/lib/wallet/guardianCode";
-import { ownsWatcher, watcherFor } from "@/lib/wallet/homeAccounts";
+import { FAUCET_URL, YOCTO_PER_BYTE, nearShort, viewAccount } from "@/lib/wallet/guardianCode";
+import { GAS_MARGIN, ownsWatcher, watcherFor } from "@/lib/wallet/homeAccounts";
 import { FACTORY, GuardianName, guardiansOf, requiredDeposit } from "@/lib/wallet/factory";
 
-type Load = { status: "loading" } | { status: "error"; error: string } | { status: "ready"; deposit: bigint; guardians: string[] };
+type Load = { status: "loading" } | { status: "error"; error: string } | { status: "ready"; deposit: bigint; guardians: string[]; spendable: bigint };
 
 /**
  * "Create a guarded agent account": the factory makes <name>.guard.si-project-5289.testnet with a guardian whose owner is
@@ -23,8 +23,9 @@ export function FactoryPanel({ ownerId, eth, busy, selected, reloadKey, onCreate
   const reload = useCallback(async () => {
     setLoad({ status: "loading" });
     try {
-      const [deposit, guardians] = await Promise.all([requiredDeposit(), guardiansOf(ownerId)]);
-      setLoad({ status: "ready", deposit, guardians });
+      const [deposit, guardians, owner] = await Promise.all([requiredDeposit(), guardiansOf(ownerId), viewAccount(ownerId)]);
+      // What the owner can spend: storage (a deployed guardian, for one) stays locked and cannot pay the deposit.
+      setLoad({ status: "ready", deposit, guardians, spendable: owner.amount - owner.storageUsage * YOCTO_PER_BYTE });
       // A name that is now one of this owner's guardians was just created: clear it so it is not offered again.
       setName((n) => (n && guardians.includes(`${n}.${FACTORY}`) ? "" : n));
     } catch (e) {
@@ -35,6 +36,8 @@ export function FactoryPanel({ ownerId, eth, busy, selected, reloadKey, onCreate
 
   const parsed = GuardianName.safeParse(name);
   const id = `${name || "name"}.${FACTORY}`;
+  const need = load.status === "ready" ? load.deposit + GAS_MARGIN : 0n;
+  const short = load.status === "ready" && load.spendable < need ? need - load.spendable : 0n;
   // Ask the chain whether the account exists before offering to sign: a taken name only costs gas and a refund.
   const [taken, setTaken] = useState<{ id: string; exists: boolean | null } | null>(null);
   useEffect(() => {
@@ -71,11 +74,17 @@ export function FactoryPanel({ ownerId, eth, busy, selected, reloadKey, onCreate
         <div className="rounded-md border border-line bg-ink-900 px-2.5 py-2 text-[11px] leading-relaxed text-fg-muted" data-testid="factory-deposit">
           {load.status === "ready" ? (
             <>Deposit <span className="font-mono text-fg">{nearShort(load.deposit, 3)} NEAR</span> (the factory's required_deposit). It moves into the new
-              account: most is locked for the guardian's code and state, about 0.3 NEAR stays withdrawable by you.</>
+              account: most is locked for the guardian's code and state, about 0.3 NEAR stays withdrawable by you.
+              {short > 0n ? (
+                <span className="mt-1.5 block text-warn" data-testid="factory-shortfall">
+                  {ownerId} can spend {nearShort(load.spendable, 3)} NEAR, so it is short by {nearShort(short, 3)} NEAR with gas; nothing is offered
+                  for signing. Add testnet NEAR from the <ExtLink href={FAUCET_URL}>testnet faucet</ExtLink>, then read again.
+                </span>
+              ) : null}</>
           ) : load.status === "error" ? <span className="text-trip">Could not read the factory: {load.error}</span> : <Shimmer className="h-4 w-48" />}
         </div>
         <Button size="sm" variant="invert" className="w-full sm:w-auto" data-testid="factory-create"
-          disabled={busy || !parsed.success || isTaken || checking || load.status !== "ready"} onClick={() => load.status === "ready" && parsed.success && onCreate(parsed.data, load.deposit)}>
+          disabled={busy || !parsed.success || isTaken || checking || load.status !== "ready" || short > 0n} onClick={() => load.status === "ready" && parsed.success && onCreate(parsed.data, load.deposit)}>
           <Boxes aria-hidden />{busy ? "Waiting for wallet…" : "Review and sign in wallet"}
         </Button>
       </div>

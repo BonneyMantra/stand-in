@@ -38,7 +38,7 @@ export function HomeAccountsFacts({ signerId, read, deployRequired, txCount, bat
     <div data-testid="home-accounts">
       <dl className="divide-y divide-line px-3.5 py-1">
         {read.accounts.map((a) => <AccountRow key={a.accountId} a={a} />)}
-        <Row k="from you">
+        {(toCreate > 0 || deployRequired !== null) && <Row k="from you">
           <div className="space-y-1 font-sans [word-break:normal] [overflow-wrap:anywhere]">
             <p className="text-fg">
               {toCreate ? <><span className="font-mono">{nearShort(HOME_ACCOUNT_FUND * BigInt(toCreate), 1)} NEAR</span> into the new account{toCreate > 1 ? "s" : ""}</> : "No new accounts"}
@@ -57,7 +57,7 @@ export function HomeAccountsFacts({ signerId, read, deployRequired, txCount, bat
               </div>
             )}
           </div>
-        </Row>
+        </Row>}
       </dl>
       {txCount > 1 && (
         <p className="border-t border-line px-3.5 py-2.5 text-[11px] leading-relaxed text-fg-muted" data-testid="batch-note">

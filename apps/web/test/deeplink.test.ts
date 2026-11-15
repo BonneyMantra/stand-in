@@ -69,6 +69,8 @@ describe("wallet outcomes and errors", () => {
     expect(msg).toBe("agent-2321.guard.si-project-5289.testnet already exists on testnet: pick another name. A failed create refunds the deposit; only gas was spent.");
     expect(msg).not.toContain("{");
     expect(readableError('{"Failure":{"ActionError":{"index":0,"kind":{"DeleteKeyDoesNotExist":{}}}}}')).toBe("The transaction failed on chain (DeleteKeyDoesNotExist). Nothing else changed.");
+    // create_guardian from an owner whose spendable balance was below the deposit (live, 15 Nov): the RPC's raw refusal
+    expect(readableError('{"info":{},"name":"INVALID_TRANSACTION"}')).toMatch(/cannot pay its deposit and gas\. It did not land\./);
   });
 });
 
