@@ -50,7 +50,10 @@ export default function OwnerPage() {
   const { forget } = a;
   useEffect(() => {
     if (seenAccount.current === w.accountId) return;
+    const prev = seenAccount.current;
     seenAccount.current = w.accountId;
+    // The session restoring on load (none -> account) keeps ?guardian=; a real switch or a disconnect starts clean.
+    if (prev === null) return;
     setPicked(null); forget(); reset();
   }, [w.accountId, reset, forget]);
 

@@ -39,10 +39,16 @@ enclave's attested signing address. No server of ours is involved.
 ## With your own testnet wallet (the owner's main path)
 Open **https://stand-in-44e.pages.dev/app/owner** and press Connect wallet. NEAR Connect lists the testnet wallets
 (Meteor, Intear, Ledger, Nightly, NEAR CLI, Ethereum Wallets); there is no Google or email sign-in.
-- A fresh named testnet account with about 2 NEAR: **Protect this account** deploys the guardian from your wallet
-  (code hash shown and checked), then Freeze and Unfreeze are one wallet transaction each.
-- A MetaMask (0x) account, or any account you would rather not deploy on: **Create a guarded agent account** asks the
-  factory for a keyless guardian account you own; Freeze, Unfreeze and Withdraw work from your wallet.
+Or start from the landing page's **Protect your account**.
+- A fresh named testnet account with about 2.7 NEAR: **Protect this account** deploys the guardian from your wallet
+  (code hash shown and checked) and, in the same approval, creates your bait and watcher with keys kept in your browser
+  (2.622 NEAR quoted line by line before signing). Freeze and Unfreeze are then one wallet transaction each.
+- A MetaMask (0x) account, Meteor (it refuses contract deployment), or any account you would rather not deploy on:
+  **Create a guarded agent account** asks the factory for a keyless guardian account you own (plus the bait and watcher
+  for a named account, about 2.94 NEAR); Freeze, Unfreeze and Withdraw work from your wallet.
+- **My account** (`/app`) then shows your guardians, keys, decoys, trips and freezes from chain, with a next step. Add a
+  decoy there, export the keys to a CLI home (`standin dev up --home DIR`), add an intents key or try a Chain Signatures
+  request in the console (refused while frozen). The recorded run is the Example (`/app/example`).
 - `standin adopt --wallet --account <id> --home DIR` prints a link: one wallet request gives the agent its scoped key and
   creates your own bait (`deployer.<id>`, 0.2 NEAR) and watcher (`watch.<id>`, 0.45 NEAR: enough to prepay a blocklist
   report), with keys the CLI generated and kept. The CLI and the console show the same quote before signing (about 2.62

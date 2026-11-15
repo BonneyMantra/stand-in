@@ -71,5 +71,16 @@ outline in `fg-muted`. Motion respects `prefers-reduced-motion` through `motion/
 | Connect, disconnect, sign buttons | shadcn `button` | `invert`, `line`, `quiet` variants |
 | Freeze reason field | custom textarea in theme tokens | Byte counter against the guardian's 500-byte limit |
 
-`zod` 4.6.7 validates the approval link (`src/lib/wallet/deeplink.ts`). The page is lazy-loaded, so the wallet code
-is not in the other pages' bundle.
+`zod` 4.6.7 validates the approval link (`src/lib/wallet/deeplink.ts`). The page is lazy-loaded; NEAR Connect itself
+loads with the dashboard (My account needs the wallet session), not with the landing page's own code.
+
+## My account (`/app`) and the Example (`/app/example`)
+
+| UI | Source | Notes |
+|---|---|---|
+| Next step card, guardian rows, decoy and freeze lists, transactions | custom, in the dashboard's `Panel` (ReUI `frame`), `Tag`, `EmptyState`, `CopyText` | Same tokens as the recorded pages; `components/account/` |
+| KPI strip | existing `MetricStrip` (after ReUI `card-38`) | five cells for the owner's own counts |
+| Bait and watcher panel, quote lines, export and import | custom in `Panel`; shadcn `button` (`line`, `invert`) | `components/owner/HomePanel.tsx`, `QuoteBlock.tsx`, `HomeTransfer.tsx`; the import is a native file and folder picker |
+| Intents key and Chain Signatures panels | custom in `Panel` | `components/owner/GuardianTools.tsx`; results read back by transaction hash |
+| Example banner | custom, decoy tone | Every `/app/example` page says it is a recorded run on the project's accounts |
+| Sidebar groups (Your account, Example, Project) | shadcn `sidebar` | the footer card shows the connected owner's state, or the recorded agent on Example pages |

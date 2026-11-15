@@ -354,3 +354,49 @@ link and the console showed the same lines before signing: 0.002 already locked,
 | theft to a fresh thief `thief-r.selfserve-w1115.testnet` (block 277733601) | `6bFPNj3R7EXgcHp5srtgQFwosaMVg347Cqebfdof2AEZ` | signer `deployer.fresh-r…`; `check(thief-r)` was `allow` before |
 | freeze by the home's own watcher (block 277733604, **3 blocks**) | `4VSbiUsP1ucGmhMAExkndVQ5iNpj7ZeZHwmujRWow14k` | signer `watch.fresh-r…`; `frozen: true` |
 | blocklist report by the same watcher | `GW53k3pV6LckhN8TCY84Jy9aiPrNA2wcADJWyC1ZFUKM` | `report` SuccessValue; net cost 0.0028 NEAR; `check(thief-r)` = `block`, attested by OutLayer project `si-ol-25769.testnet/standin-verdict`; the watcher keeps 0.447 NEAR |
+
+## 2026-11-15, 11:15–11:45 IST: the bait and watcher held in the browser, My account, intents and Chain Signatures
+
+Change: Protect and Create create `deployer.<owner>` and `watch.<owner>` in the same wallet request, with keys generated
+and kept in the browser (`homeStore.ts`); the watcher's key is a function-call key for `freeze` on one guardian. `/app` is
+the owner's own state from chain; the recorded run is `/app/example`. No contract changed. Two fresh accounts, each funded
+from one of this file's earlier test accounts (the faucet is rate-limited; the product never funds anyone):
+`judge-p1.stranger-qa-1115b.testnet` (3.4 NEAR, tx `3ZLgN8jvyH1pG7tH838dTHRW5YNdEyy49epZfNYJNer6`) and
+`judge-c1.selfserve-k1115.testnet` (3.5 NEAR, tx `E7oxWLapKWtcZ5gsmUovWL1C4T38U2TytH2EUT4MgQ8V`). Scripted wallet in
+NEAR Connect's picker; every row read back with `tx`, `get_state`, `view_access_key_list` or `has_public_key` from drpc.
+
+### Protect, local production build (commit `e953a5b` before deploy), `judge-p1`
+| Step | Tx | Readback |
+|---|---|---|
+| one request, 3 transactions: DeployContract + `new`; create bait; create watcher (quote shown: 2.622 NEAR) | `7VgVhGMXiVv3mVCr1ew1vMLHufecYraFcLXGSUV6ZfPv`, `wduR9kZNqHnCi2tMEogjipcZx6HAyBq5ucuYZtD1Yi3`, `8SsHLj55YAgVL1PYQJ36nuTPu8mnjMhLUpsJmoNhearL` | code hash `7PbHKs…9ZuE`, watcher `watch.judge-p1…`; bait 0.2 NEAR, one full-access key; watcher 0.45 NEAR, one key `FunctionCall {receiver: judge-p1…, methods: [freeze], allowance: null}` |
+| add a decoy (signed in the browser by the bait key, no wallet) | `Gj9u6ZWhyacCVj9HNtsNwJBT5TqHSRyJgQYi31RL1i9o` | a second full-access key on the bait; the bait key's nonce moved by one |
+| add an intents key (a fresh test key) | `95C7JZ1kEpa7RZFVzqqmfed6EaTFxmrdmpjgPiZuMHxB` | `has_public_key` = true |
+| Chain Signatures while active | `6BcgFfqYGrsDDbdBMdbtyzNPVASgLHuPhq8kw8PiZNqN` | SuccessValue: MPC signature (big_r, s, recovery_id 0) |
+| freeze (owner) | `3a2X9VeoH6SypZc5AnAou4QbGfShCE9CvQARJk5YSyLj` | `frozen: true`; 1 intents key removed; `has_public_key` = false |
+| Chain Signatures while frozen | `4YZhBoFktMKjDEq7X3MiEKYYm9XPzQHHFw7WDHiHXh2p` | Failure: `frozen: sign_evm refused until unfreeze` |
+| unfreeze | `5B6ypVx5y4WSySv8HdVwC9g1zXborued2xoURxNE4iZJ` | `frozen: false` |
+| Export to CLI home → `standin dev up --home DIR --pool 1` (empty `STANDIN_SECRETS`) | pool decoy `JCp2WXtQ2fSQooccYxcMt2gLuV7X4bFPonoXFu3wZpDw` | dev up accepted the browser's config and keys; the watcher started with the freeze-only key |
+| theft with the browser's decoy (`standin attack drain`, block 277764369) | `AreyJ5Q7WFuh8Pifg8NUqBPtD9Hfp8uaQZikYyTadR4y` | 0.099 NEAR to `si-attacker-5289.testnet` |
+| freeze by the exported watcher (block 277764372, **3 blocks**) | `FdCfw6aC7khVMCE5aoXCkMzBzzY57KnCxJMXZLqRqxAD` | signer `watch.judge-p1…` with the function-call key; `frozen: true`, freeze_log names the decoy and the theft; the watcher logged one line: report skipped (a function-call key cannot attach the deposit) |
+
+My account then showed the guardian frozen, both freezes (trip by your watcher, manual by you) with the freeze tx matched
+from the indexer, the used decoy tagged with its theft, and every transaction above with an explorer link.
+
+### Create a guarded agent account, the live root (deploy `fb501b61`), `judge-c1`
+| Step | Tx | Readback |
+|---|---|---|
+| one request, 3 transactions: `create_guardian judgec1-agent`; create bait; create watcher (quote: 2.941 NEAR) | `DcHUWcHUFAWeLwuVnjG3k1sFAnkfeA1JxkYEKzWA2uJ`, `FZu4nQfh9VSHm6qBbWhsYjp2RHBCrNdLKDiCu4UKaCn6`, `3wTkvpxavxwt1jCBsiLiKdkmhRmY2cTM7M2n7wF69LsL` | `judgec1-agent.guard.si-project-5289.testnet`: owner `judge-c1…`, watcher `watch.judge-c1…`, no access keys; watcher key `FunctionCall {receiver: judgec1-agent.guard…, methods: [freeze]}` |
+| add a decoy | `EXXzDdvLYg15Z5itejvzNCupAaTsawQsZiGMPtFGJ7wS` | second key on the bait |
+| Chain Signatures while active (owner calls through its own account) | `GtJ48dmJf9211gZHAhtzqZxPMc5tKoExVNuK9bjXtCKh` | MPC signature |
+| freeze, then Chain Signatures while frozen | `SUdemjjj6Mi9CQ3ArMvzZSxPRB1fUkHLoZkhz8ANDjb`, `2i1nchLTvx8oVvnZT25ARthmF5rr8qPEiWQ4d3197XLi` | refused: `frozen: sign_evm refused until unfreeze` |
+| unfreeze, add an intents key | `HRvz4P6vnRBJYVG7DK2WWBoZBnFs5Vr2ZL1DPsqnp2Gn`, `9mMS1TSQakcraJd81xYx2U1vNTiueqDgaSFAwp3pB58x` | `has_public_key` = true |
+
+States on the live root: no wallet (connect invitation, Example offered), the picker, connected and empty (next step:
+Protect), protected without decoys (next step: add a decoy), without an agent key (next step: the CLI command), frozen,
+every RPC host aborted ("Every testnet RPC endpoint failed" + Try again, which recovers), the Example pages with their
+banner, old links (`/app/trips/<hash>`, `/app/sessions`, `/app/blocklist`) redirected to the Example. 390, 768 and 1440
+px: no horizontal scroll (scrollWidth = viewport). Browser console: no messages.
+
+Headless Chrome reached the local test signer only with `--disable-features=Translate,LocalNetworkAccessChecks,
+BlockInsecurePrivateNetworkRequests,PrivateNetworkAccessSendPreflights,PrivateNetworkAccessRespectPreflightResults`: the
+browser tool adds its own `--disable-features=Translate`, which replaced a lone `LocalNetworkAccessChecks` flag.

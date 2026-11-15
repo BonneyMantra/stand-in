@@ -20,8 +20,12 @@ incident report.
 
 Built for NEAR HACKATHON (November 2026), Security and Agents tracks. MIT licensed.
 
-**Try it without installing anything:** leak a decoy yourself at https://stand-in-44e.pages.dev/lab, check every claim
-from chain at https://stand-in-44e.pages.dev/verify, and see the guide for judges in [JUDGES.md](JUDGES.md).
+**Try it on your own testnet account:** open https://stand-in-44e.pages.dev, press **Protect your account** and connect a
+testnet wallet. One approval deploys the guardian (or creates a guarded agent account) and creates your own bait and
+watcher, with the NEAR it spends shown line by line first; **My account** (`/app`) then shows your guardians, keys, decoys,
+trips and freezes, read from chain. The recorded run is the Example (`/app/example`). Without a wallet: leak a decoy at
+https://stand-in-44e.pages.dev/lab and check every claim from chain at https://stand-in-44e.pages.dev/verify. The guide
+for judges is [JUDGES.md](JUDGES.md).
 
 ## How it works
 
@@ -104,6 +108,21 @@ Two ways to own a guardian, each one wallet transaction:
 A guardian made here is watched by `watch.<owner>`, the owner's own watcher account (a 0x owner cannot create
 sub-accounts, so its guardian keeps the project's watcher and is frozen from the console).
 
+**Your bait and watcher, held in the browser.** Protect and Create put the owner's home in the same wallet approval:
+`deployer.<owner>` (0.2 NEAR, a full-access key, so it can add decoy keys to itself) and `watch.<owner>` (0.45 NEAR, a
+function-call key that may only call `freeze` on that one guardian; the guardian, factory and pinned code are unchanged).
+Both keys are generated in the browser and kept in its local storage (`apps/web/src/lib/wallet/homeStore.ts`); the page
+says they are low-value test keys and never to use them for real funds. **My account** (`/app`) reads the owner's own
+state from testnet (guardians from `get_state` and the factory's `guardians_of`, agent and intents keys, decoys from the
+bait's `view_access_key_list`, trips and freezes from `freeze_log`, each transaction from the nearblocks indexer with an
+explorer link) and says what to do next. From there: add a decoy (signed by the bait's own key, no wallet), **Export to
+CLI home** (a tar of `.standin/config.json` and both keys; `standin dev up --home DIR` runs the same bait and watcher, and
+`standin adopt --wallet` accepts the freeze-only watcher key), and import a CLI home into the browser. A freeze-only
+watcher cannot attach the blocklist report's deposit, so the CLI watcher says in one line that it skipped the report. The
+console also adds an intents key (`add_intents_key`) and tries a Chain Signatures request (`sign_evm`: refused while
+frozen, signed by the MPC network when active), each read back from chain. Incident reports for your own trips stay
+CLI only (your own NEAR AI key); the site never calls NEAR AI. Evidence: [`docs/wallet-tests.md`](docs/wallet-tests.md).
+
 From the wallet the owner then freezes, unfreezes and withdraws, each with an explorer link and a fresh `get_state`
 read. The CLI gives the agent its key without touching an owner key:
 - `standin adopt --wallet --account <id> [--owner <id>] --home DIR` prints an `op=adopt` link. One wallet request
@@ -177,7 +196,7 @@ pnpm standin:claude --home .sandbox/me      # Claude Code plugin into an isolate
 pnpm standin:codex                          # Codex with decoys and hooks
 pnpm standin pay <contract> <method> --args '{"note":"x"}'   # counterparty check first: allow / warn / block
 cd apps/web && pnpm exec vite               # dashboard and landing page on 127.0.0.1:4173
-pnpm test                                   # TypeScript tests (182)
+pnpm test                                   # TypeScript tests (254)
 ```
 
 `adopt --account` needs the account's full-access key in `HOME/.near-credentials/testnet/`, a `.env` or shell history,
@@ -188,8 +207,9 @@ Without `--home`, `dev up` and the other commands use the project's own film acc
 home's ledger, scoped key and config. The agent holds a function-call key, so `pay` calls a method on the project
 contract; it cannot transfer NEAR.
 
-The dashboard reads the live watcher; with no watcher it falls back to a recorded testnet run
-(`apps/web/public/demo-state.json`, built from real ledgers by `apps/web/src/data/build-demo-state.mjs`).
+My account (`/app`) reads the connected wallet's own state from testnet. The Example (`/app/example`) reads the live
+watcher; with no watcher it shows a recorded testnet run (`apps/web/public/demo-state.json`, built from real ledgers by
+`apps/web/src/data/build-demo-state.mjs`).
 
 ## Repository
 
