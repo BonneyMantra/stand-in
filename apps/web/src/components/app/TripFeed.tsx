@@ -22,14 +22,14 @@ export function buildFeed(s: StandinState, limit = 9): Item[] {
     const at = tripTime(s, t);
     const base = at ? new Date(at).getTime() : t.block_height;
     items.push({
-      key: `trip-${t.tx_hash}`, icon: Zap, tone: "trip", href: `/app/trips/${t.tx_hash}`, t: base + 0.5,
+      key: `trip-${t.tx_hash}`, icon: Zap, tone: "trip", href: `/app/example/trips/${t.tx_hash}`, t: base + 0.5,
       title: `Decoy used by ${t.attacker_account}`,
       detail: `${t.attributed_to.tool_name || "no tool call"} · ${sessionLabel(s, t.attributed_to.session_id)}`,
       when: at ? fmtTime(at) : `#${t.block_height}`,
     });
     if (t.freeze.tx_hash) {
       items.push({
-        key: `freeze-${t.tx_hash}`, icon: Snowflake, tone: alreadyFrozen(t) ? "muted" : "trip", href: `/app/trips/${t.tx_hash}`, t: base + 1,
+        key: `freeze-${t.tx_hash}`, icon: Snowflake, tone: alreadyFrozen(t) ? "muted" : "trip", href: `/app/example/trips/${t.tx_hash}`, t: base + 1,
         title: alreadyFrozen(t) ? "Agent already frozen" : `Freeze landed in ${t.freeze.blocks_after_trip} blocks`,
         detail: `${t.freeze.deleted_keys.length} agent keys deleted · ${t.freeze.intents_keys_removed.length} intents key removed · ${shortHash(t.freeze.tx_hash)}`,
         when: s.recorded?.freeze_times[t.tx_hash] ? fmtTime(s.recorded.freeze_times[t.tx_hash]) : `#${t.freeze.block_height}`,
@@ -59,7 +59,7 @@ export function TripFeed({ state, live }: { state: StandinState; live: boolean }
     <Panel
       title="Trip feed" icon={Radio} id="feed-title" bodyClassName="p-0 min-h-0 overflow-y-auto" className="xl:absolute xl:inset-0"
       meta={live ? "streaming /api/events" : "recorded"}
-      actions={<Link to="/app/trips" className="text-[11px] text-fg-muted hover:text-fg">All trips</Link>}
+      actions={<Link to="/app/example/trips" className="text-[11px] text-fg-muted hover:text-fg">All trips</Link>}
     >
       {!items.length ? (
         <EmptyState icon={Radio} title="Quiet so far">No exposures or trips yet. Decoys seen in a tool call, decoys used on chain and freezes appear here the moment the watcher sees them.</EmptyState>

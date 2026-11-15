@@ -59,7 +59,7 @@ export default function DecoysPage() {
         rows={rows}
         columns={cols}
         rowKey={(k) => k.public_key}
-        rowHref={(k) => { const t = data.trips.find((x) => x.decoy_public_key === k.public_key); return t ? `/app/trips/${t.tx_hash}` : undefined; }}
+        rowHref={(k) => { const t = data.trips.find((x) => x.decoy_public_key === k.public_key); return t ? `/app/example/trips/${t.tx_hash}` : undefined; }}
         rowTone={(k) => (st(k) === "tripped" ? "trip" : undefined)}
         initialSort={{ id: "status", dir: "desc" }}
         empty={<EmptyState icon={KeyRound} title={filter === "all" ? "No decoys planted" : `No ${filter} decoys`}>{filter === "all" ? <>Run <code className="font-mono text-fg">standin adopt</code> or start a guarded agent session.</> : "Try another filter."}</EmptyState>}

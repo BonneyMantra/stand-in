@@ -1,6 +1,7 @@
 import { motion, useReducedMotion } from "motion/react";
-import { DASHBOARD_PATH, SETUP_PROMPT } from "./content";
-import { AccentLink, Bleed, lineBtn } from "./cta";
+import { Link } from "react-router";
+import { EXAMPLE_PATH, OWNER_PATH, SETUP_PROMPT } from "./content";
+import { AccentLink, Bleed, lineBtn, quietBtn } from "./cta";
 import { CopyIcon, EASE_OUT, useCopy } from "./primitives";
 import { TripMap } from "./trip-map";
 
@@ -73,22 +74,23 @@ export function Hero() {
           className="mt-6 max-w-[576px] text-[15px] leading-[22.5px] text-pretty text-white/[0.63]"
         >
           Stand-in gives AI coding agents decoy NEAR keys. When one leaks and gets used, the real account freezes
-          on-chain within about three blocks (measured on testnet).
+          on-chain within about three blocks (measured on testnet). Connect your testnet wallet: one approval protects
+          your own account.
         </motion.p>
 
         <motion.div {...rise(0.14, 8)} className="mt-8 flex flex-wrap items-center gap-3">
-          <AccentLink to={DASHBOARD_PATH}>Open the dashboard</AccentLink>
-          <button type="button" onClick={() => copy(SETUP_PROMPT)} className={lineBtn}>
+          <AccentLink to={OWNER_PATH}>Protect your account</AccentLink>
+          <Link to={EXAMPLE_PATH} className={lineBtn}>See an example</Link>
+          <button type="button" onClick={() => copy(SETUP_PROMPT)} className={quietBtn}>
             <CopyIcon copied={copied} />
             <span className="relative">
-              <span className={copied ? "invisible" : ""}>Copy setup prompt</span>
+              <span className={copied ? "invisible" : ""}>Copy the agent setup prompt</span>
               <span className={`absolute inset-0 ${copied ? "" : "invisible"}`}>Prompt copied</span>
             </span>
           </button>
           <span className="sr-only" aria-live="polite">
             {copied ? "Setup prompt copied. Paste it into Claude Code or Codex." : ""}
           </span>
-          <span className="hidden text-[13px] text-white/40 lg:inline">Paste it into Claude Code or Codex.</span>
         </motion.div>
       </div>
 

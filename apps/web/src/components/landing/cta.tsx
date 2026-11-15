@@ -22,6 +22,13 @@ export const lineBtn = cn(
   RING,
 );
 
+/** Tertiary: no box until hover, for an action beside the two main ones. */
+export const quietBtn = cn(
+  "inline-flex h-9 items-center gap-1.5 rounded-[6px] px-2 text-[13px] font-medium text-fg-muted",
+  "transition-[color,background-color] duration-150 ease-[var(--ease-out-strong)] hover:bg-ink-850 hover:text-fg",
+  RING,
+);
+
 function Arrow() {
   return (
     <ArrowRight

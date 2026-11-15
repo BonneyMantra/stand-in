@@ -86,7 +86,7 @@ export function Nav() {
             <GithubMark className="size-4" />
             <span className="hidden sm:inline">GitHub</span>
           </a>
-          <AccentLink to={DASHBOARD_PATH}>Dashboard</AccentLink>
+          <AccentLink to={DASHBOARD_PATH}>My account</AccentLink>
         </div>
       </nav>
     </header>

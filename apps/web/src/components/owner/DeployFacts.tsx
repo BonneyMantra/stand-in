@@ -9,8 +9,10 @@ import { Row } from "./ApprovePanel";
 import type { DeployPlan } from "./useDeployPlan";
 
 /** What a deploy from the wallet puts on the account, in plain words: code, hash, owner, watcher, storage and balance. */
-export function DeployFacts({ accountId, watcher, intents, plan, onReload, watcherInRequest = false }: {
+export function DeployFacts({ accountId, watcher, intents, plan, onReload, watcherInRequest = false, browserKeys = false }: {
   accountId: string; watcher: string; intents: string; plan: DeployPlan; onReload: () => void; watcherInRequest?: boolean;
+  /** the request's home keys are generated in this browser (the quote for the whole request is shown separately) */
+  browserKeys?: boolean;
 }) {
   return (
     <div data-testid="deploy-facts">
@@ -32,12 +34,13 @@ export function DeployFacts({ accountId, watcher, intents, plan, onReload, watch
           <span data-testid="deploy-watcher">{watcher}</span>
           <p className="mt-1 font-sans text-[11px] leading-relaxed text-fg-muted [word-break:normal] [overflow-wrap:anywhere]">
             Can freeze this account when a decoy key is used. It can never unfreeze, add keys or move funds.
-            {watcherInRequest ? <> It is your own account, created in this same request with a key your CLI generated; <code className="font-mono">standin dev up</code> runs it.</>
+            {watcherInRequest && browserKeys ? <> It is your own account, created in this same request with a freeze-only key generated in this browser.</>
+              : watcherInRequest ? <> It is your own account, created in this same request with a key your CLI generated; <code className="font-mono">standin dev up</code> runs it.</>
               : ownsWatcher(accountId, watcher) ? <> It is your own account: <code className="font-mono">standin adopt --wallet</code> creates it with a key that stays on your machine, and runs it. Until then, only you can freeze.</> : null}
           </p>
         </Row>
         <Row k="intents registry">{intents}</Row>
-        <Row k="storage"><Storage plan={plan} onReload={onReload} /></Row>
+        <Row k="storage">{browserKeys ? <Locked plan={plan} /> : <Storage plan={plan} onReload={onReload} />}</Row>
       </dl>
       {plan.status === "error" && (
         <p className="flex items-start gap-2 border-t border-line px-3.5 py-2.5 text-xs text-trip" data-testid="deploy-plan-error">
@@ -47,6 +50,11 @@ export function DeployFacts({ accountId, watcher, intents, plan, onReload, watch
       )}
     </div>
   );
+}
+
+function Locked({ plan }: { plan: DeployPlan }) {
+  if (plan.status !== "ready") return plan.status === "error" ? <span className="font-sans text-fg-faint">unknown</span> : <Shimmer className="h-4 w-40" />;
+  return <p className="font-sans text-fg [word-break:normal] [overflow-wrap:anywhere]">About <span className="font-mono">{nearShort(plan.quote.codeStorage)} NEAR</span> stays locked for storage while the guardian is deployed.</p>;
 }
 
 function Storage({ plan, onReload }: { plan: DeployPlan; onReload: () => void }) {

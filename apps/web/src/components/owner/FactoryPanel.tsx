@@ -4,10 +4,14 @@ import { Button } from "@/components/ui/button";
 import { ExtLink, Panel, Shimmer, Tag } from "@/components/app/common";
 import { cn } from "@/lib/utils";
 import { accountExists, explorerAccount } from "@/lib/wallet/near";
-import { FAUCET_URL, nearShort, viewAccount } from "@/lib/wallet/guardianCode";
+import { nearShort, viewAccount } from "@/lib/wallet/guardianCode";
 import { quoteFactory, shortOf } from "@/lib/wallet/funding";
 import { ownsWatcher, watcherFor } from "@/lib/wallet/homeAccounts";
 import { FACTORY, GuardianName, guardiansOf, requiredDeposit } from "@/lib/wallet/factory";
+import { retarget, type HomePlan } from "@/lib/wallet/homePlan";
+import { useHomePlan } from "./useHomePlan";
+import { HomeCreateRows } from "./HomeCreateRows";
+import { QuoteBlock } from "./QuoteBlock";
 
 type Load = { status: "loading" } | { status: "error"; error: string } | { status: "ready"; deposit: bigint; guardians: string[]; amount: bigint; storageBytes: bigint };
 
@@ -17,8 +21,11 @@ type Load = { status: "loading" } | { status: "error"; error: string } | { statu
  */
 export function FactoryPanel({ ownerId, eth, busy, selected, reloadKey, onCreate, onSelect }: {
   ownerId: string; eth: boolean; busy: boolean; selected: string | null; reloadKey: number;
-  onCreate: (name: string, deposit: bigint) => void; onSelect: (id: string | null) => void;
+  onCreate: (name: string, deposit: bigint, home: HomePlan | null) => void; onSelect: (id: string | null) => void;
 }) {
+  // The home part does not depend on the name; the watcher key is pointed at the new guardian when the button is pressed.
+  const home = useHomePlan(eth ? null : ownerId, ownerId, reloadKey);
+  const hp = home.read.status === "ready" && home.read.plan.kind === "plan" ? home.read.plan : null;
   const [load, setLoad] = useState<Load>({ status: "loading" });
   const [name, setName] = useState("");
   const reload = useCallback(async () => {
@@ -38,7 +45,9 @@ export function FactoryPanel({ ownerId, eth, busy, selected, reloadKey, onCreate
   const parsed = GuardianName.safeParse(name);
   const id = `${name || "name"}.${FACTORY}`;
   // Shared with the CLI (packages/core/src/funding.ts): locked storage + the factory's required_deposit + up-front gas.
-  const quote = load.status === "ready" ? quoteFactory({ storageBytes: load.storageBytes, deposit: load.deposit }) : null;
+  const quote = load.status === "ready"
+    ? quoteFactory({ storageBytes: load.storageBytes, deposit: load.deposit, createBait: !!hp?.create.bait, createWatcher: !!hp?.create.watcher, watcherFreezeOnly: true })
+    : null;
   const short = quote && load.status === "ready" ? shortOf(load.amount, quote) : 0n;
   // Ask the chain whether the account exists before offering to sign: a taken name only costs gas and a refund.
   const [taken, setTaken] = useState<{ id: string; exists: boolean | null } | null>(null);
@@ -63,7 +72,7 @@ export function FactoryPanel({ ownerId, eth, busy, selected, reloadKey, onCreate
           The factory <ExtLink href={explorerAccount(FACTORY)}>{FACTORY}</ExtLink> creates a new account for the agent with the guardian already
           on it. Its owner is <span className="font-mono break-all text-fg">{ownerId}</span>; the account itself has no keys, so every owner call
           is signed by this wallet. Watcher: <span className="font-mono break-all text-fg">{watcherFor(ownerId)}</span> (freeze only){ownsWatcher(ownerId, watcherFor(ownerId))
-            ? <>, your own account: <code className="font-mono text-fg">standin adopt --wallet --account &lt;name&gt;.{FACTORY} --owner {ownerId} --home DIR</code> creates it, with the bait, and runs it on your machine.</>
+            ? <>, your own account, created in this same approval with the bait (keys generated in this browser). To run it always-on, export them to a CLI home from My account.</>
             : <>: a 0x account cannot create sub-accounts, so no watcher of yours can run for it yet; freeze it from this console.</>}
         </p>
         <div className="space-y-1.5">
@@ -74,19 +83,24 @@ export function FactoryPanel({ ownerId, eth, busy, selected, reloadKey, onCreate
           <p className={cn("font-mono text-[11px] break-all", nameError ? "text-trip" : "text-fg-faint")} data-testid="factory-name-hint">{nameError ?? id}</p>
         </div>
         <div className="rounded-md border border-line bg-ink-900 px-2.5 py-2 text-[11px] leading-relaxed text-fg-muted" data-testid="factory-deposit">
-          {load.status === "ready" ? (
-            <>Deposit <span className="font-mono text-fg">{nearShort(load.deposit, 3)} NEAR</span> (the factory's required_deposit). It moves into the new
-              account: most is locked for the guardian's code and state, about 0.3 NEAR stays withdrawable by you.
-              {short > 0n ? (
-                <span className="mt-1.5 block text-warn" data-testid="factory-shortfall">
-                  {ownerId} holds {nearShort(load.amount, 3)} NEAR and this needs {nearShort(quote!.total, 3)} ({quote!.lines.map((l) => `${nearShort(l.yocto, 3)} ${l.label}`).join(" + ")}):
-                  short by {nearShort(short, 3)} NEAR, so nothing is offered for signing. Add testnet NEAR from the <ExtLink href={FAUCET_URL}>testnet faucet</ExtLink>, then read again.
-                </span>
-              ) : null}</>
+          {load.status === "ready" && quote ? (
+            <>
+              <p className="mb-2">Deposit <span className="font-mono text-fg">{nearShort(load.deposit, 3)} NEAR</span> (the factory's required_deposit). It moves into the new
+                account: most is locked for the guardian's code and state, about 0.3 NEAR stays withdrawable by you.</p>
+              <QuoteBlock quote={quote} signerId={ownerId} balance={load.amount} onReload={() => { void reload(); void home.reload(); }} testid="factory-quote" />
+              {short > 0n && <span className="sr-only" data-testid="factory-shortfall">short by {nearShort(short, 3)} NEAR</span>}
+            </>
           ) : load.status === "error" ? <span className="text-trip">Could not read the factory: {load.error}</span> : <Shimmer className="h-4 w-48" />}
         </div>
+        {!eth && (
+          <div className="-mx-3.5 border-y border-line">
+            <p className="px-3.5 pt-2.5 text-[11px] text-fg-faint">Your bait and watcher, in the same approval</p>
+            <HomeCreateRows owner={ownerId} guardian={parsed.success ? id : `<name>.${FACTORY}`} read={home.read} />
+          </div>
+        )}
         <Button size="sm" variant="invert" className="w-full sm:w-auto" data-testid="factory-create"
-          disabled={busy || !parsed.success || isTaken || checking || load.status !== "ready" || short > 0n} onClick={() => load.status === "ready" && parsed.success && onCreate(parsed.data, load.deposit)}>
+          disabled={busy || !parsed.success || isTaken || checking || load.status !== "ready" || short > 0n || home.read.status === "loading"}
+          onClick={() => load.status === "ready" && parsed.success && onCreate(parsed.data, load.deposit, hp ? retarget(hp, id) : null)}>
           <Boxes aria-hidden />{busy ? "Waiting for wallet…" : "Review and sign in wallet"}
         </Button>
       </div>

@@ -11,7 +11,7 @@ import http from "node:http";
 import path from "node:path";
 import { Rpc } from "../../../../packages/lab/src/rpc.ts";
 import { createHash } from "node:crypto";
-import { Wallet, actions as nearActions, addFullKey, call } from "../../../../packages/lab/src/chain.ts";
+import { PublicKey, Wallet, actions as nearActions, addFullKey, call } from "../../../../packages/lab/src/chain.ts";
 import { base58Encode as baseEncode } from "../../src/lib/wallet/guardianCode.ts";
 
 const root = path.resolve(import.meta.dirname, "../../../..");
@@ -20,7 +20,7 @@ const keyRecord = JSON.parse(fs.readFileSync(path.join(root, ".sandbox/wallet-te
 const rpc = new Rpc(["https://near-testnet.drpc.org", "https://rpc.testnet.near.org", "https://rpc.testnet.fastnear.com"]);
 const signer = new Wallet(rpc, account, keyRecord.private_key);
 const PORT = Number(process.env.WALLET_TEST_PORT ?? 4391);
-const ALLOWED = new Set(["freeze", "unfreeze", "add_agent_key", "new", "withdraw"]);
+const ALLOWED = new Set(["freeze", "unfreeze", "add_agent_key", "new", "withdraw", "add_intents_key", "sign_evm"]);
 // Guardian factory: create_guardian (deposit up to 3 NEAR) to the factory; owner calls to its guardians.
 const FACTORY = "guard.si-project-5289.testnet";
 const MAX_CREATE_DEPOSIT = 3n * 10n ** 24n;
@@ -51,16 +51,25 @@ function accountsFor(): { accountId: string; publicKey?: string }[] {
 let signedSinceMode = 0;
 const MAX_HOME_FUND = 5n * 10n ** 23n; // 0.5 NEAR: the console asks for 0.2 per home account
 
-/** A home account: CreateAccount + Transfer (<= 0.5 NEAR) + AddKey(full access) to a direct sub-account of this account. */
+/**
+ * A home account: CreateAccount + Transfer (<= 0.5 NEAR) + AddKey to a direct sub-account of this account. The key is full
+ * access (the bait; a CLI watcher) or, for the console's browser-made watcher, a function-call key for `freeze` only on this
+ * account or one of its factory guardians.
+ */
 function homeAccountActions(receiver: string, list: any[]) {
   if (!receiver.endsWith(`.${account}`) || receiver.slice(0, -account.length - 1).includes(".")) return null;
   const [c, t, k] = list;
-  if (list.length !== 3 || c?.type !== "CreateAccount" || t?.type !== "Transfer" || k?.type !== "AddKey" || k.params?.accessKey?.permission !== "FullAccess") {
-    throw Object.assign(new Error("test wallet creates sub-accounts only as CreateAccount + Transfer + AddKey(full access)"), { status: 400 });
+  const perm = k?.params?.accessKey?.permission;
+  const fc = perm && perm !== "FullAccess" ? perm : null;
+  const fcOk = !!fc && (fc.receiverId === account || (String(fc.receiverId).endsWith(`.${FACTORY}`) && !String(fc.receiverId).slice(0, -FACTORY.length - 1).includes(".")))
+    && Array.isArray(fc.methodNames) && fc.methodNames.length === 1 && fc.methodNames[0] === "freeze" && !fc.allowance;
+  if (list.length !== 3 || c?.type !== "CreateAccount" || t?.type !== "Transfer" || k?.type !== "AddKey" || (perm !== "FullAccess" && !fcOk)) {
+    throw Object.assign(new Error("test wallet creates sub-accounts only as CreateAccount + Transfer + AddKey(full access, or freeze-only on its guardian)"), { status: 400 });
   }
   const dep = BigInt(t.params.deposit);
   if (dep <= 0n || dep > MAX_HOME_FUND) throw Object.assign(new Error("sub-account funding out of range"), { status: 400 });
-  return [nearActions.createAccount(), nearActions.transfer(dep), addFullKey(String(k.params.publicKey))];
+  const key = fc ? nearActions.addFunctionCallAccessKey(PublicKey.from(String(k.params.publicKey)), String(fc.receiverId), ["freeze"]) : addFullKey(String(k.params.publicKey));
+  return [nearActions.createAccount(), nearActions.transfer(dep), key];
 }
 
 async function sendTx(p: any) {

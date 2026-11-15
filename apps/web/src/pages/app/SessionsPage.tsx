@@ -39,7 +39,7 @@ export default function SessionsPage() {
         rows={data.sessions}
         columns={cols}
         rowKey={(s) => s.session_id}
-        rowHref={(s) => { const t = tripOf(s); return t ? `/app/trips/${t.tx_hash}` : undefined; }}
+        rowHref={(s) => { const t = tripOf(s); return t ? `/app/example/trips/${t.tx_hash}` : undefined; }}
         rowTone={(s) => (tripOf(s) ? "trip" : undefined)}
         initialSort={{ id: "start", dir: "desc" }}
         empty={<EmptyState icon={TerminalSquare} title="No guarded sessions yet">Install the Claude Code plugin or launch Codex with <code className="font-mono text-fg">pnpm standin:codex</code>; each new session mints a decoy and shows up here.</EmptyState>}

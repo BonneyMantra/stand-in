@@ -108,6 +108,9 @@ export function IncidentReportPanel({ report }: { report?: IncidentReport }) {
           <Proof r={report} />
         </div>
       )}
+      <p className="border-t border-line px-3.5 py-2 text-[11px] text-fg-faint" data-testid="report-cli-only">
+        This report is from the recorded example run. For your own account, incident reports are CLI only: <code className="font-mono">standin dev up</code> with your own NEAR AI key writes them on your machine; this site never calls NEAR AI.
+      </p>
     </Panel>
   );
 }

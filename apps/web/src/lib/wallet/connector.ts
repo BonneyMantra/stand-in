@@ -17,7 +17,7 @@ export function getConnector(): NearConnector {
 }
 
 export interface OwnerCall {
-  method: "freeze" | "unfreeze" | "add_agent_key" | "withdraw";
+  method: "freeze" | "unfreeze" | "add_agent_key" | "withdraw" | "add_intents_key" | "sign_evm";
   args: Record<string, unknown>;
 }
 
@@ -27,7 +27,7 @@ export interface TxOutcome {
   failure?: string;
 }
 
-const fnCall = (c: OwnerCall, tgas = 100n) => ({
+const fnCall = (c: OwnerCall, tgas: bigint = 100n) => ({
   type: "FunctionCall" as const,
   params: { methodName: c.method, args: c.args, gas: (tgas * TGAS).toString(), deposit: "0" },
 });
@@ -35,7 +35,7 @@ const fnCall = (c: OwnerCall, tgas = 100n) => ({
 export type WalletTx = { receiverId: string; actions: Parameters<NearWalletBase["signAndSendTransaction"]>[0]["actions"] };
 
 /** Owner calls on a guardian: `guardianId` is the account the guardian runs on (== the signer for a self-hosted guardian). */
-export const ownerTx = (guardianId: string, calls: OwnerCall[]): WalletTx => ({ receiverId: guardianId, actions: calls.map((c) => fnCall(c)) });
+export const ownerTx = (guardianId: string, calls: OwnerCall[], tgas?: bigint): WalletTx => ({ receiverId: guardianId, actions: calls.map((c) => fnCall(c, tgas)) });
 
 export interface GuardianInit { watcher: string; intents_contract: string }
 
@@ -56,8 +56,8 @@ export const deployTx = (accountId: string, code: Uint8Array, init: GuardianInit
  * One owner transaction: `ownerId` (the connected wallet, get_state.owner) signs; `guardianId` is the account the guardian runs on.
  * A self-hosted guardian has guardianId == ownerId. A factory guardian (<name>.<factory>) is owned by another account, e.g. a 0x one.
  */
-export async function sendOwnerTx(wallet: NearWalletBase, ownerId: string, guardianId: string, calls: OwnerCall[]): Promise<TxOutcome> {
-  return readOutcome(await wallet.signAndSendTransaction({ network: NETWORK, signerId: ownerId, ...ownerTx(guardianId, calls) }));
+export async function sendOwnerTx(wallet: NearWalletBase, ownerId: string, guardianId: string, calls: OwnerCall[], tgas?: bigint): Promise<TxOutcome> {
+  return readOutcome(await wallet.signAndSendTransaction({ network: NETWORK, signerId: ownerId, ...ownerTx(guardianId, calls, tgas) }));
 }
 
 export async function sendDeployTx(wallet: NearWalletBase, accountId: string, code: Uint8Array, init: GuardianInit, after: OwnerCall[] = []): Promise<TxOutcome> {
@@ -115,6 +115,9 @@ function panicText(s: string): string {
 }
 
 const CONTRACT_MESSAGES: [RegExp, string][] = [
+  [/frozen: sign_evm refused until unfreeze/, "Refused by the guardian: it is frozen, so it never asks the MPC network for a signature (frozen: sign_evm refused until unfreeze)."],
+  [/sign_evm: caller not authorized/, "Refused by the guardian: only its owner may request a Chain Signatures signature."],
+  [/PublicKeyExists/, "That key is already registered for this guardian on the intents registry."],
   [/owner only/, "The guardian refused: owner only. Sign with this account's own full-access key, not a function-call key."],
   [/already frozen/, "The guardian is already frozen."],
   [/not frozen/, "The guardian is not frozen, so there is nothing to unfreeze."],

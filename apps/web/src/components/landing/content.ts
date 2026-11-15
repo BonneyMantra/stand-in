@@ -4,6 +4,10 @@
 export const REPO_URL = "https://github.com/BonneyMantra/stand-in";
 export const BENCH_URL = `${REPO_URL}/tree/main/bench`;
 export const DASHBOARD_PATH = "/app";
+/** The main path: connect a wallet, Protect (or Create), the home is created, then My account. */
+export const OWNER_PATH = "/app/owner";
+/** The recorded testnet run on the project's own accounts: an example, secondary. */
+export const EXAMPLE_PATH = "/app/example";
 
 export const txUrl = (hash: string) => `https://testnet.nearblocks.io/txns/${hash}`;
 

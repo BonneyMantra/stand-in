@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation } from "react-router";
-import { Wallet } from "lucide-react";
+import { Link, useLocation, useSearchParams } from "react-router";
+import { ArrowRight, Wallet } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert";
 import { Button } from "@/components/ui/button";
 import { ExtLink, PageHeader, Panel } from "@/components/app/common";
@@ -8,21 +8,21 @@ import { WalletControl } from "@/components/owner/WalletControl";
 import { GuardianPanel } from "@/components/owner/GuardianPanel";
 import { OwnerActions } from "@/components/owner/OwnerActions";
 import { ActivityLog } from "@/components/owner/ActivityLog";
-import { ApprovePanel, type ApproveResult } from "@/components/owner/ApprovePanel";
-import { AdoptPanel, type AdoptSend } from "@/components/owner/AdoptPanel";
-import { ProtectPanel, type ProtectInit } from "@/components/owner/ProtectPanel";
+import { ApprovePanel } from "@/components/owner/ApprovePanel";
+import { AdoptPanel } from "@/components/owner/AdoptPanel";
+import { ProtectPanel } from "@/components/owner/ProtectPanel";
 import { FactoryPanel } from "@/components/owner/FactoryPanel";
 import { WithdrawPanel } from "@/components/owner/WithdrawPanel";
-import { FACTORY, guardiansOf, isFactoryGuardian, sendCreateGuardian } from "@/lib/wallet/factory";
-import { DEFAULT_INTENTS } from "@/lib/wallet/guardianCode";
-import { createAccountTx, readHomeAccount, watcherFor } from "@/lib/wallet/homeAccounts";
+import { ChainSigTry, IntentsPanel } from "@/components/owner/GuardianTools";
 import { useOwnerTx } from "@/components/owner/useOwnerTx";
-import { useNearWallet } from "@/components/owner/useNearWallet";
+import { useWallet } from "@/components/owner/WalletProvider";
 import { useGuardian } from "@/components/owner/useGuardian";
-import { parseDeepLink, type ApproveRequest } from "@/lib/wallet/deeplink";
-import { deployTx, ownerTx, sendDeployTx, sendOwnerTx, sendTransactions, supportsBatch, type OwnerCall, type WalletTx } from "@/lib/wallet/connector";
-import { explorerTx, isEthAccount, looksMainnet, readGuardian, viewAccessKey } from "@/lib/wallet/near";
-import type { GuardianCode } from "@/lib/wallet/guardianCode";
+import { useConsoleActions } from "@/components/owner/useConsoleActions";
+import { useMyAccount } from "@/data/useMyAccount";
+import { isFactoryGuardian } from "@/lib/wallet/factory";
+import { parseDeepLink } from "@/lib/wallet/deeplink";
+import { supportsBatch } from "@/lib/wallet/connector";
+import { explorerTx, isEthAccount, looksMainnet } from "@/lib/wallet/near";
 
 // NEAR Connect's manifest, filtered to testnet + signAndSendTransaction. WalletConnect and Unity also qualify but NEAR Connect
 // drops wallets that need WalletConnect unless a WalletConnect projectId is configured; this site has none.
@@ -30,103 +30,47 @@ const TESTNET_WALLETS = "Meteor, Intear, Nightly, Ledger, NEAR CLI and Ethereum 
 
 export default function OwnerPage() {
   const { search } = useLocation();
+  const [params] = useSearchParams();
   const link = useMemo(() => parseDeepLink(search), [search]);
-  const w = useNearWallet();
+  const w = useWallet();
+  const mine = useMyAccount();
   const wrongNet = w.status === "connected" && !!w.accountId && looksMainnet(w.accountId);
-  // The guardian account: the link's `account` when a link is open, else the connected account (self-hosted guardian).
-  // A factory guardian lives on another account and is owned by the connected one (get_state.owner).
-  const [picked, setPicked] = useState<string | null>(null);
-  const [factoryKey, setFactoryKey] = useState(0);
+  // The guardian account: the link's `account` when a link is open, else the picked factory guardian (?guardian= or the
+  // list), else the connected account (a self-hosted guardian).
+  const [picked, setPicked] = useState<string | null>(() => params.get("guardian"));
   const target = link.kind === "ok" || link.kind === "adopt" ? link.req.account : picked ?? w.accountId;
   const eth = !!w.accountId && isEthAccount(w.accountId);
   const { read, refresh } = useGuardian(w.status === "connected" && !wrongNet ? target : null);
-  const { log, busy, run, runBatch, reset } = useOwnerTx(w.wallet, w.accountId, refresh);
-  const [approved, setApproved] = useState<ApproveResult | null>(null);
-  const [deployed, setDeployed] = useState<string | null>(null);
-  const [homeKey, setHomeKey] = useState(0);
+  const tx = useOwnerTx(w.wallet, w.accountId, refresh);
+  const a = useConsoleActions(w, tx, target, mine.refreshSoon);
   // Everything this page remembers belongs to the connected account: a switch (or disconnect) starts clean, so another
   // account's selected guardian, deploy notice or transactions never show under the new one.
   const seenAccount = useRef(w.accountId);
+  const { reset } = tx;
+  const { forget } = a;
   useEffect(() => {
     if (seenAccount.current === w.accountId) return;
     seenAccount.current = w.accountId;
-    setPicked(null); setDeployed(null); setApproved(null); reset();
-  }, [w.accountId, reset]);
+    setPicked(null); forget(); reset();
+  }, [w.accountId, reset, forget]);
 
   const lookup = read.status === "ready" ? read.lookup : read.status === "loading" ? read.previous : undefined;
   const guardian = lookup?.kind === "guardian" ? lookup.state : null;
   const isOwner = !!guardian && guardian.owner === w.accountId;
-
-  const owner = (label: string, calls: OwnerCall[], landed?: () => Promise<boolean>) =>
-    run(label, (wallet, id) => sendOwnerTx(wallet, id, target ?? id, calls), landed);
-  const frozenIs = (want: boolean) => async () => {
-    const g = target ? await readGuardian(target) : null;
-    return g?.kind === "guardian" && g.state.frozen === want;
-  };
-  const keyIsOn = (account: string, key: string) => async () => (await viewAccessKey(account, key)) !== null;
-  const freeze = (reason: string) => void owner("freeze", [{ method: "freeze", args: { reason, decoy_public_key: null, tx_hash: null } }], frozenIs(true));
-  const unfreeze = () => void owner("unfreeze", [{ method: "unfreeze", args: {} }], frozenIs(false));
-  const protect = async (code: GuardianCode, init: ProtectInit) => {
-    const isGuardian = async () => !!w.accountId && (await readGuardian(w.accountId)).kind === "guardian";
-    const out = await run("deploy guardian + new", (wallet, id) => sendDeployTx(wallet, id, code.bytes, init), isGuardian);
-    if (out?.hash) setDeployed(out.hash);
-  };
-  const addKeyCall = (r: { agent_key: string; receiver: string; methods: string[]; allowance: bigint }): OwnerCall =>
-    ({ method: "add_agent_key", args: { public_key: r.agent_key, receiver_id: r.receiver, method_names: r.methods, allowance: r.allowance.toString() } });
-  // One wallet request: the guardian part (unless it already landed) and every home account still missing.
-  const adopt = async ({ req, code, guardianDone, creates }: AdoptSend) => {
-    const txs: WalletTx[] = [], labels: string[] = [], landed: (() => Promise<boolean>)[] = [];
-    if (!guardianDone) {
-      txs.push(code ? deployTx(req.account, code.bytes, { watcher: req.watcher, intents_contract: req.intents }, [addKeyCall(req)]) : ownerTx(req.account, [addKeyCall(req)]));
-      labels.push(code ? "deploy guardian + new + add_agent_key" : "add_agent_key");
-      landed.push(keyIsOn(req.account, req.agent_key));
-    }
-    for (const a of creates) {
-      txs.push(createAccountTx(a));
-      labels.push(`create ${a.accountId}`);
-      landed.push(async () => (await readHomeAccount(a)).status === "ready");
-    }
-    const outs = await runBatch(labels, (wallet, id) => sendTransactions(wallet, id, txs), landed);
-    setHomeKey((k) => k + 1);
-    window.setTimeout(() => setHomeKey((k) => k + 1), 4000); // a second read once every node has the new accounts
-    if (!guardianDone && outs[0]) setApproved({ hash: outs[0].hash, key: await viewAccessKey(req.account, req.agent_key).catch(() => null) });
-  };
-  const create = async (name: string, deposit: bigint) => {
-    let created: string | null = null;
-    const expected = `${name}.${FACTORY}`;
-    const listed = async () => {
-      const mine = w.accountId ? await guardiansOf(w.accountId) : [];
-      if (mine.includes(expected)) created = expected;
-      return created !== null;
-    };
-    const out = await run(`create_guardian ${name}`, async (wallet, id) => {
-      const r = await sendCreateGuardian(wallet, id, name, watcherFor(id), DEFAULT_INTENTS, deposit);
-      created = r.guardianId;
-      return r.failure || r.guardianId ? r : { ...r, failure: "The factory returned null: the name is taken or creation failed. The deposit was refunded." };
-    }, listed);
-    setFactoryKey((k) => k + 1);
-    if (out && created) { setPicked(created); if (out.hash) setDeployed(out.hash); }
-  };
-  const withdraw = (yocto: bigint) => void owner("withdraw", [{ method: "withdraw", args: { amount: yocto.toString() } }]).then(() => setFactoryKey((k) => k + 1));
   const switchAccount = async () => { await w.disconnect(); await w.connect(); };
-  const approve = async (req: ApproveRequest, unfreezeFirst: boolean) => {
-    const calls: OwnerCall[] = [...(unfreezeFirst ? [{ method: "unfreeze" as const, args: {} }] : []), addKeyCall(req)];
-    const out = await owner(unfreezeFirst ? "unfreeze + add_agent_key" : "add_agent_key", calls, keyIsOn(req.account, req.agent_key));
-    if (out) setApproved({ hash: out.hash, key: await viewAccessKey(req.account, req.agent_key).catch(() => null) });
-  };
+  const busy = tx.busy;
 
   const factory = w.accountId && (
-    <FactoryPanel ownerId={w.accountId} eth={eth} busy={busy} selected={picked} reloadKey={factoryKey}
-      onCreate={(n, d) => void create(n, d)} onSelect={setPicked} />
+    <FactoryPanel ownerId={w.accountId} eth={eth} busy={busy} selected={picked} reloadKey={a.factoryKey + a.homeKey}
+      onCreate={(n, d, h) => void a.create(n, d, h, setPicked)} onSelect={setPicked} />
   );
 
   return (
     <div className="space-y-4">
       <PageHeader
         title="Owner console"
-        sub={<>The main owner path: your own NEAR wallet protects the account and signs every owner call. Testnet. No wallet?
-          The judge route is <Link to="/lab" className="text-fg-muted underline underline-offset-4">/lab</Link>,{" "}
-          <Link to="/verify" className="text-fg-muted underline underline-offset-4">/verify</Link> and the CLI.</>}
+        sub={<>Your own NEAR wallet protects the account and signs every owner call. Testnet. Your guardians, keys and decoys are on{" "}
+          <Link to="/app" className="text-fg-muted underline underline-offset-4">My account</Link>.</>}
         actions={<WalletControl info={w} onConnect={() => void w.connect()} onDisconnect={() => void w.disconnect()} />}
       />
 
@@ -137,19 +81,32 @@ export default function OwnerPage() {
         </Alert>
       )}
 
+      {a.storageRefused && (
+        <Alert variant="warning" data-testid="storage-refused">
+          <AlertTitle>This browser refused to store the keys</AlertTitle>
+          <AlertDescription><p>Its storage is blocked (a private window, or site data turned off), so the bait and watcher were left out of the request: an account whose key is lost cannot be used. Allow site data and try again, or create them with <code className="font-mono">standin adopt --wallet</code>.</p></AlertDescription>
+        </Alert>
+      )}
+
       {(link.kind === "adopt" || (link.kind === "invalid" && link.op === "adopt")) && (
         <AdoptPanel
           link={link} accountId={w.status === "connected" ? w.accountId : null} guardian={lookup}
-          busy={busy} result={approved} batch={supportsBatch(w.wallet.current)} homeKey={homeKey}
-          onAdopt={(s) => void adopt(s)} onSwitch={() => void switchAccount()}
+          busy={busy} result={a.approved} batch={supportsBatch(w.wallet.current)} homeKey={a.homeKey}
+          onAdopt={(s) => void a.adopt(s)} onSwitch={() => void switchAccount()}
         />
       )}
 
-      {deployed && (
+      {a.deployed && (
         <Alert variant="success" data-testid="deployed">
-          <AlertTitle>{picked ? "Guarded agent account created" : "Guardian deployed"}</AlertTitle>
+          <AlertTitle>{isFactoryGuardian(a.deployed.guardian) ? "Guarded agent account created" : "Guardian deployed"}{a.deployed.home ? ", with your bait and watcher" : ""}</AlertTitle>
           <AlertDescription>
-            <p>{picked ? <><span className="font-mono break-all">{picked}</span> is yours; the console below is read back from chain.</> : "The account is protected; the console below is read back from chain."} Transaction <ExtLink href={explorerTx(deployed)}>{deployed.slice(0, 12)}…</ExtLink></p>
+            <p>
+              <span className="font-mono break-all">{a.deployed.guardian}</span> is protected; the console below is read back from chain.
+              Transaction <ExtLink href={explorerTx(a.deployed.hash)}>{a.deployed.hash.slice(0, 12)}…</ExtLink>
+            </p>
+            <Link to="/app" className="mt-2 inline-flex items-center gap-1.5 font-medium text-fg underline-offset-4 hover:underline" data-testid="to-my-account">
+              See it on My account<ArrowRight className="size-3.5" aria-hidden />
+            </Link>
           </AlertDescription>
         </Alert>
       )}
@@ -157,7 +114,7 @@ export default function OwnerPage() {
       {(link.kind === "ok" || (link.kind === "invalid" && link.op !== "adopt")) && (
         <ApprovePanel
           link={link} accountId={w.status === "connected" ? w.accountId : null} guardian={lookup}
-          busy={busy} result={approved} onApprove={(r, u) => void approve(r, u)}
+          busy={busy} result={a.approved} onApprove={(r, u) => void a.approve(r, u)}
         />
       )}
 
@@ -176,16 +133,22 @@ export default function OwnerPage() {
           <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
             <div className="contents xl:block xl:min-w-0 xl:space-y-4">
               {lookup && lookup.kind !== "guardian" && link.kind !== "adopt" && target === w.accountId && (
-                <div className="order-1 min-w-0"><ProtectPanel accountId={w.accountId} lookup={lookup} busy={busy} onDeploy={(c, i) => void protect(c, i)} /></div>
+                <div className="order-1 min-w-0"><ProtectPanel accountId={w.accountId} lookup={lookup} busy={busy} reloadKey={a.homeKey} onDeploy={(c, i, h) => void a.protect(c, i, h)} /></div>
               )}
               {eth && link.kind === "none" && <div className="order-2 min-w-0">{factory}</div>}
               <div className="order-3 min-w-0"><GuardianPanel accountId={target ?? w.accountId} read={read} onRefresh={() => void refresh()} /></div>
-              {!eth && link.kind === "none" && <div className="order-6 min-w-0">{factory}</div>}
+              {!eth && link.kind === "none" && <div className="order-8 min-w-0">{factory}</div>}
             </div>
             <div className="contents xl:block xl:space-y-4">
-              {guardian && isOwner && <div className="order-4 min-w-0"><OwnerActions state={guardian} busy={busy} onFreeze={freeze} onUnfreeze={unfreeze} /></div>}
+              {guardian && isOwner && <div className="order-4 min-w-0"><OwnerActions state={guardian} busy={busy} onFreeze={a.freeze} onUnfreeze={a.unfreeze} /></div>}
+              {guardian && isOwner && target && (
+                <div className="order-5 min-w-0 space-y-4">
+                  <ChainSigTry ownerId={w.accountId} state={guardian} busy={busy} onSign={a.signEvm} />
+                  <IntentsPanel guardianId={target} state={guardian} busy={busy} onAdd={a.addIntentsKey} />
+                </div>
+              )}
               {guardian && isOwner && target && isFactoryGuardian(target) && (
-                <div className="order-5 min-w-0"><WithdrawPanel guardianId={target} ownerId={w.accountId} busy={busy} reloadKey={factoryKey} onWithdraw={withdraw} /></div>
+                <div className="order-6 min-w-0"><WithdrawPanel guardianId={target} ownerId={w.accountId} busy={busy} reloadKey={a.factoryKey} onWithdraw={a.withdraw} /></div>
               )}
               {guardian && !isOwner && (
                 <Alert variant="warning" data-testid="not-owner" className="order-4">
@@ -195,7 +158,7 @@ export default function OwnerPage() {
                   </AlertDescription>
                 </Alert>
               )}
-              <div className="order-7 min-w-0"><ActivityLog entries={log} /></div>
+              <div className="order-7 min-w-0"><ActivityLog entries={tx.log} /></div>
             </div>
           </div>
         )
@@ -207,9 +170,9 @@ export default function OwnerPage() {
 }
 
 const STEPS: [string, string][] = [
-  ["The guardian lives on your account", "Connect, then Protect this account: your wallet deploys it on the account itself, so it can delete that account's agent keys. Meteor refuses contract deployment and a MetaMask (0x) account already runs NEAR's wallet contract: with either, create a guarded agent account instead (one function call)."],
+  ["The guardian lives on your account", "Connect, then Protect this account: one approval deploys it on the account itself and creates your bait and watcher. Meteor refuses contract deployment and a MetaMask (0x) account already runs NEAR's wallet contract: with either, create a guarded agent account instead (one function call)."],
   ["Its owner is the account", "Unfreeze and adding agent keys need a transaction signed by the account's own full-access key, the one your wallet holds."],
-  ["Your wallet signs; this page never holds a key", `Wallets run in NEAR Connect's sandbox. Offered on testnet: ${TESTNET_WALLETS}.`],
+  ["Your wallet signs; your owner key never reaches this page", `Wallets run in NEAR Connect's sandbox. Offered on testnet: ${TESTNET_WALLETS}. Only the low-value bait and watcher keys are made and kept in this browser.`],
 ];
 
 function ConnectPrompt({ onConnect, connecting }: { onConnect: () => void; connecting: boolean }) {
@@ -226,10 +189,11 @@ function ConnectPrompt({ onConnect, connecting }: { onConnect: () => void; conne
           </li>
         ))}
       </ol>
-      <div className="border-t border-line p-3.5">
+      <div className="flex flex-wrap items-center gap-3 border-t border-line p-3.5">
         <Button variant="invert" size="sm" onClick={onConnect} disabled={connecting}>
           <Wallet aria-hidden />{connecting ? "Waiting for wallet…" : "Connect wallet"}
         </Button>
+        <Link to="/app/example" className="text-xs text-fg-muted underline-offset-4 hover:text-fg hover:underline">No wallet? See an example</Link>
       </div>
     </Panel>
   );

@@ -7,7 +7,7 @@ import { EmptyState } from "@/components/app/common";
 const PLACES = [
   { to: "/lab", label: "Leak a decoy in the lab" },
   { to: "/verify", label: "Check every claim on chain" },
-  { to: "/app", label: "Open the dashboard" },
+  { to: "/app", label: "Open My account" },
 ];
 
 /** Any path outside the routes: the public shell, the path that missed, and the three places worth going. */

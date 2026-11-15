@@ -18,7 +18,7 @@ export default function TripDetailPage() {
       <div className="rounded-[10px] border border-line bg-ink-900">
         <EmptyState icon={FileSearch} title="Trip not found">
           <p>No trip with tx <span className="font-mono text-fg">{shortHash(tx)}</span> in this {data.recorded ? "recorded run" : "watcher state"}.</p>
-          <Link to="/app/trips" className="mt-3 inline-block text-fg underline underline-offset-4">Back to trips</Link>
+          <Link to="/app/example/trips" className="mt-3 inline-block text-fg underline underline-offset-4">Back to trips</Link>
         </EmptyState>
       </div>
     );
@@ -38,7 +38,7 @@ export default function TripDetailPage() {
 
   return (
     <div className="space-y-4">
-      <Link to="/app/trips" className="inline-flex items-center gap-1.5 text-xs text-fg-muted hover:text-fg"><ArrowLeft className="size-3.5" aria-hidden />Trips</Link>
+      <Link to="/app/example/trips" className="inline-flex items-center gap-1.5 text-xs text-fg-muted hover:text-fg"><ArrowLeft className="size-3.5" aria-hidden />Trips</Link>
       <PageHeader
         title={pre ? "Decoy used after freeze" : `Frozen ${trip.freeze.blocks_after_trip} blocks after the decoy was used`}
         sub={a.session_id

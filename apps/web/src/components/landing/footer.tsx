@@ -45,7 +45,8 @@ function LabStatus() {
 const SOURCES = [...PROBLEM_STATS.map((s) => ({ label: s.source, href: s.href })), { label: INCIDENT.source, href: INCIDENT.href }];
 
 const PRODUCT = [
-  { to: "/app", label: "Dashboard" },
+  { to: "/app", label: "My account" },
+  { to: "/app/example", label: "Example (recorded run)" },
   { to: "/lab", label: "Lab" },
   { to: "/verify", label: "Verify" },
   { to: "/app/owner", label: "Owner console" },

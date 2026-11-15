@@ -118,7 +118,7 @@ export function DecoyMap({ state }: { state: StandinState }) {
                   className="cursor-pointer outline-none [&:focus-visible>circle:last-child]:stroke-fg"
                   onMouseEnter={() => setHover(n.pk)} onMouseLeave={() => setHover(null)}
                   onFocus={() => setHover(n.pk)} onBlur={() => setHover(null)}
-                  onClick={() => st === "tripped" && state.trips.find((t) => t.decoy_public_key === n.pk) && nav(`/app/trips/${state.trips.find((t) => t.decoy_public_key === n.pk)!.tx_hash}`)}
+                  onClick={() => st === "tripped" && state.trips.find((t) => t.decoy_public_key === n.pk) && nav(`/app/example/trips/${state.trips.find((t) => t.decoy_public_key === n.pk)!.tx_hash}`)}
                   onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as SVGGElement).dispatchEvent(new MouseEvent("click", { bubbles: true }))}
                 >
                   {st !== "dormant" && <circle cx={n.x} cy={n.y} r={st === "tripped" ? 7 : 5} fill={FILL[st]} opacity="0.5" filter="url(#dm-glow)" />}

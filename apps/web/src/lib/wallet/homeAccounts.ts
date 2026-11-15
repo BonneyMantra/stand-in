@@ -62,3 +62,29 @@ export function createAccountTx(a: HomeAccountReq) {
     ],
   };
 }
+
+/**
+ * The home this browser holds (homeStore): one transaction per account still missing, from the owner. The bait gets a
+ * full-access key (it adds decoy keys to itself); the watcher gets a function-call key that may only call `freeze` on its
+ * one guardian, with no allowance cap (it holds only its own 0.45 NEAR, and a function-call key cannot attach a deposit).
+ */
+export function browserHomeTxs(home: { bait: { account_id: string; public_key: string }; watcher: { account_id: string; public_key: string; scope: { kind: string; receiver_id?: string; method_names?: string[] } } }, create: { bait: boolean; watcher: boolean }) {
+  const txs: { role: HomeRole; accountId: string; tx: ReturnType<typeof createAccountTx> | ReturnType<typeof watcherTx> }[] = [];
+  if (create.bait) txs.push({ role: "bait", accountId: home.bait.account_id, tx: createAccountTx({ role: "bait", accountId: home.bait.account_id, publicKey: home.bait.public_key }) });
+  if (create.watcher) txs.push({ role: "watcher", accountId: home.watcher.account_id, tx: watcherTx(home.watcher) });
+  return txs;
+}
+
+function watcherTx(w: { account_id: string; public_key: string; scope: { kind: string; receiver_id?: string; method_names?: string[] } }) {
+  const permission = w.scope.kind === "function-call" && w.scope.receiver_id
+    ? { receiverId: w.scope.receiver_id, methodNames: w.scope.method_names ?? ["freeze"] }
+    : ("FullAccess" as const);
+  return {
+    receiverId: w.account_id,
+    actions: [
+      { type: "CreateAccount" as const },
+      { type: "Transfer" as const, params: { deposit: WATCHER_FUND.toString() } },
+      { type: "AddKey" as const, params: { publicKey: w.public_key, accessKey: { permission } } },
+    ],
+  };
+}

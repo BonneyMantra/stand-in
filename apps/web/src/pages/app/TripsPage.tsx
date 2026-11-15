@@ -37,7 +37,7 @@ export default function TripsPage() {
         rows={[...data.trips].reverse()}
         columns={cols}
         rowKey={(t) => t.tx_hash}
-        rowHref={(t) => `/app/trips/${t.tx_hash}`}
+        rowHref={(t) => `/app/example/trips/${t.tx_hash}`}
         rowTone={(t) => (alreadyFrozen(t) ? undefined : "trip")}
         empty={<EmptyState icon={Zap} title="No trips">No decoy key has signed a transaction. The {data.decoy.keys.length} planted decoys are dormant or only exposed.</EmptyState>}
       />
