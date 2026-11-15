@@ -32,33 +32,73 @@ const fnCall = (c: OwnerCall, tgas = 100n) => ({
   params: { methodName: c.method, args: c.args, gas: (tgas * TGAS).toString(), deposit: "0" },
 });
 
+export type WalletTx = { receiverId: string; actions: Parameters<NearWalletBase["signAndSendTransaction"]>[0]["actions"] };
+
+/** Owner calls on a guardian: `guardianId` is the account the guardian runs on (== the signer for a self-hosted guardian). */
+export const ownerTx = (guardianId: string, calls: OwnerCall[]): WalletTx => ({ receiverId: guardianId, actions: calls.map((c) => fnCall(c)) });
+
+export interface GuardianInit { watcher: string; intents_contract: string }
+
+/**
+ * The guardian deploy on the signer's own account: DeployContract, `new`, then any owner calls (add_agent_key for an adopt
+ * link). Every action is atomic: a failed `new` or key add rolls the deploy back.
+ */
+export const deployTx = (accountId: string, code: Uint8Array, init: GuardianInit, after: OwnerCall[] = []): WalletTx => ({
+  receiverId: accountId,
+  actions: [
+    { type: "DeployContract" as const, params: { code } },
+    { type: "FunctionCall" as const, params: { methodName: "new", args: { ...init }, gas: (50n * TGAS).toString(), deposit: "0" } },
+    ...after.map((c) => fnCall(c)),
+  ],
+});
+
 /**
  * One owner transaction: `ownerId` (the connected wallet, get_state.owner) signs; `guardianId` is the account the guardian runs on.
  * A self-hosted guardian has guardianId == ownerId. A factory guardian (<name>.<factory>) is owned by another account, e.g. a 0x one.
  */
 export async function sendOwnerTx(wallet: NearWalletBase, ownerId: string, guardianId: string, calls: OwnerCall[]): Promise<TxOutcome> {
-  const outcome = await wallet.signAndSendTransaction({
-    network: NETWORK, signerId: ownerId, receiverId: guardianId, actions: calls.map((c) => fnCall(c)),
-  });
-  return readOutcome(outcome);
+  return readOutcome(await wallet.signAndSendTransaction({ network: NETWORK, signerId: ownerId, ...ownerTx(guardianId, calls) }));
 }
 
-export interface GuardianInit { watcher: string; intents_contract: string }
+export async function sendDeployTx(wallet: NearWalletBase, accountId: string, code: Uint8Array, init: GuardianInit, after: OwnerCall[] = []): Promise<TxOutcome> {
+  return readOutcome(await wallet.signAndSendTransaction({ network: NETWORK, signerId: accountId, ...deployTx(accountId, code, init, after) }));
+}
+
+/** NEAR Connect passes signAndSendTransactions straight to the wallet; every testnet wallet in its manifest declares it. */
+export const supportsBatch = (wallet: NearWalletBase | null | undefined) => !!wallet?.manifest.features?.signAndSendTransactions;
+
+/** A request that stopped part-way: `done` holds the outcomes of the transactions the wallet did answer. */
+export class BatchStopped extends Error {
+  readonly reason: unknown;
+  readonly done: TxOutcome[];
+  constructor(reason: unknown, done: TxOutcome[]) {
+    super(reason instanceof Error ? reason.message : String(reason));
+    this.reason = reason;
+    this.done = done;
+  }
+}
 
 /**
- * Deploys the guardian on the signer's own account in one transaction: DeployContract, `new`, then any owner calls
- * (add_agent_key for an adopt link). Every action is atomic: a failed `new` or key add rolls the deploy back.
+ * Several transactions from one signer. A wallet that declares signAndSendTransactions gets them all in one request (one
+ * approval in Meteor and Intear); any other wallet gets them one at a time, and the sequence stops at the first failure.
+ * The transactions are independent on chain: an earlier one stays landed when a later one fails.
  */
-export async function sendDeployTx(wallet: NearWalletBase, accountId: string, code: Uint8Array, init: GuardianInit, after: OwnerCall[] = []): Promise<TxOutcome> {
-  const outcome = await wallet.signAndSendTransaction({
-    network: NETWORK, signerId: accountId, receiverId: accountId,
-    actions: [
-      { type: "DeployContract" as const, params: { code } },
-      { type: "FunctionCall" as const, params: { methodName: "new", args: { ...init }, gas: (50n * TGAS).toString(), deposit: "0" } },
-      ...after.map((c) => fnCall(c)),
-    ],
-  });
-  return readOutcome(outcome);
+export async function sendTransactions(wallet: NearWalletBase, signerId: string, txs: WalletTx[]): Promise<TxOutcome[]> {
+  if (txs.length > 1 && supportsBatch(wallet)) {
+    const outs = await wallet.signAndSendTransactions({ network: NETWORK, signerId, transactions: txs });
+    return (outs ?? []).map(readOutcome);
+  }
+  const done: TxOutcome[] = [];
+  for (const t of txs) {
+    try {
+      const o = readOutcome(await wallet.signAndSendTransaction({ network: NETWORK, signerId, ...t }));
+      done.push(o);
+      if (o.failure) break;
+    } catch (e) {
+      throw new BatchStopped(e, done);
+    }
+  }
+  return done;
 }
 
 export function readOutcome(o: unknown): TxOutcome {

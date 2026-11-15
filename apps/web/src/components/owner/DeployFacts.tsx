@@ -4,12 +4,13 @@ import { CopyText, ExtLink, Shimmer, Tag } from "@/components/app/common";
 import { shortKey } from "@/data/derive";
 import { explorerAccount, yoctoToNear } from "@/lib/wallet/near";
 import { CODE_SOURCE, FAUCET_URL, GUARDIAN_CODE_HASH, nearShort } from "@/lib/wallet/guardianCode";
+import { ownsWatcher } from "@/lib/wallet/homeAccounts";
 import { Row } from "./ApprovePanel";
 import type { DeployPlan } from "./useDeployPlan";
 
 /** What a deploy from the wallet puts on the account, in plain words: code, hash, owner, watcher, storage and balance. */
-export function DeployFacts({ accountId, watcher, intents, plan, onReload }: {
-  accountId: string; watcher: string; intents: string; plan: DeployPlan; onReload: () => void;
+export function DeployFacts({ accountId, watcher, intents, plan, onReload, watcherInRequest = false }: {
+  accountId: string; watcher: string; intents: string; plan: DeployPlan; onReload: () => void; watcherInRequest?: boolean;
 }) {
   return (
     <div data-testid="deploy-facts">
@@ -29,7 +30,11 @@ export function DeployFacts({ accountId, watcher, intents, plan, onReload }: {
         <Row k="owner">{accountId} <span className="font-sans text-fg-faint [word-break:normal] [overflow-wrap:anywhere]">(the account itself: only your wallet can unfreeze)</span></Row>
         <Row k="watcher">
           <span data-testid="deploy-watcher">{watcher}</span>
-          <p className="mt-1 font-sans text-[11px] leading-relaxed text-fg-muted [word-break:normal] [overflow-wrap:anywhere]">Can freeze this account when a decoy key is used. It can never unfreeze, add keys or move funds.</p>
+          <p className="mt-1 font-sans text-[11px] leading-relaxed text-fg-muted [word-break:normal] [overflow-wrap:anywhere]">
+            Can freeze this account when a decoy key is used. It can never unfreeze, add keys or move funds.
+            {watcherInRequest ? <> It is your own account, created in this same request with a key your CLI generated; <code className="font-mono">standin dev up</code> runs it.</>
+              : ownsWatcher(accountId, watcher) ? <> It is your own account: <code className="font-mono">standin adopt --wallet</code> creates it with a key that stays on your machine, and runs it. Until then, only you can freeze.</> : null}
+          </p>
         </Row>
         <Row k="intents registry">{intents}</Row>
         <Row k="storage"><Storage plan={plan} onReload={onReload} /></Row>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 import { Wallet } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/reui/alert";
@@ -7,21 +7,22 @@ import { ExtLink, PageHeader, Panel } from "@/components/app/common";
 import { WalletControl } from "@/components/owner/WalletControl";
 import { GuardianPanel } from "@/components/owner/GuardianPanel";
 import { OwnerActions } from "@/components/owner/OwnerActions";
-import { ActivityLog, type TxEntry } from "@/components/owner/ActivityLog";
+import { ActivityLog } from "@/components/owner/ActivityLog";
 import { ApprovePanel, type ApproveResult } from "@/components/owner/ApprovePanel";
-import { AdoptPanel } from "@/components/owner/AdoptPanel";
+import { AdoptPanel, type AdoptSend } from "@/components/owner/AdoptPanel";
 import { ProtectPanel, type ProtectInit } from "@/components/owner/ProtectPanel";
 import { FactoryPanel } from "@/components/owner/FactoryPanel";
 import { WithdrawPanel } from "@/components/owner/WithdrawPanel";
 import { FACTORY, guardiansOf, isFactoryGuardian, sendCreateGuardian } from "@/lib/wallet/factory";
-import { DEFAULT_INTENTS, DEFAULT_WATCHER } from "@/lib/wallet/guardianCode";
+import { DEFAULT_INTENTS } from "@/lib/wallet/guardianCode";
+import { createAccountTx, readHomeAccount, watcherFor } from "@/lib/wallet/homeAccounts";
+import { useOwnerTx } from "@/components/owner/useOwnerTx";
 import { useNearWallet } from "@/components/owner/useNearWallet";
 import { useGuardian } from "@/components/owner/useGuardian";
-import { parseDeepLink, type AdoptRequest, type ApproveRequest } from "@/lib/wallet/deeplink";
-import { readableError, sendDeployTx, sendOwnerTx, type OwnerCall, type TxOutcome } from "@/lib/wallet/connector";
+import { parseDeepLink, type ApproveRequest } from "@/lib/wallet/deeplink";
+import { deployTx, ownerTx, sendDeployTx, sendOwnerTx, sendTransactions, supportsBatch, type OwnerCall, type WalletTx } from "@/lib/wallet/connector";
 import { explorerTx, isEthAccount, looksMainnet, readGuardian, viewAccessKey } from "@/lib/wallet/near";
 import type { GuardianCode } from "@/lib/wallet/guardianCode";
-import type { NearWalletBase } from "@hot-labs/near-connect";
 
 // NEAR Connect's manifest, filtered to testnet + signAndSendTransaction. WalletConnect and Unity also qualify but NEAR Connect
 // drops wallets that need WalletConnect unless a WalletConnect projectId is configured; this site has none.
@@ -39,51 +40,22 @@ export default function OwnerPage() {
   const target = link.kind === "ok" || link.kind === "adopt" ? link.req.account : picked ?? w.accountId;
   const eth = !!w.accountId && isEthAccount(w.accountId);
   const { read, refresh } = useGuardian(w.status === "connected" && !wrongNet ? target : null);
-  const [log, setLog] = useState<TxEntry[]>([]);
-  const [busy, setBusy] = useState(false);
+  const { log, busy, run, runBatch, reset } = useOwnerTx(w.wallet, w.accountId, refresh);
   const [approved, setApproved] = useState<ApproveResult | null>(null);
   const [deployed, setDeployed] = useState<string | null>(null);
-  const nextId = useRef(1);
+  const [homeKey, setHomeKey] = useState(0);
   // Everything this page remembers belongs to the connected account: a switch (or disconnect) starts clean, so another
   // account's selected guardian, deploy notice or transactions never show under the new one.
   const seenAccount = useRef(w.accountId);
   useEffect(() => {
     if (seenAccount.current === w.accountId) return;
     seenAccount.current = w.accountId;
-    setPicked(null); setDeployed(null); setApproved(null); setLog([]);
-  }, [w.accountId]);
+    setPicked(null); setDeployed(null); setApproved(null); reset();
+  }, [w.accountId, reset]);
 
   const lookup = read.status === "ready" ? read.lookup : read.status === "loading" ? read.previous : undefined;
   const guardian = lookup?.kind === "guardian" ? lookup.state : null;
   const isOwner = !!guardian && guardian.owner === w.accountId;
-
-  // `landed` re-reads the chain when the wallet gives no result (window closed, or an error after broadcasting: Meteor
-  // Web reported "Cannot read properties of undefined" after create_guardian had landed, 15 Nov). Never claim
-  // "nothing was sent" from a missing answer alone.
-  const run = useCallback(async (label: string, send: (wallet: NearWalletBase, accountId: string) => Promise<TxOutcome>, landed?: () => Promise<boolean>) => {
-    const wallet = w.wallet.current;
-    if (!wallet || !w.accountId) return null;
-    const id = nextId.current++;
-    const patch = (p: Partial<TxEntry>) => setLog((l) => l.map((e) => (e.id === id ? { ...e, ...p } : e)));
-    setLog((l) => [{ id, label, status: "pending", message: "Confirm in your wallet", at: Date.now() }, ...l]);
-    setBusy(true);
-    try {
-      const out = await send(wallet, w.accountId);
-      if (out.failure) patch({ status: "failed", hash: out.hash || undefined, message: readableError(out.failure) });
-      else patch({ status: "ok", hash: out.hash, message: "Landed on testnet. State read again from chain." });
-      return out.failure ? null : out;
-    } catch (e) {
-      const msg = readableError(e);
-      const rejected = /rejected in the wallet/.test(msg);
-      const onChain = !rejected && landed ? await landed().catch(() => false) : false;
-      if (onChain) patch({ status: "ok", message: "Landed on testnet: the wallet gave no result, so this was confirmed by reading the chain." });
-      else patch({ status: "failed", message: rejected || !landed ? msg : `${msg} Nothing new was found on chain.` });
-      return onChain ? { hash: "" } : null;
-    } finally {
-      setBusy(false);
-      await refresh();
-    }
-  }, [w.wallet, w.accountId, refresh]);
 
   const owner = (label: string, calls: OwnerCall[], landed?: () => Promise<boolean>) =>
     run(label, (wallet, id) => sendOwnerTx(wallet, id, target ?? id, calls), landed);
@@ -101,11 +73,22 @@ export default function OwnerPage() {
   };
   const addKeyCall = (r: { agent_key: string; receiver: string; methods: string[]; allowance: bigint }): OwnerCall =>
     ({ method: "add_agent_key", args: { public_key: r.agent_key, receiver_id: r.receiver, method_names: r.methods, allowance: r.allowance.toString() } });
-  const adopt = async (req: AdoptRequest, code: GuardianCode | null) => {
-    const out = code
-      ? await run("deploy guardian + new + add_agent_key", (wallet, id) => sendDeployTx(wallet, id, code.bytes, { watcher: req.watcher, intents_contract: req.intents }, [addKeyCall(req)]), keyIsOn(req.account, req.agent_key))
-      : await owner("add_agent_key", [addKeyCall(req)], keyIsOn(req.account, req.agent_key));
-    if (out) setApproved({ hash: out.hash, key: await viewAccessKey(req.account, req.agent_key).catch(() => null) });
+  // One wallet request: the guardian part (unless it already landed) and every home account still missing.
+  const adopt = async ({ req, code, guardianDone, creates }: AdoptSend) => {
+    const txs: WalletTx[] = [], labels: string[] = [], landed: (() => Promise<boolean>)[] = [];
+    if (!guardianDone) {
+      txs.push(code ? deployTx(req.account, code.bytes, { watcher: req.watcher, intents_contract: req.intents }, [addKeyCall(req)]) : ownerTx(req.account, [addKeyCall(req)]));
+      labels.push(code ? "deploy guardian + new + add_agent_key" : "add_agent_key");
+      landed.push(keyIsOn(req.account, req.agent_key));
+    }
+    for (const a of creates) {
+      txs.push(createAccountTx(a));
+      labels.push(`create ${a.accountId}`);
+      landed.push(async () => (await readHomeAccount(a)).status === "ready");
+    }
+    const outs = await runBatch(labels, (wallet, id) => sendTransactions(wallet, id, txs), landed);
+    setHomeKey((k) => k + 1);
+    if (!guardianDone && outs[0]) setApproved({ hash: outs[0].hash, key: await viewAccessKey(req.account, req.agent_key).catch(() => null) });
   };
   const create = async (name: string, deposit: bigint) => {
     let created: string | null = null;
@@ -116,7 +99,7 @@ export default function OwnerPage() {
       return created !== null;
     };
     const out = await run(`create_guardian ${name}`, async (wallet, id) => {
-      const r = await sendCreateGuardian(wallet, id, name, DEFAULT_WATCHER, DEFAULT_INTENTS, deposit);
+      const r = await sendCreateGuardian(wallet, id, name, watcherFor(id), DEFAULT_INTENTS, deposit);
       created = r.guardianId;
       return r.failure || r.guardianId ? r : { ...r, failure: "The factory returned null: the name is taken or creation failed. The deposit was refunded." };
     }, listed);
@@ -156,7 +139,8 @@ export default function OwnerPage() {
       {(link.kind === "adopt" || (link.kind === "invalid" && link.op === "adopt")) && (
         <AdoptPanel
           link={link} accountId={w.status === "connected" ? w.accountId : null} guardian={lookup}
-          busy={busy} result={approved} onAdopt={(r, c) => void adopt(r, c)} onSwitch={() => void switchAccount()}
+          busy={busy} result={approved} batch={supportsBatch(w.wallet.current)} homeKey={homeKey}
+          onAdopt={(s) => void adopt(s)} onSwitch={() => void switchAccount()}
         />
       )}
 

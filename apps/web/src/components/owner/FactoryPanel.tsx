@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { ExtLink, Panel, Shimmer, Tag } from "@/components/app/common";
 import { cn } from "@/lib/utils";
 import { accountExists, explorerAccount } from "@/lib/wallet/near";
-import { DEFAULT_WATCHER, nearShort } from "@/lib/wallet/guardianCode";
+import { nearShort } from "@/lib/wallet/guardianCode";
+import { ownsWatcher, watcherFor } from "@/lib/wallet/homeAccounts";
 import { FACTORY, GuardianName, guardiansOf, requiredDeposit } from "@/lib/wallet/factory";
 
 type Load = { status: "loading" } | { status: "error"; error: string } | { status: "ready"; deposit: bigint; guardians: string[] };
@@ -56,7 +57,9 @@ export function FactoryPanel({ ownerId, eth, busy, selected, reloadKey, onCreate
         <p className="leading-relaxed text-fg-muted">
           The factory <ExtLink href={explorerAccount(FACTORY)}>{FACTORY}</ExtLink> creates a new account for the agent with the guardian already
           on it. Its owner is <span className="font-mono break-all text-fg">{ownerId}</span>; the account itself has no keys, so every owner call
-          is signed by this wallet. Watcher: <span className="font-mono text-fg">{DEFAULT_WATCHER}</span> (freeze only).
+          is signed by this wallet. Watcher: <span className="font-mono break-all text-fg">{watcherFor(ownerId)}</span> (freeze only){ownsWatcher(ownerId, watcherFor(ownerId))
+            ? <>, your own account: <code className="font-mono text-fg">standin adopt --wallet --account &lt;name&gt;.{FACTORY} --owner {ownerId} --home DIR</code> creates it, with the bait, and runs it on your machine.</>
+            : <>: a 0x account cannot create sub-accounts, so no watcher of yours can run for it yet; freeze it from this console.</>}
         </p>
         <div className="space-y-1.5">
           <label htmlFor="guardian-name" className="font-medium text-fg">Name</label>

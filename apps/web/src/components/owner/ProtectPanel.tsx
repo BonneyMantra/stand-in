@@ -1,7 +1,8 @@
 import { ShieldAlert, ShieldPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/app/common";
-import { DEFAULT_INTENTS, DEFAULT_WATCHER, type GuardianCode } from "@/lib/wallet/guardianCode";
+import { DEFAULT_INTENTS, type GuardianCode } from "@/lib/wallet/guardianCode";
+import { watcherFor } from "@/lib/wallet/homeAccounts";
 import { isEthAccount, type GuardianLookup } from "@/lib/wallet/near";
 import { DeployFacts } from "./DeployFacts";
 import { useDeployPlan } from "./useDeployPlan";
@@ -19,6 +20,7 @@ export function ProtectPanel({ accountId, lookup, busy, onDeploy }: {
   const eth = isEthAccount(accountId);
   const offer = lookup.kind === "no-contract" && !eth;
   const { plan, reload } = useDeployPlan(offer ? accountId : null);
+  const watcher = watcherFor(accountId);
 
   if (!offer) {
     return (
@@ -53,10 +55,12 @@ export function ProtectPanel({ accountId, lookup, busy, onDeploy }: {
   return (
     <Panel title="Protect this account" icon={ShieldPlus} id="protect-title" meta="deploy the guardian from your wallet" bodyClassName="p-0">
       <p className="px-3.5 pt-3 text-xs leading-relaxed text-fg-muted">
-        No contract runs on <span className="font-mono text-fg">{accountId}</span>. Deploy the Stand-in guardian on it, and a decoy key used by
-        an agent freezes this account's agent keys. You stay the owner: only a transaction from this wallet can unfreeze.
+        No contract runs on <span className="font-mono text-fg">{accountId}</span>. Deploy the Stand-in guardian on it; then{" "}
+        <code className="font-mono text-fg">standin adopt --wallet --account {accountId} --home DIR</code> creates your own bait and watcher
+        accounts and plants decoys, so a decoy key used by an agent freezes this account's agent keys. You stay the owner: only a
+        transaction from this wallet can unfreeze.
       </p>
-      <DeployFacts accountId={accountId} watcher={DEFAULT_WATCHER} intents={DEFAULT_INTENTS} plan={plan} onReload={() => void reload()} />
+      <DeployFacts accountId={accountId} watcher={watcher} intents={DEFAULT_INTENTS} plan={plan} onReload={() => void reload()} />
       <div className="space-y-3 border-t border-line p-3.5">
         <p className="text-xs text-fg-muted">
           One transaction from <span className="font-mono text-fg">{accountId}</span> to itself:
@@ -69,7 +73,7 @@ export function ProtectPanel({ accountId, lookup, busy, onDeploy }: {
         </p>
         <Button
           size="sm" variant="invert" className="w-full sm:w-auto" data-testid="protect-sign"
-          disabled={busy || !ready} onClick={() => plan.status === "ready" && onDeploy(plan.code, { watcher: DEFAULT_WATCHER, intents_contract: DEFAULT_INTENTS })}
+          disabled={busy || !ready} onClick={() => plan.status === "ready" && onDeploy(plan.code, { watcher, intents_contract: DEFAULT_INTENTS })}
         >
           <ShieldPlus aria-hidden />{busy ? "Waiting for wallet…" : "Review and sign in wallet"}
         </Button>

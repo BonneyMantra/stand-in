@@ -2,7 +2,7 @@
 // Serves a NEAR Connect executor (registered in the page as a NEAR Connect debug wallet) and signs on testnet
 // with the test account's key from .sandbox/wallet-test/. Listens on 127.0.0.1 only.
 // Run from the repo root: node --import tsx apps/web/scripts/wallet-test/signer.ts [account-id]
-// Modes (POST /mode {"mode": ...}): "ok" | "reject" (wallet refuses) | "mainnet" (signs in as a .near account)
+// Modes (POST /mode {"mode": ...}): "ok" | "reject" (wallet refuses) | "reject-after:N" (signs N, refuses the rest) | "mainnet" (signs in as a .near account)
 //   | "account:<id>" (signs in as another testnet account, read-only states)
 //   | "drop-unfreeze" (drops the unfreeze action, so the guardian panics on chain).
 // DeployContract is accepted only for the pinned guardian build (sha256 = GUARDIAN_CODE_HASH), followed by `new`.
@@ -11,7 +11,7 @@ import http from "node:http";
 import path from "node:path";
 import { Rpc } from "../../../../packages/lab/src/rpc.ts";
 import { createHash } from "node:crypto";
-import { Wallet, actions as nearActions, call } from "../../../../packages/lab/src/chain.ts";
+import { Wallet, actions as nearActions, addFullKey, call } from "../../../../packages/lab/src/chain.ts";
 import { base58Encode as baseEncode } from "../../src/lib/wallet/guardianCode.ts";
 
 const root = path.resolve(import.meta.dirname, "../../../..");
@@ -47,14 +47,40 @@ function accountsFor(): { accountId: string; publicKey?: string }[] {
   return [{ accountId: account, publicKey: keyRecord.public_key }];
 }
 
+// "reject-after:N": signs the next N transactions, then refuses the rest (a wallet that stops part-way through a batch).
+let signedSinceMode = 0;
+const MAX_HOME_FUND = 5n * 10n ** 23n; // 0.5 NEAR: the console asks for 0.2 per home account
+
+/** A home account: CreateAccount + Transfer (<= 0.5 NEAR) + AddKey(full access) to a direct sub-account of this account. */
+function homeAccountActions(receiver: string, list: any[]) {
+  if (!receiver.endsWith(`.${account}`) || receiver.slice(0, -account.length - 1).includes(".")) return null;
+  const [c, t, k] = list;
+  if (list.length !== 3 || c?.type !== "CreateAccount" || t?.type !== "Transfer" || k?.type !== "AddKey" || k.params?.accessKey?.permission !== "FullAccess") {
+    throw Object.assign(new Error("test wallet creates sub-accounts only as CreateAccount + Transfer + AddKey(full access)"), { status: 400 });
+  }
+  const dep = BigInt(t.params.deposit);
+  if (dep <= 0n || dep > MAX_HOME_FUND) throw Object.assign(new Error("sub-account funding out of range"), { status: 400 });
+  return [nearActions.createAccount(), nearActions.transfer(dep), addFullKey(String(k.params.publicKey))];
+}
+
 async function sendTx(p: any) {
   if (mode === "reject") throw Object.assign(new Error("User rejected the request"), { status: 400 });
+  if (mode.startsWith("reject-after:") && signedSinceMode >= Number(mode.slice(13))) throw Object.assign(new Error("User rejected the request"), { status: 400 });
   if (p.network !== "testnet") throw Object.assign(new Error(`test wallet is on testnet; request asked for ${p.network}`), { status: 400 });
   const receiver = String(p.receiverId);
-  const factoryGuardian = receiver.endsWith(`.${FACTORY}`) && !receiver.slice(0, -FACTORY.length - 1).includes(".");
-  if ((receiver !== account && receiver !== FACTORY && !factoryGuardian) || (p.signerId && p.signerId !== account)) {
-    throw Object.assign(new Error("test wallet signs only to its own account, the guardian factory or a factory guardian"), { status: 400 });
+  if (p.signerId && p.signerId !== account) throw Object.assign(new Error("test wallet signs only as its own account"), { status: 400 });
+  const home = homeAccountActions(receiver, p.actions as any[]);
+  if (home) {
+    signedSinceMode++;
+    const r = await signer.send(receiver, home);
+    sent.push({ at: new Date().toISOString(), hash: r.hash, ok: r.ok, methods: ["CreateAccount", "Transfer", "AddKey"], error: r.error });
+    return r.raw;
   }
+  const factoryGuardian = receiver.endsWith(`.${FACTORY}`) && !receiver.slice(0, -FACTORY.length - 1).includes(".");
+  if (receiver !== account && receiver !== FACTORY && !factoryGuardian) {
+    throw Object.assign(new Error("test wallet signs only to its own account, its sub-accounts, the guardian factory or a factory guardian"), { status: 400 });
+  }
+  signedSinceMode++;
   // "drop-unfreeze": sends the batch without its unfreeze action, to get a real on-chain contract panic.
   const wanted = mode === "drop-unfreeze" ? (p.actions as any[]).filter((a) => a.params?.methodName !== "unfreeze") : (p.actions as any[]);
   const acts = wanted.map((a) => {
@@ -87,7 +113,7 @@ http.createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/sent") return reply(res, 200, sent);
     if (req.method !== "POST") return reply(res, 404, { error: "not found" });
     const p = await body(req);
-    if (url.pathname === "/mode") { mode = String(p.mode); return reply(res, 200, { mode }); }
+    if (url.pathname === "/mode") { mode = String(p.mode); signedSinceMode = 0; return reply(res, 200, { mode }); }
     if (url.pathname === "/signIn") {
       if (mode === "reject") return reply(res, 400, { error: "User rejected the request" });
       return reply(res, 200, { accounts: accountsFor() });

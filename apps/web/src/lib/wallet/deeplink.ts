@@ -26,11 +26,13 @@ export function base58Decode(s: string): Uint8Array | null {
   return new Uint8Array(bytes);
 }
 
-export const Ed25519Key = z.string().refine((v) => {
+const isEd25519 = (v: string) => {
   if (!v.startsWith("ed25519:")) return false;
   const raw = v.slice(8);
   return raw.length >= 32 && raw.length <= 44 && base58Decode(raw)?.length === 32;
-}, "agent_key must be ed25519:<base58 of 32 bytes>");
+};
+const ed25519 = (field: string) => z.string().refine(isEd25519, `${field} must be ed25519:<base58 of 32 bytes>`);
+export const Ed25519Key = ed25519("agent_key");
 
 const METHOD_RE = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
 const Methods = z.string().max(1000, "methods list is too long").transform((v, ctx) => {
@@ -72,10 +74,30 @@ export const ApproveRequest = z.object({
 }).superRefine(notSelf);
 export type ApproveRequest = z.infer<typeof ApproveRequest>;
 
+/** The parent of a sub-account (`watch.alice.testnet` -> `alice.testnet`). */
+export const parentOf = (id: string) => id.slice(id.indexOf(".") + 1);
+
+/**
+ * The home accounts of an adopt link: `bait` names the bait account, `bait_key` / `watch_key` are the public keys the CLI
+ * generated for an account the owner still has to create (`watcher` is that watcher). Both are sub-accounts of one parent,
+ * the guardian's owner, which alone can create them. No secret ever travels in a link.
+ */
+const homeAccounts = (r: { account: string; watcher: string; bait?: string; bait_key?: string; watch_key?: string }, ctx: z.RefinementCtx) => {
+  if (r.bait_key && !r.bait) ctx.addIssue({ code: "custom", path: ["bait"], message: "bait_key needs bait" });
+  if (!r.bait) return;
+  if (r.bait === r.watcher) ctx.addIssue({ code: "custom", path: ["bait"], message: "the bait and the watcher must be different accounts" });
+  if (r.bait === r.account || r.watcher === r.account) ctx.addIssue({ code: "custom", path: ["bait"], message: "the bait and the watcher must not be the guardian account" });
+  if (!r.bait.includes(".") || !r.watcher.includes(".") || parentOf(r.bait) !== parentOf(r.watcher)) {
+    ctx.addIssue({ code: "custom", path: ["bait"], message: "the bait and the watcher must be sub-accounts of the same owner account" });
+  }
+};
+
 /**
  * The "adopt from wallet" deep link (contract with the CLI; do not change):
  *   /app/owner?op=adopt&account=<id>&watcher=<id>&intents=<id>&agent_key=<ed25519:base58>&receiver=<id>&methods=<a,b|empty>&allowance=<yocto>
+ *     [&bait=<id>][&bait_key=<ed25519:base58>][&watch_key=<ed25519:base58>]
  * Deploys the guardian on `account` when it has no code, then registers the agent key; on an existing guardian it only adds the key.
+ * With bait_key / watch_key it also creates those home accounts (0.2 NEAR each), in the same wallet request.
  */
 export const AdoptRequest = z.object({
   op: z.literal("adopt"),
@@ -86,13 +108,17 @@ export const AdoptRequest = z.object({
   receiver: AccountId,
   methods: Methods,
   allowance: Allowance,
-}).superRefine(notSelf);
+  bait: AccountId.optional(),
+  bait_key: ed25519("bait_key").optional(),
+  watch_key: ed25519("watch_key").optional(),
+}).superRefine(notSelf).superRefine(homeAccounts);
 export type AdoptRequest = z.infer<typeof AdoptRequest>;
 
 const FIELDS = {
   unfreeze: ["op", "account", "agent_key", "receiver", "methods", "allowance"],
   adopt: ["op", "account", "watcher", "intents", "agent_key", "receiver", "methods", "allowance"],
 } as const;
+const OPTIONAL = { unfreeze: [], adopt: ["bait", "bait_key", "watch_key"] } as const;
 
 export type DeepLink =
   | { kind: "none" }
@@ -117,6 +143,11 @@ export function parseDeepLink(search: string): DeepLink {
     if (all.length > 1) problems.push(`${f} appears ${all.length} times`);
     if (all.length === 0) problems.push(`${f} is missing`);
     else raw[f] = all[0]!;
+  }
+  for (const f of OPTIONAL[op]) {
+    const all = q.getAll(f);
+    if (all.length > 1) problems.push(`${f} appears ${all.length} times`);
+    else if (all.length === 1) raw[f] = all[0]!;
   }
   if (problems.length) return { kind: "invalid", op, problems };
   const issues = (e: z.ZodError) => e.issues.map((i) => `${i.path.join(".") || "link"}: ${i.message}`);
