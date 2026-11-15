@@ -142,7 +142,7 @@ function Gate({ children }: { children: ReactNode }) {
   if (useLocation().pathname.startsWith("/app/owner")) return <>{children}</>;
   if (source === "loading") {
     return (
-      <div className="space-y-4" aria-busy="true" aria-label="Loading watcher state">
+      <div className="space-y-4" role="status" aria-busy="true" aria-label="Loading watcher state">
         <div className="h-6 w-48 animate-pulse rounded bg-ink-850" />
         <div className="grid grid-cols-2 gap-px overflow-hidden rounded-[10px] border border-line bg-line md:grid-cols-6">
           {Array.from({ length: 6 }, (_, i) => <div key={i} className="h-[92px] animate-pulse bg-ink-900" />)}
