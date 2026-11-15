@@ -14,10 +14,14 @@ export class FastSender {
   private signer: KeyPairSigner;
   private publicKey: string;
   private provider: ReturnType<typeof makeProvider>;
-  constructor(private cfg: NetworkConfig, readonly accountId: string, secretKey: string) {
+  /** `newProvider` is the rotation source (core's makeProvider by default); tests pass a stub so no retry hits the network. */
+  constructor(
+    private cfg: NetworkConfig, readonly accountId: string, secretKey: string,
+    private newProvider: (cfg: NetworkConfig) => ReturnType<typeof makeProvider> = makeProvider,
+  ) {
     this.signer = KeyPairSigner.fromSecretKey(secretKey as `ed25519:${string}`);
     this.publicKey = KeyPair.fromString(secretKey as `ed25519:${string}`).getPublicKey().toString();
-    this.provider = makeProvider(cfg);
+    this.provider = this.newProvider(cfg);
   }
 
   /**
@@ -38,7 +42,7 @@ export class FastSender {
         return true;
       } catch (e: any) {
         log.warn(`warm attempt ${i + 1}/${attempts} failed: ${String(e?.message ?? e).slice(0, 120)}`);
-        this.provider = makeProvider(this.cfg); // rotate endpoint
+        this.provider = this.newProvider(this.cfg); // rotate endpoint
         if (i < attempts - 1) await new Promise((r) => setTimeout(r, baseDelayMs * 2 ** i));
       }
     }

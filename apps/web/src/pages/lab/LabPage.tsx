@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { lazy, Suspense, useMemo } from "react";
+import { useSearchParams } from "react-router";
 import { PageHead, PublicShell } from "@/components/public/PublicShell";
 import { Frame, FramePanel, PanelBar } from "@/components/landing/frame";
 import { RunPanel } from "@/components/lab/RunPanel";
@@ -6,6 +7,11 @@ import { PhoneCard } from "@/components/lab/PhoneCard";
 import { RecentRuns, ago } from "@/components/lab/RecentRuns";
 import { foldSteps, type LabConfig } from "@/lib/lab/types";
 import { useLabRun } from "@/lib/lab/useLabRun";
+import { LabModeSwitch, defaultMode, type LabMode } from "@/components/lab/LabModeSwitch";
+import { Shimmer } from "@/components/app/common";
+
+// The own-account run carries the wallet and signing code; it loads only when that tab opens.
+const MyAccountLab = lazy(() => import("@/components/lab/MyAccountLab"));
 
 /** The public lab topic (docs/UPGRADES.md, STANDIN_LAB_NTFY_TOPIC); the API's config wins when it answers. */
 const LAB_TOPIC = "standin-lab-09d9a8";
@@ -54,6 +60,30 @@ function Accounts({ config }: { config: LabConfig | null }) {
 }
 
 export default function LabPage() {
+  const [params, setParams] = useSearchParams();
+  const mode: LabMode = params.get("mode") === "mine" ? "mine" : params.get("mode") === "demo" ? "demo" : defaultMode();
+  const setMode = (m: LabMode) => setParams((p) => { p.set("mode", m); return p; }, { replace: true });
+  return mode === "mine" ? <MinePage onMode={setMode} /> : <DemoPage onMode={setMode} />;
+}
+
+function MinePage({ onMode }: { onMode: (m: LabMode) => void }) {
+  return (
+    <PublicShell title="Lab · Stand-in">
+      <PageHead eyebrow="Your own account · NEAR testnet" title="Leak a decoy on your account." muted="Your watcher freezes your guardian." dot="trip">
+        <p>
+          This tab plants a fresh decoy key on your bait with the bait's own key, lets a thief spend it, and your watcher, running in this tab,
+          sees the decoy used and freezes your guardian. Every transaction is read back from chain; unfreezing is one transaction from your wallet.
+        </p>
+      </PageHead>
+      <LabModeSwitch mode="mine" onChange={onMode} />
+      <Suspense fallback={<div className="mt-5 space-y-2"><Shimmer className="h-40 w-full" /></div>}>
+        <div className="mt-5"><MyAccountLab /></div>
+      </Suspense>
+    </PublicShell>
+  );
+}
+
+function DemoPage({ onMode }: { onMode: (m: LabMode) => void }) {
   const { run, runs, config, start, refreshRuns } = useLabRun();
   const latest = runs.status === "ok" ? runs.runs[0] : undefined;
   const showLatest = run.events.length === 0 && (run.phase === "busy" || run.phase === "rate_limited");
@@ -78,14 +108,16 @@ export default function LabPage() {
 
   return (
     <PublicShell title="Lab · Stand-in">
-      <PageHead eyebrow="Hosted attack lab · NEAR testnet" title="Leak a decoy yourself." muted="Watch the freeze land on chain." dot="trip">
+      <PageHead eyebrow="Hosted attack lab · the lab's own accounts" title="Leak a decoy yourself." muted="Watch the freeze land on chain." dot="trip">
         <p>
           One click plants a decoy key, leaks it through a simulated agent session and lets a thief spend it. Stand-in's watcher sees the decoy
-          used and freezes the agent account with its function-call key. Every transaction opens in the explorer.
+          used and freezes the agent account with its function-call key. Every transaction opens in the explorer. No wallet needed; to run the
+          same loop on your own guarded account, open Your account.
         </p>
       </PageHead>
 
-      <div className="mt-10 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+      <LabModeSwitch mode="demo" onChange={onMode} />
+      <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
         <RunPanel run={run} steps={steps} latest={showLatest ? latest : undefined} onStart={start} />
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-1">
           <Frame>

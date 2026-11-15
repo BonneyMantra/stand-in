@@ -3,26 +3,29 @@ import { generateKey, loadNetworkConfig } from "@standin/core";
 import { FastSender } from "../src/fastsend.ts";
 
 const rate429 = () => Promise.reject(Object.assign(new Error('{"code":-429,"message":"Rate limits exceeded"}'), { cause: 429 }));
+const hash = "11111111111111111111111111111111";
+const limited = () => ({ viewAccessKey: rate429, viewBlock: rate429 });
+const healthy = () => ({ viewAccessKey: () => Promise.resolve({ nonce: 7 }), viewBlock: () => Promise.resolve({ header: { hash } }) });
+
+/** A sender whose provider rotation hands out the given stubs in order: no attempt reaches the network. */
+function sender(...providers: (() => object)[]) {
+  let i = 0;
+  const made: object[] = [];
+  const next = () => { const p = providers[Math.min(i++, providers.length - 1)](); made.push(p); return p as any; };
+  const s = new FastSender(loadNetworkConfig(), "si-watch-0.testnet", generateKey().secret_key, next);
+  return { s, made };
+}
 
 it("warm() does not throw on a 429: it backs off, rotates the provider and reports false", async () => {
-  const k = generateKey();
-  const s = new FastSender(loadNetworkConfig(), "si-watch-0.testnet", k.secret_key);
-  const stub = { viewAccessKey: rate429, viewBlock: rate429 };
-  (s as any).provider = stub;
+  const { s, made } = sender(limited, limited, limited);
   await expect(s.warm(2, 1)).resolves.toBe(false);
-  expect((s as any).provider).not.toBe(stub); // rotated to a fresh provider
+  expect(made).toHaveLength(3); // the initial provider plus one rotation per failed attempt
+  expect((s as any).provider).toBe(made[2]);
 });
 
-it("warm() recovers once the endpoint answers and caches nonce and block hash", async () => {
-  const k = generateKey();
-  const s = new FastSender(loadNetworkConfig(), "si-watch-0.testnet", k.secret_key);
-  let calls = 0;
-  const hash = "11111111111111111111111111111111";
-  (s as any).provider = { viewAccessKey: () => (calls++ ? Promise.resolve({ nonce: 7 }) : rate429()), viewBlock: () => Promise.resolve({ header: { hash } }) };
-  // first attempt fails on the 429, rotation installs a real provider, so stub again for the retry
-  const orig = (s as any).warm.bind(s);
-  expect(await orig(1, 1)).toBe(false);
-  (s as any).provider = { viewAccessKey: () => Promise.resolve({ nonce: 7 }), viewBlock: () => Promise.resolve({ header: { hash } }) };
-  expect(await orig(1, 1)).toBe(true);
+it("warm() recovers once a rotated endpoint answers and caches nonce and block hash", async () => {
+  const { s } = sender(limited, healthy);
+  expect(await s.warm(2, 1)).toBe(true);
   expect((s as any).nonce).toBe(7n);
+  expect((s as any).blockHash).not.toBeNull();
 });

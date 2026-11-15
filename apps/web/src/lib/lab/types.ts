@@ -66,10 +66,10 @@ export interface LabConfig {
   explorer: string;
 }
 
-/** A step as the trace shows it: the latest status plus every tx it produced. */
-export interface StepView {
-  id: StepId;
-  status: StepStatus | "pending";
+/** A step as the trace shows it: the latest status plus every tx it produced. `skip`: not run, with the reason as title. */
+export interface StepViewOf<Id extends string> {
+  id: Id;
+  status: StepStatus | "pending" | "skip";
   title?: string;
   detail?: string;
   at?: string;
@@ -78,6 +78,8 @@ export interface StepView {
   blocks_after_trip?: number;
   ntfy?: NtfyPayload;
 }
+
+export type StepView = StepViewOf<StepId>;
 
 export const isStepId = (s: unknown): s is StepId => typeof s === "string" && (STEP_ORDER as readonly string[]).includes(s);
 

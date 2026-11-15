@@ -1,16 +1,18 @@
 import { motion, useReducedMotion } from "motion/react";
-import { ArrowUpRight, Check, LoaderCircle, X } from "lucide-react";
+import { ArrowUpRight, Check, LoaderCircle, Minus, X } from "lucide-react";
 import {
   Timeline, TimelineContent, TimelineHeader, TimelineIndicator, TimelineItem, TimelineSeparator, TimelineTitle,
 } from "@/components/reui/timeline";
 import { EASE_OUT } from "@/components/landing/primitives";
-import { STEP_LABEL, shortHash, type StepId, type StepView } from "@/lib/lab/types";
+import { STEP_LABEL, shortHash, type StepViewOf } from "@/lib/lab/types";
 import { cn } from "@/lib/utils";
 
-/** Steps whose success is the alarm path: drawn in the trip colour. */
-const ALARM: ReadonlySet<StepId> = new Set(["theft", "detect", "freeze"]);
+type AnyStep = StepViewOf<string>;
 
-function Indicator({ v }: { v: StepView }) {
+/** Steps whose success is the alarm path: drawn in the trip colour. */
+const ALARM: ReadonlySet<string> = new Set(["theft", "detect", "freeze"]);
+
+function Indicator({ v }: { v: AnyStep }) {
   const alarm = ALARM.has(v.id);
   return (
     <TimelineIndicator
@@ -20,11 +22,13 @@ function Indicator({ v }: { v: StepView }) {
         v.status === "start" && "border-fg-muted bg-ink-900 text-fg",
         v.status === "ok" && (alarm ? "border-trip bg-trip text-ink-950" : "border-fg bg-fg text-ink-950"),
         v.status === "fail" && "border-trip bg-trip-soft text-trip",
+        v.status === "skip" && "border-dashed border-fg-faint bg-ink-950 text-fg-faint",
       )}
     >
       {v.status === "start" ? <LoaderCircle className="size-3 animate-spin" /> : null}
       {v.status === "ok" ? <Check className="size-3" strokeWidth={3} /> : null}
       {v.status === "fail" ? <X className="size-3" strokeWidth={3} /> : null}
+      {v.status === "skip" ? <Minus className="size-3" strokeWidth={3} /> : null}
     </TimelineIndicator>
   );
 }
@@ -69,18 +73,18 @@ function elapsed(at: string | undefined, t0: number | null) {
   return Number.isFinite(ms) && ms >= 0 ? `+${(ms / 1000).toFixed(1)}s` : null;
 }
 
-export function RunTrace({ steps, live }: { steps: StepView[]; live: boolean }) {
+export function RunTrace({ steps, live, labels = STEP_LABEL, label = "Lab run steps" }: { steps: AnyStep[]; live: boolean; labels?: Record<string, string>; label?: string }) {
   const reduce = useReducedMotion();
   const firstAt = steps.find((s) => s.at)?.at;
   const t0 = firstAt ? Date.parse(firstAt) : null;
   const active = steps.reduce((n, s, i) => (s.status === "pending" ? n : i + 1), 0);
 
   return (
-    <Timeline value={active} className="pl-1" aria-label="Lab run steps">
+    <Timeline value={active} className="pl-1" aria-label={label}>
       {steps.map((raw, i) => {
         // ntfy.sh refuses Cloudflare Workers, so the server hands the push to the page, which sends it.
         // That hand-off is the designed path, not a failure of the run.
-        const v: StepView = raw.id === "notify" && raw.status === "fail" && raw.ntfy
+        const v: AnyStep = raw.id === "notify" && raw.status === "fail" && raw.ntfy
           ? { ...raw, status: "ok", title: `Phone push sent from the visitor's browser to ntfy.sh/${raw.ntfy.topic}`, detail: "ntfy.sh refuses connections from Cloudflare Workers, so the page sends it" }
           : raw;
         const reached = v.status !== "pending";
@@ -93,7 +97,7 @@ export function RunTrace({ steps, live }: { steps: StepView[]; live: boolean }) 
               <div className="flex min-w-0 items-baseline justify-between gap-3">
                 <TimelineTitle className={cn("flex min-w-0 items-baseline gap-2.5 text-[14px] transition-colors duration-300", reached ? "text-fg" : "text-fg-faint")}>
                   <span className="font-mono text-[11px] text-fg-faint tabular-nums">{String(i + 1).padStart(2, "0")}</span>
-                  <span className="min-w-0">{STEP_LABEL[v.id]}</span>
+                  <span className="min-w-0">{labels[v.id] ?? v.id}</span>
                 </TimelineTitle>
                 {time ? <span className="shrink-0 font-mono text-[11px] text-fg-faint tabular-nums">{time}</span> : null}
               </div>
@@ -109,7 +113,7 @@ export function RunTrace({ steps, live }: { steps: StepView[]; live: boolean }) 
                 }
                 className="mt-1 pl-[30px] text-[13px] leading-relaxed text-fg-muted"
               >
-                {v.title ? <p className={cn("[overflow-wrap:anywhere]", v.status === "fail" && "text-trip")}>{v.title}</p> : null}
+                {v.title ? <p className={cn("[overflow-wrap:anywhere]", v.status === "fail" && "text-trip", v.status === "skip" && "text-fg-faint")}>{v.title}</p> : null}
                 {v.detail ? <p className="mt-0.5 font-mono text-[11.5px] [overflow-wrap:anywhere] text-fg-faint">{v.detail}</p> : null}
                 {v.txs.length || typeof v.block === "number" ? (
                   <div className="mt-2 flex flex-wrap items-center gap-1.5">
