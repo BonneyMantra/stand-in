@@ -15,7 +15,7 @@ export default function MyDecoysPage() {
       <OwnGate>
         {s && (
           <>
-            <DecoysPanel bait={s.bait.id} exists={s.bait.exists} decoys={t.decoys} home={m.home} canAdd={m.summary?.bait === "held"} adding={t.tools.working === "decoy"} onAdd={() => void t.tools.addDecoy()} />
+            <DecoysPanel bait={s.bait.id} exists={s.bait.exists} decoys={t.decoys} home={m.home} canAdd={m.summary?.bait === "held"} adding={t.tools.working === "decoy"} onAdd={() => void t.tools.addDecoy()} thefts={t.thefts} />
             {t.tools.note && <p role="status" className={t.tools.note.tone === "error" ? "text-xs text-trip" : "text-xs text-safe"}>{t.tools.note.text}</p>}
           </>
         )}

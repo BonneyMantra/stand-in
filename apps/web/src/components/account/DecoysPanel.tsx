@@ -5,13 +5,16 @@ import { blockUrl, shortKey } from "@/data/derive";
 import type { DecoyView } from "@/data/accountDerive";
 import type { HomeRecord } from "@/lib/wallet/homeStore";
 import { explorerAccount, explorerTx } from "@/lib/wallet/near";
+import { freezeKey, type TheftLookup } from "@/data/useTheftTxs";
+import { TheftLink } from "./FreezesPanel";
 
 /**
  * The decoys on the owner's bait: every key on deployer.<owner> except the bait's own key, from view_access_key_list. A key
  * whose nonce moved has signed a transaction: on a decoy, that is a theft.
  */
-export function DecoysPanel({ bait, exists, decoys, home, canAdd, adding, onAdd, limit }: {
+export function DecoysPanel({ bait, exists, decoys, home, canAdd, adding, onAdd, limit, thefts = {} }: {
   bait: string; exists: boolean; decoys: DecoyView[]; home: HomeRecord | null; canAdd: boolean; adding: boolean; onAdd: () => void; limit?: number;
+  thefts?: Record<string, TheftLookup>;
 }) {
   const real = decoys.filter((d) => !d.admin);
   const admin = decoys.find((d) => d.admin);
@@ -47,7 +50,7 @@ export function DecoysPanel({ bait, exists, decoys, home, canAdd, adding, onAdd,
                 </div>
                 <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-fg-faint">
                   {mine?.tx_hash && <span>added in <ExtLink href={explorerTx(mine.tx_hash)} className="text-[11px]">{shortKey(mine.tx_hash, 6, 4)}</ExtLink></span>}
-                  {trip?.trip_tx && <span>theft <ExtLink href={explorerTx(trip.trip_tx)} className="text-[11px]">{shortKey(trip.trip_tx, 6, 4)}</ExtLink></span>}
+                  {trip && <TheftLink txHash={trip.trip_tx} lookup={thefts[freezeKey(trip)]} />}
                   {trip && <span>freeze at block <ExtLink href={blockUrl(Number(trip.at_block))} className="text-[11px]">{trip.at_block}</ExtLink></span>}
                   {mine && !d.signed && (
                     <span className="inline-flex items-center gap-1">

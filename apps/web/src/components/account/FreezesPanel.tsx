@@ -4,13 +4,21 @@ import { blockUrl, shortKey } from "@/data/derive";
 import type { FreezeView } from "@/data/accountDerive";
 import { freezeTxFor, type ActivityTx } from "@/data/activity";
 import { explorerTx } from "@/lib/wallet/near";
+import { freezeKey, type TheftLookup } from "@/data/useTheftTxs";
+
+/** The theft behind a trip: the record's own tx_hash, else the theft read back from the bait (as /verify shows it). */
+export function TheftLink({ txHash, lookup }: { txHash: string | null; lookup: TheftLookup | undefined }) {
+  if (txHash) return <span>theft <ExtLink href={explorerTx(txHash)} className="text-[11px]">{shortKey(txHash, 6, 4)}</ExtLink></span>;
+  if (lookup?.status === "found") return <span data-testid="theft-recovered">theft <ExtLink href={explorerTx(lookup.hash)} className="text-[11px]">{shortKey(lookup.hash, 6, 4)}</ExtLink> (read from the bait; the record has none)</span>;
+  return <span>{lookup?.status === "loading" ? "finding the theft on the bait…" : lookup?.status === "unreachable" ? "theft: RPC did not answer" : "theft tx not recorded"}</span>;
+}
 
 /**
  * Trips and freezes from each guardian's on-chain freeze_log (at most the last 50 per guardian, as the contract keeps them):
  * who froze (your watcher or you), why, the decoy and its theft, the keys deleted. The freeze transaction itself is not in
  * the contract's state; it is matched from the indexer by block.
  */
-export function FreezesPanel({ freezes, activity, limit }: { freezes: FreezeView[]; activity: ActivityTx[]; limit?: number }) {
+export function FreezesPanel({ freezes, activity, thefts = {}, limit }: { freezes: FreezeView[]; activity: ActivityTx[]; thefts?: Record<string, TheftLookup>; limit?: number }) {
   const shown = limit ? freezes.slice(0, limit) : freezes;
   const trips = freezes.filter((f) => f.trip).length;
   return (
@@ -34,7 +42,7 @@ export function FreezesPanel({ freezes, activity, limit }: { freezes: FreezeView
                 <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-fg-faint">
                   <span>block <ExtLink href={blockUrl(Number(f.at_block))} className="text-[11px]">{f.at_block}</ExtLink></span>
                   {ftx && <span>freeze tx <ExtLink href={explorerTx(ftx.hash)} className="text-[11px]">{shortKey(ftx.hash, 6, 4)}</ExtLink></span>}
-                  {f.trip_tx && <span>theft <ExtLink href={explorerTx(f.trip_tx)} className="text-[11px]">{shortKey(f.trip_tx, 6, 4)}</ExtLink></span>}
+                  {f.decoy_public_key && <TheftLink txHash={f.trip_tx} lookup={thefts[freezeKey(f)]} />}
                   {f.decoy_public_key && <span className="inline-flex items-center gap-1">decoy <CopyText value={f.decoy_public_key} display={shortKey(f.decoy_public_key, 6, 4)} className="text-[11px]" /></span>}
                   <span>{f.deleted_keys.length} agent key{f.deleted_keys.length === 1 ? "" : "s"} deleted · {f.intents_keys_removed.length} intents key{f.intents_keys_removed.length === 1 ? "" : "s"} removed</span>
                 </p>

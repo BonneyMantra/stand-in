@@ -99,8 +99,8 @@ function Body({ t, homeRef, toHome }: { t: ReturnType<typeof useAccountTools>; h
         <div className="min-w-0 space-y-4">
           <GuardiansPanel snapshot={s} />
           <div className="grid items-start gap-4 2xl:grid-cols-2">
-            <DecoysPanel bait={s.bait.id} exists={s.bait.exists} decoys={t.decoys} home={m.home} canAdd={m.summary?.bait === "held"} adding={t.tools.working === "decoy"} onAdd={() => void t.tools.addDecoy()} limit={6} />
-            <FreezesPanel freezes={t.freezes} activity={t.activityTxs} limit={5} />
+            <DecoysPanel bait={s.bait.id} exists={s.bait.exists} decoys={t.decoys} home={m.home} canAdd={m.summary?.bait === "held"} adding={t.tools.working === "decoy"} onAdd={() => void t.tools.addDecoy()} limit={6} thefts={t.thefts} />
+            <FreezesPanel freezes={t.freezes} activity={t.activityTxs} thefts={t.thefts} limit={5} />
           </div>
           <ActivityPanel read={t.activity.read} local={m.home?.txs ?? []} ctx={{ bait: s.bait.id, watcher: s.watcher.id }} onReload={() => void t.activity.reload()} />
         </div>

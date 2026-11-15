@@ -16,7 +16,7 @@ export default function MyTripsPage() {
       <OwnGate>
         {s && (
           <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
-            <FreezesPanel freezes={t.freezes} activity={t.activityTxs} />
+            <FreezesPanel freezes={t.freezes} activity={t.activityTxs} thefts={t.thefts} />
             <ActivityPanel read={t.activity.read} local={m.home?.txs ?? []} ctx={{ bait: s.bait.id, watcher: s.watcher.id }} onReload={() => void t.activity.reload()} limit={25} />
           </div>
         )}

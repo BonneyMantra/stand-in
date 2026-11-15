@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useMyAccount } from "@/data/useMyAccount";
 import { decoysOf, freezesOf } from "@/data/accountDerive";
 import { activityTxs, useActivity } from "@/data/useActivity";
+import { useTheftTxs } from "@/data/useTheftTxs";
 import { useWallet } from "@/components/owner/WalletProvider";
 import { useOwnerTx } from "@/components/owner/useOwnerTx";
 import { useConsoleActions } from "@/components/owner/useConsoleActions";
@@ -27,11 +28,12 @@ export function useAccountTools() {
   const tools = useHomeTools(m.owner, watched, m.refreshSoon);
   const freezes = useMemo(() => (s ? freezesOf(s.guardians) : []), [s]);
   const decoys = useMemo(() => (s ? decoysOf(s.bait, m.home, freezes) : []), [s, m.home, freezes]);
+  const thefts = useTheftTxs(freezes, m.owner);
   const accounts = useMemo(() => (s ? [...s.guardians.map((g) => g.id), ...(s.bait.exists ? [s.bait.id] : []), ...(s.watcher.exists ? [s.watcher.id] : [])] : []), [s]);
   const freezeCount = freezes.length;
   const activity = useActivity(accounts, freezeCount + (m.home?.txs.length ?? 0));
   return {
-    plan, tools, freezes, decoys, activity, activityTxs: activityTxs(activity.read),
+    plan, tools, freezes, decoys, thefts, activity, activityTxs: activityTxs(activity.read),
     busy: tx.busy, log: tx.log, createHome: actions.createHome,
   };
 }
