@@ -44,31 +44,50 @@ export function near(yocto: bigint, digits = 2): string {
   return `${s.slice(0, -digits)}.${s.slice(-digits)}`;
 }
 
+const baitLine = (): QuoteLine => ({ label: "bait account", yocto: BAIT_FUND, why: "storage for its decoy keys, gas for a thief's transaction, and something worth stealing" });
+/**
+ * The watcher's line. A browser-made watcher holds a freeze-only function-call key (it cannot attach the report's deposit),
+ * so its reason says what the same funding pays for there.
+ */
+const watcherLine = (freezeOnly = false): QuoteLine => ({
+  label: "watcher account", yocto: WATCHER_FUND,
+  why: freezeOnly
+    ? `pays for its freezes (100 TGas up front, about 0.0002 NEAR spent each); the same funding the CLI gives a watcher, enough for a blocklist report (${near(REPORT_UPFRONT)} NEAR up front) if you later run it with a full-access key`
+    : `a blocklist report needs ${near(REPORT_UPFRONT)} NEAR up front (300 TGas + 0.05 deposit; about 0.003 is spent), plus freezes`,
+});
+
 export const guardianStorage = () => (GUARDIAN_CODE_BYTES + GUARDIAN_STATE_BYTES) * YOCTO_PER_BYTE;
 
 /**
  * The balance an account needs before an adopt request: what its own storage already locks, the guardian (storage + up-front
  * deploy gas) when one is deployed, the bait and the watcher it creates, and gas.
  */
-export function quoteAdopt(o: { storageBytes: bigint; deployGuardian: boolean; createBait: boolean; createWatcher: boolean }): Quote {
+export function quoteAdopt(o: { storageBytes: bigint; deployGuardian: boolean; createBait: boolean; createWatcher: boolean; watcherFreezeOnly?: boolean }): Quote {
   const lines: QuoteLine[] = [{ label: "already locked", yocto: o.storageBytes * YOCTO_PER_BYTE, why: "the account's own storage, which it cannot spend" }];
   if (o.deployGuardian) {
     lines.push({ label: "guardian storage", yocto: guardianStorage(), why: "the 176,033-byte contract and its state at 1 NEAR per 100 kB; locked while the guardian is deployed" });
     lines.push({ label: "deploy gas", yocto: DEPLOY_TGAS * UPFRONT_PER_TGAS, why: "150 TGas paid up front; the unused part comes back" });
   }
-  if (o.createBait) lines.push({ label: "bait account", yocto: BAIT_FUND, why: "storage for its decoy keys, gas for a thief's transaction, and something worth stealing" });
-  if (o.createWatcher) lines.push({ label: "watcher account", yocto: WATCHER_FUND, why: `a blocklist report needs ${near(REPORT_UPFRONT)} NEAR up front (300 TGas + 0.05 deposit; about 0.003 is spent), plus freezes` });
+  if (o.createBait) lines.push(baitLine());
+  if (o.createWatcher) lines.push(watcherLine(o.watcherFreezeOnly));
   lines.push({ label: "gas", yocto: OWNER_GAS, why: "your own transactions; nearly all of it stays with you" });
   return sum(lines);
 }
 
-/** create_guardian: the factory's own required_deposit (read from chain) plus up-front gas, on top of locked storage. */
-export function quoteFactory(o: { storageBytes: bigint; deposit: bigint }): Quote {
-  return sum([
+/**
+ * create_guardian: the factory's own required_deposit (read from chain) plus up-front gas, on top of locked storage. The
+ * owner console can create the home's bait and watcher in the same wallet request; their funding is then quoted too.
+ */
+export function quoteFactory(o: { storageBytes: bigint; deposit: bigint; createBait?: boolean; createWatcher?: boolean; watcherFreezeOnly?: boolean }): Quote {
+  const lines: QuoteLine[] = [
     { label: "already locked", yocto: o.storageBytes * YOCTO_PER_BYTE, why: "the account's own storage, which it cannot spend" },
     { label: "factory deposit", yocto: o.deposit, why: "the factory's required_deposit: the new account's guardian storage; about 0.3 NEAR of it stays withdrawable" },
     { label: "gas", yocto: FACTORY_TGAS * UPFRONT_PER_TGAS, why: "100 TGas paid up front; the unused part comes back" },
-  ]);
+  ];
+  if (o.createBait) lines.push(baitLine());
+  if (o.createWatcher) lines.push(watcherLine(o.watcherFreezeOnly));
+  if (o.createBait || o.createWatcher) lines.push({ label: "account gas", yocto: OWNER_GAS, why: "the transactions that create your bait and watcher; nearly all of it stays with you" });
+  return sum(lines);
 }
 
 /** How much `balance` is short of a quote (0 when it covers it). */

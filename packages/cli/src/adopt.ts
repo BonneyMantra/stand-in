@@ -138,7 +138,7 @@ async function setUpHomeAccounts(cfg: NetworkConfig, agent: string, owner: Retur
     const st: any = await makeProvider(cfg).callFunction({ contractId: agent, method: "get_state", args: {} } as any).catch(() => null);
     if (st && typeof st === "object" && "watcher" in st && String(st.watcher) !== ids.watcher) throw new HomeRefusal(watcherMismatch(agent, String(st.watcher), ids.watcher));
   }
-  const plan = await planHomeAccounts(agent, ledgerHome, chain);
+  const plan = await planHomeAccounts(agent, ledgerHome, chain, agent);
   const { summary } = await checkFunding(chain, plan, acc.code_hash === EMPTY);
   out(`Before signing with ${agent}'s key: ${summary}`);
   for (const c of await createHomeAccounts(owner, plan)) {

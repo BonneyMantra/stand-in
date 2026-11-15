@@ -109,7 +109,7 @@ export async function adoptWallet(o: AdoptWalletOpts): Promise<number> {
     try {
       const g = await chain.guardian(o.account);
       if (g && g.watcher !== ids.watcher) throw new HomeRefusal(watcherMismatch(o.account, g.watcher, ids.watcher));
-      const plan = await planHomeAccounts(parent, home, homeChain);
+      const plan = await planHomeAccounts(parent, home, homeChain, o.account);
       const deploys = !g && o.account === parent;
       quoteSummary = (await checkFunding(homeChain, plan, deploys)).summary;
       const k = generateKey();

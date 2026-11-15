@@ -16,7 +16,13 @@ export interface HomeChain {
   account(id: string): Promise<AccountView | null>;
   /** true when `publicKey` is a full-access key on `id` */
   fullAccess(id: string, publicKey: string): Promise<boolean>;
+  /**
+   * The permission of `publicKey` on `id`, or null when it is not on the account. Optional: a chain without it can only
+   * tell full access, so a function-call watcher key (made by the owner console) is accepted only where this exists.
+   */
+  keyView?(id: string, publicKey: string): Promise<KeyView | null>;
 }
+export type KeyView = { kind: "full-access" } | { kind: "function-call"; receiver_id: string; method_names: string[] };
 export interface HomeAccount { role: HomeRole; account_id: string; public_key: string; exists: boolean }
 export interface HomePlan { parent: string; bait: HomeAccount; watcher: HomeAccount; toCreate: HomeAccount[] }
 
@@ -37,22 +43,33 @@ export function liveHomeChain(cfg: NetworkConfig): HomeChain {
       }
     },
     async fullAccess(id, publicKey) {
+      return (await this.keyView!(id, publicKey))?.kind === "full-access";
+    },
+    async keyView(id, publicKey) {
       try {
         const k: any = await eachEndpoint(cfg, false, (p) => p.viewAccessKey({ accountId: id, publicKey } as any), missing);
-        return k.permission === "FullAccess" || k.permission?.FullAccess !== undefined;
+        if (k.permission === "FullAccess" || k.permission?.FullAccess !== undefined) return { kind: "full-access" };
+        const fc = k.permission?.FunctionCall ?? k.permission?.functionCall;
+        if (!fc) return null;
+        return { kind: "function-call", receiver_id: String(fc.receiver_id ?? fc.receiverId), method_names: (fc.method_names ?? fc.methodNames ?? []).map(String) };
       } catch (e) {
-        if (missing(e)) return false;
+        if (missing(e)) return null;
         throw e;
       }
     },
   };
 }
 
+/** A function-call key that may call `freeze` on exactly this guardian (what the owner console makes for a watcher). */
+const freezesGuardian = (k: KeyView | null, guardian: string) => k?.kind === "function-call" && k.receiver_id === guardian && k.method_names.includes("freeze");
+
 /**
  * Per home account: on chain with this home's key: reuse. On chain without it: refuse, naming the fix. Missing: create,
  * with a key generated now and saved first (an unfinished run's saved key is reused, so its printed link stays valid).
+ * The bait needs a full-access key (every decoy is a key added to it). The watcher also accepts, when `guardian` is given,
+ * a function-call key whose receiver is that guardian and whose methods include `freeze`: all a freeze needs.
  */
-export async function planHomeAccounts(parent: string, home: string, chain: HomeChain): Promise<HomePlan> {
+export async function planHomeAccounts(parent: string, home: string, chain: HomeChain, guardian?: string): Promise<HomePlan> {
   const problem = homeAccountProblem(parent);
   if (problem) throw new HomeRefusal(problem);
   const ids = homeAccountIds(parent);
@@ -60,8 +77,12 @@ export async function planHomeAccounts(parent: string, home: string, chain: Home
     const local = loadHomeKey(home, id);
     if (await chain.account(id)) {
       if (local && (await chain.fullAccess(id, local.public_key))) return { role, account_id: id, public_key: local.public_key, exists: true };
+      const view = local && role === "watcher" && guardian && chain.keyView ? await chain.keyView(id, local.public_key) : null;
+      if (local && guardian && freezesGuardian(view, guardian)) return { role, account_id: id, public_key: local.public_key, exists: true };
       const what = role === "bait" ? "add decoy keys to it" : "sign freezes with it";
-      throw new HomeRefusal(`${id} already exists and this home holds no full-access key for it, so Stand-in cannot ${what}. Run adopt with the --home that created it, or copy that home's .standin/keys/${id}.json into ${homeKeysDir(home)}/`);
+      const orFc = role === "watcher" && guardian ? `, nor a function-call key that may call freeze on ${guardian}` : "";
+      const seen = view?.kind === "function-call" ? ` Its key here is a function-call key on ${view.receiver_id} for ${view.method_names.length ? view.method_names.join(", ") : "any method"}.` : "";
+      throw new HomeRefusal(`${id} already exists and this home holds no full-access key for it${orFc}, so Stand-in cannot ${what}.${seen} Run adopt with the --home that created it, or copy that home's .standin/keys/${id}.json into ${homeKeysDir(home)}/`);
     }
     const key = local ?? generateKey();
     if (!local) saveHomeKey(home, role, id, key);

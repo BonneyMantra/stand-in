@@ -41,6 +41,8 @@ export class TripHandler {
   readonly registry: string;
   private submittedAt = 0;
   private frozenCheckedAt = 0;
+  /** Whether the watcher's own key is a FunctionCall key; read from chain once, then cached. */
+  private fcWatcher?: boolean;
   private ownerExtra?: { intents_tx_hash: string; deleted_keys: string[]; intents_keys_removed: string[] };
   constructor(private cfg: NetworkConfig, private home?: string) {
     this.decoy = requireAccount(cfg, "decoy");
@@ -227,6 +229,17 @@ export class TripHandler {
     };
   }
 
+  /** True when the watcher's key on chain is a FunctionCall key (an unreadable key counts as not, so the report is tried). */
+  private async holdsFunctionCallKey(): Promise<boolean> {
+    if (this.fcWatcher !== undefined) return this.fcWatcher;
+    try {
+      const k: any = await makeProvider(this.cfg).viewAccessKey({ accountId: requireAccount(this.cfg, "watcher"), publicKey: loadDevKey(this.cfg, "watcher").public_key } as any);
+      return (this.fcWatcher = k.permission !== "FullAccess" && k.permission?.FullAccess === undefined);
+    } catch {
+      return false;
+    }
+  }
+
   /**
    * registry.report(...) signed by the watcher account (300 TGas: the OutLayer yield/resume needs it).
    * The report tx only completes after OutLayer resumes it; if the worker times out the registry refuses and the
@@ -234,6 +247,11 @@ export class TripHandler {
    */
   private async reportToRegistry(tx: SeenTx, attacker: string): Promise<void> {
     if (!this.registry || process.env.STANDIN_NO_REPORT === "1") return;
+    if (await this.holdsFunctionCallKey()) {
+      log.warn(`blocklist report skipped: ${requireAccount(this.cfg, "watcher")} holds a freeze-only function-call key (made by the owner console); a report attaches a deposit, which only a full-access key can sign. The freeze does not depend on it.`);
+      appendEvent("tool_call", { tool_name: "standin watcher", outcome: "report_skipped_function_call_key", trip_tx_hash: tx.hash }, this.home);
+      return;
+    }
     const w = makeAccount(this.cfg, requireAccount(this.cfg, "watcher"), loadDevKey(this.cfg, "watcher").secret_key);
     const deposit = BigInt(process.env.STANDIN_REPORT_DEPOSIT_YOCTO ?? "50000000000000000000000"); // registry min 0.01 NEAR; unused part refunded
     const args = { tx_hash: tx.hash, decoy_account_id: this.decoy, sender_id: this.decoy, admin_public_key: this.adminPk };
