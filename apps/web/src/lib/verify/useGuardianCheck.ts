@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { loadGuardianCode, CodeMismatch } from "../wallet/guardianCode";
-import { checkGuardian, findFreezeTx, verifyRpc, type CheckResult } from "./guardian";
+import { baitOf, checkGuardian, findFreezeTx, findTheftTx, verifyRpc, type CheckResult } from "./guardian";
 
 export type GuardianCheckState =
   | { status: "idle" }
@@ -18,6 +18,7 @@ const FREEZE_LOOKUPS = 6;
 export function useGuardianCheck() {
   const [state, setState] = useState<GuardianCheckState>({ status: "idle" });
   const [freezeTxs, setFreezeTxs] = useState<FreezeTxs>({});
+  const [theftTxs, setTheftTxs] = useState<FreezeTxs>({});
   const [served, setServed] = useState<ServedWasm>({ status: "idle" });
   const gen = useRef(0);
 
@@ -35,6 +36,7 @@ export function useGuardianCheck() {
     const g = ++gen.current;
     setState({ status: "loading", account });
     setFreezeTxs({});
+    setTheftTxs({});
     let result: CheckResult;
     try {
       result = await checkGuardian(account);
@@ -58,8 +60,15 @@ export function useGuardianCheck() {
       }
       if (g !== gen.current) return;
       setFreezeTxs((m) => ({ ...m, [r.at_block]: found }));
+      // A record with a decoy but no theft hash: the theft is read back from the bait's key changes before the freeze.
+      if (!r.tx_hash && r.decoy_public_key) {
+        setTheftTxs((m) => ({ ...m, [r.at_block]: "loading" }));
+        const t = await findTheftTx(baitOf(r.reason, result.state.owner), r.decoy_public_key, Number(r.at_block), verifyRpc).catch(() => "unreachable" as const);
+        if (g !== gen.current) return;
+        setTheftTxs((m) => ({ ...m, [r.at_block]: t === "unreachable" ? t : t?.hash ?? null }));
+      }
     }
   }, [served.status, hashServed]);
 
-  return { state, freezeTxs, served, check };
+  return { state, freezeTxs, theftTxs, served, check };
 }

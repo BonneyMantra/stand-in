@@ -100,6 +100,31 @@ export async function checkGuardian(account: string, rpc: Rpc = verifyRpc): Prom
   };
 }
 
+/** The bait a freeze record's decoy lives on: named in a tab watcher's reason, else the owner's own `deployer.<owner>`. */
+export function baitOf(reason: string, owner: string): string {
+  return reason.match(/ on ([a-z0-9._-]+) signed a transaction/)?.[1] ?? `deployer.${owner}`;
+}
+
+/**
+ * The theft behind a freeze record that names its decoy key but carries no transaction hash (a freeze sent before the
+ * theft's block was read): the decoy key's nonce moved, in a `transaction_processing` change, a few blocks before the freeze
+ * ran. Reads the bait's key changes back from `atBlock`.
+ */
+export async function findTheftTx(bait: string, decoyPk: string, atBlock: number, rpc: Rpc = verifyRpc, depth = 15): Promise<{ hash: string; block: number } | null> {
+  for (let h = atBlock - 1; h >= atBlock - depth; h--) {
+    let changes: { type?: string; cause?: { type?: string; tx_hash?: string }; change?: { public_key?: string } }[];
+    try {
+      changes = (await rpc.call<{ changes: typeof changes }>("EXPERIMENTAL_changes", { changes_type: "all_access_key_changes", account_ids: [bait], block_id: h })).changes ?? [];
+    } catch (e) {
+      if (e instanceof ChainAnswer) continue;
+      throw e;
+    }
+    const c = changes.find((x) => x.type === "access_key_update" && x.cause?.type === "transaction_processing" && x.change?.public_key === decoyPk);
+    if (c?.cause?.tx_hash) return { hash: c.cause.tx_hash, block: h };
+  }
+  return null;
+}
+
 /**
  * The transaction behind a freeze record. The guardian logs the block its freeze ran in (`at_block`) and who called it
  * (`by`), not the transaction hash: the caller's key nonce moved in the block that included it, at most a few blocks

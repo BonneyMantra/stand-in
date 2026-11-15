@@ -98,7 +98,7 @@ export class MyRun {
     this.set({ phase: "running", runId, guardian, thief });
     const entry = tabWatcherFor(home);
     const bait = new KeySigner(this.rpc, home.bait.account_id, home.bait.secret_key);
-    const thiefSigner = new KeySigner(this.rpc, thief, thiefKey.secret_key);
+    const thiefSigner = { account: thief, secret: thiefKey.secret_key };
     let decoyPk: string | null = null;
     let stole = false;
     let pre: Preflight;
@@ -194,8 +194,8 @@ export class MyRun {
     }
   }
 
-  private async cleanup(bait: KeySigner, thief: KeySigner, decoyPk: string | null, stole: boolean) {
-    this.step("cleanup", "start", stole ? "The thief account sends the loot back; the bait's key deletes the used decoy" : "The bait's key deletes the unused decoy");
+  private async cleanup(bait: KeySigner, thief: { account: string; secret: string }, decoyPk: string | null, stole: boolean) {
+    this.step("cleanup", "start", stole ? "The thief deletes its throwaway account, returning everything to the bait; the bait's key deletes the used decoy" : "The bait's key deletes the unused decoy");
     const out = await cleanUp(this.rpc, { bait, thief, decoyPk, stole }, (label, h) => this.tx(label, h));
     if (decoyPk && out.some((o) => o.label === "delete decoy" && (o.hash || o.error === "already gone"))) {
       updateHome(this.home.owner, (h) => ({ ...h, decoys: h.decoys.filter((d) => d.public_key !== decoyPk) }));
@@ -203,7 +203,7 @@ export class MyRun {
     const bad = out.filter((o) => o.error && o.error !== "already gone");
     this.step("cleanup", bad.length ? "fail" : "ok",
       bad.length ? bad.map((b) => `${b.label}: ${b.error}`).join("; ") : out.map((o) => o.label).join(" and ") + " landed",
-      { txs: out.filter((o) => o.hash).map((o) => ({ hash: o.hash!, label: o.label })), detail: stole ? "The thief's own account keeps about 0.0023 NEAR: its storage and a gas margin, which a transfer cannot move." : undefined });
+      { txs: out.filter((o) => o.hash).map((o) => ({ hash: o.hash!, label: o.label })), detail: out.find((o) => o.detail)?.detail });
   }
 }
 

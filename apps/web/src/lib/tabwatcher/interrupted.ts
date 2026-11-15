@@ -1,6 +1,6 @@
 import { GuardianState } from "../wallet/near";
 import type { Journal } from "./journal";
-import { blockHeight, spendable, txStatus, viewAccessKey, viewAccount, viewFunction, type Rpc } from "./rpc";
+import { blockHeight, txStatus, viewAccessKey, viewAccount, viewFunction, type Rpc } from "./rpc";
 
 /** What the chain says about a run whose tab closed before it finished. Every line is read now, not remembered. */
 export interface Interrupted {
@@ -9,12 +9,11 @@ export interface Interrupted {
   frozenByRun: boolean;
   frozen: boolean;
   decoyOnBait: boolean;
-  thiefHolds: bigint;
+  /** The throwaway thief account still exists: deleting it returns everything it holds to the bait. */
+  thiefExists: boolean;
 }
 
 const fmt = (y: bigint) => (Number((y * 1000n) / 10n ** 24n) / 1000).toFixed(3);
-/** Below this the thief account holds only dust a transfer cannot usefully move. */
-export const DUST = 10n ** 21n;
 
 export async function assessInterrupted(rpc: Rpc, j: Journal): Promise<Interrupted> {
   const lines: Interrupted["lines"] = [];
@@ -52,7 +51,6 @@ export async function assessInterrupted(rpc: Rpc, j: Journal): Promise<Interrupt
   } else {
     lines.push({ tone: "muted", text: `${j.guardian} is ${state.frozen ? "frozen" : "not frozen"}.` });
   }
-  const holds = thief ? spendable(thief) : 0n;
-  if (thief && holds > DUST) lines.push({ tone: "warn", text: `The thief account still holds ${fmt(holds)} NEAR it can return.` });
-  return { lines, theftLanded, frozenByRun, frozen: !!state?.frozen, decoyOnBait: !!decoy, thiefHolds: holds };
+  if (thief) lines.push({ tone: "warn", text: `The thief account still exists and holds ${fmt(thief.amount)} NEAR; deleting it returns all of it to the bait.` });
+  return { lines, theftLanded, frozenByRun, frozen: !!state?.frozen, decoyOnBait: !!decoy, thiefExists: !!thief };
 }

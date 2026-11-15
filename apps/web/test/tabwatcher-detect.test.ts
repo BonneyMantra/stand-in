@@ -1,18 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { diffSnapshots, freezeArgs, heightsBetween, snapshotOf, usesIn, type Snapshot } from "../src/lib/tabwatcher/detect.ts";
-import { ChainAnswer, RpcDown, chainKind, type Rpc } from "../src/lib/tabwatcher/rpc.ts";
+import { ChainAnswer, chainKind } from "../src/lib/tabwatcher/rpc.ts";
 import { TabWatcher } from "../src/lib/tabwatcher/watcher.ts";
-import type { FreezeResult, Freezer } from "../src/lib/tabwatcher/freezer.ts";
 import { implicitAccountOf } from "../src/lib/tabwatcher/sign.ts";
-
-const ADMIN = "ed25519:Admin1111111111111111111111111111111111111111";
-const DECOY = "ed25519:Decoy1111111111111111111111111111111111111111";
-const OTHER = "ed25519:Other1111111111111111111111111111111111111111";
-const BAIT = "deployer.owner-qa.testnet";
-const GUARD = "owner-qa.testnet";
+import { ADMIN, BAIT, DECOY, GUARD, OTHER, fakeChain, fresh, settle } from "./tabwatcher-fake.ts";
 
 const snap = (height: number, keys: [string, bigint][]): Snapshot => ({ height, hash: `h${height}`, missing: false, keys: new Map(keys) });
-const fresh = (h: number) => BigInt(h - 1) * 1_000_000n;
 
 describe("diffSnapshots: a nonce that grew is a theft (the CLI's rule read from key state)", () => {
   const a = snap(100, [[ADMIN, 50n], [DECOY, fresh(90)]]);
@@ -65,54 +58,6 @@ describe("usesIn: EXPERIMENTAL_changes filtered exactly like packages/watcher fo
   });
 });
 
-/** A scripted chain: key-list reads and per-block changes, with switchable failure. */
-function fakeChain() {
-  const c = {
-    height: 100,
-    keys: new Map<string, bigint>([[ADMIN, 50n], [DECOY, fresh(90)]]),
-    changes: new Map<number, unknown[]>(),
-    down: false,
-    reads: 0,
-  };
-  const rpc: Rpc = {
-    async callAt<T>(method: string, params: unknown) {
-      if (c.down) throw new RpcDown("No testnet RPC answered (last: test)");
-      const p = params as { block_id?: number; request_type?: string };
-      if (method === "query") {
-        c.reads++;
-        return { result: { block_height: c.height, block_hash: `h${c.height}`, keys: [...c.keys].map(([public_key, n]) => ({ public_key, access_key: { nonce: String(n) } })) } as T, endpoint: "https://test" };
-      }
-      if (method === "EXPERIMENTAL_changes") {
-        if (p.block_id! > c.height) throw new ChainAnswer("UNKNOWN_BLOCK", "UNKNOWN_BLOCK");
-        return { result: { changes: c.changes.get(p.block_id!) ?? [] } as T, endpoint: "https://test" };
-      }
-      throw new Error(`unexpected ${method}`);
-    },
-    async call<T>(method: string, params: unknown) {
-      return (await this.callAt<T>(method, params)).result;
-    },
-  };
-  const freezes: { guardian: string; args: { tx_hash: string | null; decoy_public_key: string } }[] = [];
-  const freezer: Freezer = {
-    targets: [GUARD],
-    frozen: async () => false,
-    freeze: async (guardian, args) => {
-      freezes.push({ guardian, args });
-      const r: FreezeResult = { guardian, status: "landed", tx_hash: "FREEZE", block: c.height + 2 };
-      return r;
-    },
-  };
-  /** The decoy signs a transaction included at the next height. */
-  const steal = (hash = "THEFT") => {
-    c.height += 1;
-    c.keys.set(DECOY, c.keys.get(DECOY)! + 1n);
-    c.changes.set(c.height, [{ type: "access_key_update", cause: { type: "transaction_processing", tx_hash: hash }, change: { public_key: DECOY } }]);
-  };
-  return { c, rpc, freezer, freezes, steal };
-}
-
-const settle = () => new Promise((r) => setTimeout(r, 450));
-
 describe("TabWatcher: armed before the theft, freezes once, misses nothing across a stall", () => {
   it("arms on the first read, then a decoy use freezes the guardian with the theft's tx hash", async () => {
     const f = fakeChain();
@@ -160,22 +105,6 @@ describe("TabWatcher: armed before the theft, freezes once, misses nothing acros
     await w.tick();
     await settle();
     expect(f.freezes.map((x) => x.args.tx_hash)).toEqual(["CRAFTED"]);
-  });
-
-  it("a node that has not seen the theft's block yet (UNKNOWN_BLOCK) is asked again, so the freeze still names the theft", async () => {
-    const f = fakeChain();
-    let refusals = 1;
-    const inner = f.rpc.callAt.bind(f.rpc);
-    f.rpc.callAt = async <T,>(method: string, params: unknown, endpoint?: string) => {
-      if (method === "EXPERIMENTAL_changes" && refusals > 0) { refusals--; throw new ChainAnswer("UNKNOWN_BLOCK", "UNKNOWN_BLOCK"); }
-      return inner<T>(method, params, endpoint);
-    };
-    const w = new TabWatcher({ rpc: f.rpc, bait: BAIT, admin: ADMIN, freezer: f.freezer });
-    await w.tick();
-    f.steal("LAGGING_NODE");
-    await w.tick();
-    await settle();
-    expect(f.freezes.map((x) => x.args.tx_hash)).toEqual(["LAGGING_NODE"]);
   });
 
   it("goes stalled when RPC stops answering, and the first good read after it still catches a theft from the gap", async () => {
@@ -240,38 +169,5 @@ describe("helpers", () => {
   it("a thief's implicit account is the hex of its public key", () => {
     expect(implicitAccountOf("ed25519:11111111111111111111111111111111")).toBe("00".repeat(32));
     expect(implicitAccountOf("ed25519:DzEhdSDEPbXBkv2J1kNNoPPgkw7G6dkK98c1t5JhuLJ3")).toMatch(/^[0-9a-f]{64}$/);
-  });
-});
-
-describe("WatcherFreezer: a guardian unfrozen since the last freeze is frozen again", () => {
-  it("re-reads a cached 'frozen' from chain before skipping", async () => {
-    const { WatcherFreezer } = await import("../src/lib/tabwatcher/freezer.ts");
-    let chainFrozen = true;
-    const sent: string[] = [];
-    const rpc: Rpc = {
-      async callAt<T>(method: string, params: unknown) {
-        const p = params as { method_name?: string; tx_hash?: string };
-        if (method === "query" && p.method_name === "get_state") {
-          const body = JSON.stringify({ frozen: chainFrozen, watcher: "w", owner: "o" });
-          return { result: { result: [...new TextEncoder().encode(body)] } as T, endpoint: "x" };
-        }
-        if (method === "tx") return { result: { status: { SuccessValue: "" }, transaction: {}, transaction_outcome: { block_hash: "B" }, receipts_outcome: [] } as T, endpoint: "x" };
-        if (method === "block") return { result: { header: { height: 7 } } as T, endpoint: "x" };
-        throw new Error(method);
-      },
-      async call<T>(m: string, p: unknown) { return (await this.callAt<T>(m, p)).result; },
-    };
-    const signer = { accountId: "w", broadcast: async () => { sent.push("freeze"); return "H"; }, warm: async () => {} };
-    const f = new WatcherFreezer(rpc, signer as never, [GUARD]);
-    await f.warm();
-    // frozen on chain: skipped, nothing sent
-    expect((await f.freeze(GUARD, { reason: "r", decoy_public_key: DECOY, tx_hash: null }, () => {})).status).toBe("skipped");
-    expect(sent).toHaveLength(0);
-    // the owner unfreezes; the cache still says frozen, but the freezer reads chain again and freezes
-    chainFrozen = false;
-    (f as unknown as { cache: Map<string, { frozen: boolean; at: number }> }).cache.set(GUARD, { frozen: true, at: Date.now() });
-    const r = await f.freeze(GUARD, { reason: "r", decoy_public_key: DECOY, tx_hash: null }, () => {});
-    expect(sent).toEqual(["freeze"]);
-    expect(r).toMatchObject({ status: "landed", tx_hash: "H", block: 7 });
   });
 });

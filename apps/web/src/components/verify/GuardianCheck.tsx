@@ -56,7 +56,7 @@ export function GuardianCheck() {
   const [value, setValue] = useState(initial);
   const [err, setErr] = useState<string | null>(null);
   const [suggest, setSuggest] = useState<{ id: string; why: string }[]>([]);
-  const { state, freezeTxs, served, check } = useGuardianCheck();
+  const { state, freezeTxs, theftTxs, served, check } = useGuardianCheck();
   const ran = useRef(false);
 
   const run = (raw: string, fromUser = true) => {
@@ -120,7 +120,7 @@ export function GuardianCheck() {
           ) : state.status === "ok" ? (
             <div className="space-y-4">
               <Outcome r={state.result} />
-              {state.result.kind === "guardian" ? <GuardianFacts r={state.result} freezeTxs={freezeTxs} served={served} /> : null}
+              {state.result.kind === "guardian" ? <GuardianFacts r={state.result} freezeTxs={freezeTxs} theftTxs={theftTxs} served={served} /> : null}
             </div>
           ) : (
             <p className="flex items-center gap-2 text-[12.5px] text-fg-faint"><CircleAlert aria-hidden className="size-3.5" />Try si-agent-5289.testnet (the film's guardian) or your own account.</p>

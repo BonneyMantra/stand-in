@@ -3,7 +3,7 @@ import { ArrowUpRight, Snowflake, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tag } from "@/components/app/common";
 import { FOCUS } from "@/components/landing/primitives";
-import type { TxEntry } from "@/components/owner/ActivityLog";
+import type { WalletResult } from "./useUnfreeze";
 import { shortHash } from "@/lib/lab/types";
 import { explorerTx } from "@/lib/wallet/near";
 import type { Preflight } from "@/lib/tabwatcher/preflight";
@@ -24,7 +24,7 @@ const Tx = ({ hash, label = "tx" }: { hash: string; label?: string }) => (
 );
 
 /** The owner's last wallet request from this page (unfreeze), with its explorer link and what was read back. */
-export function WalletLine({ entry }: { entry: TxEntry }) {
+export function WalletLine({ entry }: { entry: WalletResult }) {
   return (
     <p className="flex flex-wrap items-center gap-2 font-mono text-[11.5px]" data-testid="my-wallet-line">
       <Tag tone={entry.status === "ok" ? "safe" : entry.status === "failed" ? "trip" : "muted"}>{entry.label} · {entry.status === "pending" ? "waiting" : entry.status}</Tag>
@@ -69,7 +69,7 @@ export function ConfirmRun({ guardian, pre, targets, onStart, onCancel }: { guar
 }
 
 /** What the chain shows after the run, and the owner's way back: Unfreeze through their own wallet. */
-export function RunResult({ state, pre, busy, last, onUnfreeze, canSign }: { state: MyRunState; pre: Preflight | null; busy: boolean; last: TxEntry | null; onUnfreeze: () => void; canSign: boolean }) {
+export function RunResult({ state, pre, busy, last, onUnfreeze, canSign }: { state: MyRunState; pre: Preflight | null; busy: boolean; last: WalletResult | null; onUnfreeze: () => void; canSign: boolean }) {
   const rb = state.readback;
   const frozenNow = pre?.state?.frozen ?? rb?.frozen ?? false;
   return (

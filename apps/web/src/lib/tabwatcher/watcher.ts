@@ -1,6 +1,7 @@
-import { diffSnapshots, freezeArgs, heightsBetween, missingSnapshot, snapshotOf, tripId, usesIn, type KeyUse, type RawChange, type RawKeyList, type Snapshot, type Trip } from "./detect";
+import { diffSnapshots, freezeArgs, missingSnapshot, snapshotOf, tripId, type KeyUse, type RawKeyList, type Snapshot, type Trip } from "./detect";
 import type { FreezeResult, Freezer } from "./freezer";
 import { ChainAnswer, RpcDown, sleep, type Rpc } from "./rpc";
+import { BlockScan } from "./scan";
 
 export type WatchState = "starting" | "live" | "stalled" | "offline" | "stopped" | "error";
 
@@ -39,8 +40,12 @@ export interface WatcherOpts {
   prepare?: () => Promise<void>;
 }
 
-/** How long a freeze waits for the changes scan to name the theft's transaction before it goes without it. */
-const SCAN_GRACE_MS = 450;
+/**
+ * The longest a freeze waits for the block scan to name the theft's transaction, so the guardian's freeze record links the
+ * theft. It goes as soon as that key's block is read (usually one RPC round trip); a fixed 450 ms wait lost the hash
+ * whenever a lagging node or a busy page made the read slower (live, 15 Nov: the freeze of judge-p2 at block 277770420).
+ */
+export const TX_WAIT_MS = 1500;
 
 /**
  * The in-tab watcher. Every tick reads the bait's key list once; a nonce that grew (detect.ts) is a theft and freezes every
@@ -165,11 +170,11 @@ export class TabWatcher {
     if (!d) return; // a node behind the last read: nothing is concluded from it
     this.prev = snap;
     if (!d.used.length && !d.suspects.length) return;
-    const scan = this.scan(a.height, snap.height, endpoint);
+    const scan = new BlockScan(this.o.rpc, this.o.bait, this.o.admin, a.height, snap.height);
     for (const pk of d.used) void this.trip(pk, snap, "key state", scan);
     if (d.suspects.length) {
-      const uses = await scan.catch(() => [] as KeyUse[]);
-      for (const u of uses) if (d.suspects.includes(u.public_key)) void this.trip(u.public_key, snap, "changes", Promise.resolve(uses));
+      const uses = await scan.all.catch(() => [] as KeyUse[]);
+      for (const u of uses) if (d.suspects.includes(u.public_key)) void this.trip(u.public_key, snap, "changes", scan);
     }
   }
 
@@ -184,42 +189,10 @@ export class TabWatcher {
     }
   }
 
-  /** The CLI's rule over every block after `from` up to `to`, read from the node that served the key list. */
-  private async scan(from: number, to: number, endpoint: string): Promise<KeyUse[]> {
-    const heights = heightsBetween(from, to, 60);
-    const out: KeyUse[] = [];
-    for (let i = 0; i < heights.length; i += 8) {
-      const batch = heights.slice(i, i + 8);
-      const found = await Promise.all(batch.map((h) => this.changesAt(h, endpoint)));
-      for (const f of found) out.push(...f);
-    }
-    return out;
-  }
-
-  /**
-   * One block's key changes. A public endpoint balances over several nodes, and one that has not seen the newest block yet
-   * answers UNKNOWN_BLOCK, so that answer is asked again a few times (any endpoint) before the height counts as skipped.
-   */
-  private async changesAt(height: number, endpoint: string): Promise<KeyUse[]> {
-    for (let attempt = 0; attempt < 5; attempt++) {
-      try {
-        const r = await this.o.rpc.callAt<{ changes: RawChange[] }>(
-          "EXPERIMENTAL_changes", { changes_type: "all_access_key_changes", account_ids: [this.o.bait], block_id: height }, attempt === 0 ? endpoint : undefined,
-        );
-        return usesIn(r.result.changes ?? [], height, this.o.admin);
-      } catch (e) {
-        if (e instanceof ChainAnswer && e.kind !== "UNKNOWN_BLOCK") return [];
-        await sleep(e instanceof ChainAnswer ? 100 : 200);
-      }
-    }
-    return []; // a skipped height (no block was produced at it), or no node answered
-  }
-
-  private async trip(pk: string, snap: Snapshot, via: Trip["via"], scan: Promise<KeyUse[]>) {
+  private async trip(pk: string, snap: Snapshot, via: Trip["via"], scan: BlockScan) {
     const t0 = this.now();
-    // Wait briefly for the transaction hash so the guardian's freeze log links the theft; never longer than SCAN_GRACE_MS.
-    const early = await Promise.race([scan.catch(() => [] as KeyUse[]), sleep(SCAN_GRACE_MS).then(() => null)]);
-    const use = early?.find((u) => u.public_key === pk) ?? null;
+    // The freeze waits for this key's own block to be read, so the guardian's record links the theft; at most TX_WAIT_MS.
+    const use = await Promise.race([scan.find(pk).catch(() => null), sleep(TX_WAIT_MS).then(() => null)]);
     const id = tripId(pk, snap.keys.get(pk), use?.tx_hash ?? null);
     if (this.seen.has(id) || (use?.tx_hash && this.seen.has(tripId(pk, snap.keys.get(pk), null)))) return;
     this.seen.add(id);
@@ -243,8 +216,7 @@ export class TabWatcher {
     );
     // The scan finishes in the background and fills in the theft's transaction and block for the trace.
     if (!use) {
-      void scan.then((uses) => {
-        const u = uses.find((x) => x.public_key === pk);
+      void scan.find(pk).then((u) => {
         if (u) put({ tx_hash: u.tx_hash, theft_block: u.height });
       }).catch(() => undefined);
     }

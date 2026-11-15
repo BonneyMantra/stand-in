@@ -52,7 +52,17 @@ function keysSummary(keys: KeyRow[]) {
   return `${full} full-access, ${keys.length - full} function-call`;
 }
 
-export function GuardianFacts({ r, freezeTxs, served }: { r: GuardianReport; freezeTxs: FreezeTxs; served: ServedWasm }) {
+/** The theft link of one freeze record: its own tx_hash, else the theft read back from the bait's key changes. */
+function TheftLink({ txHash, decoy, found }: { txHash: string | null | undefined; decoy: string | null | undefined; found: FreezeTxs[string] | undefined }) {
+  if (txHash) return <Ext href={explorerTx(txHash)}>theft {shortHash(txHash)}</Ext>;
+  if (!decoy) return <span>no theft tx (manual freeze)</span>;
+  if (typeof found === "string" && found !== "loading" && found !== "unreachable") {
+    return <span><Ext href={explorerTx(found)}>theft {shortHash(found)}</Ext> (read from the bait; the record has none)</span>;
+  }
+  return <span>{found === "loading" ? "finding the theft on the bait…" : found === "unreachable" ? "theft: RPC did not answer" : "theft tx not recorded"}</span>;
+}
+
+export function GuardianFacts({ r, freezeTxs, theftTxs, served }: { r: GuardianReport; freezeTxs: FreezeTxs; theftTxs: FreezeTxs; served: ServedWasm }) {
   const s = r.state;
   const pinned = r.codeHash === GUARDIAN_CODE_HASH;
   const factory = r.codeHash === FACTORY_GUARDIAN_HASH;
@@ -110,7 +120,7 @@ export function GuardianFacts({ r, freezeTxs, served }: { r: GuardianReport; fre
                   </p>
                   <p className="text-[12.5px] [overflow-wrap:anywhere] text-fg-muted">{f.reason}</p>
                   <p className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-[11.5px] text-fg-faint">
-                    {f.tx_hash ? <Ext href={explorerTx(f.tx_hash)}>theft {shortHash(f.tx_hash)}</Ext> : <span>{f.decoy_public_key ? "theft tx not recorded" : "no theft tx (manual freeze)"}</span>}
+                    <TheftLink txHash={f.tx_hash} decoy={f.decoy_public_key} found={theftTxs[f.at_block]} />
                     {ft === "loading" ? <span>finding the freeze tx…</span> : typeof ft === "string" && ft !== "unreachable" ? <Ext href={explorerTx(ft)}>freeze {shortHash(ft)}</Ext> : ft === null ? <span>freeze tx not found in blocks {Number(f.at_block) - 3}–{Number(f.at_block)}</span> : ft === "unreachable" ? <span>freeze tx: RPC did not answer</span> : <span>older record: freeze tx not looked up</span>}
                     {f.decoy_public_key ? <span>decoy {pk(f.decoy_public_key)}</span> : null}
                     <span>{f.deleted_keys.length} agent key(s) deleted · {f.intents_keys_removed.length} intents key(s) removed</span>

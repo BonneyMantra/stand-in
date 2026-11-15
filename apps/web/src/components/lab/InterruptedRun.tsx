@@ -6,7 +6,7 @@ import { FOCUS } from "@/components/landing/primitives";
 import { shortHash } from "@/lib/lab/types";
 import { explorerTx } from "@/lib/wallet/near";
 import { canFreeze, recordHomeTx, type HomeRecord } from "@/lib/wallet/homeStore";
-import { DUST, assessInterrupted, type Interrupted } from "@/lib/tabwatcher/interrupted";
+import { assessInterrupted, type Interrupted } from "@/lib/tabwatcher/interrupted";
 import { writeJournal, type Journal } from "@/lib/tabwatcher/journal";
 import { freezeArgs } from "@/lib/tabwatcher/detect";
 import { tabWatcherFor } from "@/lib/tabwatcher/registry";
@@ -54,16 +54,16 @@ export function InterruptedRun({ journal, home, onClosed }: { journal: Journal; 
     setBusy("clean");
     const out = await cleanUp(uiRpc, {
       bait: new KeySigner(uiRpc, home.bait.account_id, home.bait.secret_key),
-      thief: new KeySigner(uiRpc, journal.thief.account, journal.thief.secret_key),
-      decoyPk: a?.decoyOnBait ? journal.decoy_pk ?? null : null, stole: (a?.thiefHolds ?? 0n) > DUST,
+      thief: { account: journal.thief.account, secret: journal.thief.secret_key },
+      decoyPk: a?.decoyOnBait ? journal.decoy_pk ?? null : null, stole: a?.thiefExists ?? false,
     }, (label, h) => recordHomeTx(home.owner, { hash: h, label: `lab run: ${label}`, at: Date.now() }));
-    setNote(out.map((o) => `${o.label}: ${o.hash ? `landed (${shortHash(o.hash)})` : o.error}`).join(" · ") || "Nothing left to clean up.");
+    setNote(out.map((o) => `${o.label}: ${o.hash ? `landed (${shortHash(o.hash)})${o.detail ? `, ${o.detail}` : ""}` : o.error}`).join(" · ") || "Nothing left to clean up.");
     setBusy(null);
     assess();
   };
 
   const canFreezeNow = !!a && a.theftLanded && !a.frozen && canFreeze(home, journal.guardian);
-  const canClean = !!a && (a.decoyOnBait || a.thiefHolds > DUST);
+  const canClean = !!a && (a.decoyOnBait || a.thiefExists);
   return (
     <Alert variant="warning" className="border-warn/30 bg-warn/5" data-testid="my-interrupted">
       <History />

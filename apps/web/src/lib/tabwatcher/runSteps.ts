@@ -1,7 +1,7 @@
 import { GuardianState } from "../wallet/near";
-import { firstFailure } from "../wallet/localSigner";
+import { firstFailure, sendLocalTx } from "../wallet/localSigner";
 import { act, KeySigner } from "./sign";
-import { blockHeight, spendable, viewAccessKey, viewAccount, viewFunction, waitExecuted, type Rpc, type TxView } from "./rpc";
+import { blockHeight, viewAccessKey, viewAccount, viewFunction, waitExecuted, type Rpc, type TxView } from "./rpc";
 import { REGISTRY, REPORT_DEPOSIT } from "./preflight";
 
 export const MY_STEPS = ["check", "plant", "arm", "theft", "detect", "freeze", "readback", "blocklist", "incident", "cleanup"] as const;
@@ -75,29 +75,51 @@ export async function fileReport(rpc: Rpc, watcher: KeySigner, o: { theftTx: str
   return { hash, verdict: v?.verdict ?? null, block };
 }
 
-/** The thief sends back what it can (its own storage stays locked) and the bait's key deletes the used decoy. */
-export async function cleanUp(rpc: Rpc, o: { bait: KeySigner; thief: KeySigner; decoyPk: string | null; stole: boolean }, onSigned: (label: string, h: string) => void) {
-  const out: { label: string; hash?: string; error?: string }[] = [];
-  const jobs: Promise<void>[] = [];
+const fmtNear = (y: bigint) => (Number((y * 10_000n) / 10n ** 24n) / 10_000).toFixed(4);
+
+export interface CleanStep { label: string; hash?: string; error?: string; detail?: string }
+
+/**
+ * The thief deletes its own throwaway account with the bait as beneficiary, so everything it took comes back (read back: the
+ * thief account no longer exists, and what the bait received); then the bait's key deletes the used decoy.
+ */
+export async function cleanUp(rpc: Rpc, o: { bait: KeySigner; thief: { account: string; secret: string }; decoyPk: string | null; stole: boolean }, onSigned: (label: string, h: string) => void): Promise<CleanStep[]> {
+  const out: CleanStep[] = [];
   if (o.stole) {
-    jobs.push((async () => {
-      const a = await viewAccount(rpc, o.thief.accountId);
-      const back = a ? spendable(a) - 500_000_000_000_000_000_000n : 0n; // keep 0.0005 NEAR for the transfer's gas (about 0.00005)
-      if (back <= 0n) { out.push({ label: "return loot", error: "the thief account holds nothing to return" }); return; }
-      const h = await o.thief.broadcast(o.bait.accountId, [act.transfer(back)], (x) => onSigned("return loot", x));
-      await landed(rpc, h, o.thief.accountId);
-      out.push({ label: "return loot", hash: h });
-    })().catch((e) => { out.push({ label: "return loot", error: (e as Error).message }); }));
+    try {
+      const [thiefBefore, baitBefore] = await Promise.all([viewAccount(rpc, o.thief.account), viewAccount(rpc, o.bait.accountId)]);
+      if (!thiefBefore) {
+        out.push({ label: "return loot", error: "the thief account no longer exists" });
+      } else {
+        const r = await sendLocalTx({ signerId: o.thief.account, secretKey: o.thief.secret, receiverId: o.thief.account, actions: [{ type: "DeleteAccount", beneficiaryId: o.bait.accountId }] });
+        onSigned("return loot", r.hash);
+        if (r.failure) {
+          out.push({ label: "return loot", hash: r.hash, error: r.failure });
+        } else {
+          const [thiefAfter, baitAfter] = await Promise.all([viewAccount(rpc, o.thief.account), viewAccount(rpc, o.bait.accountId)]);
+          const got = baitAfter && baitBefore ? baitAfter.amount - baitBefore.amount : null;
+          out.push({
+            label: "return loot", hash: r.hash,
+            detail: `${thiefAfter ? "the thief account still exists" : "the thief account is deleted"}; the bait received ${got !== null ? fmtNear(got) : "?"} NEAR of the ${fmtNear(thiefBefore.amount)} it held`,
+          });
+        }
+      }
+    } catch (e) {
+      out.push({ label: "return loot", error: (e as Error).message });
+    }
   }
   if (o.decoyPk) {
     const pk = o.decoyPk;
-    jobs.push((async () => {
-      if (!(await viewAccessKey(rpc, o.bait.accountId, pk))) { out.push({ label: "delete decoy", error: "already gone" }); return; }
-      const h = await o.bait.broadcast(o.bait.accountId, [act.deleteKey(pk)], (x) => onSigned("delete decoy", x));
-      await landed(rpc, h, o.bait.accountId);
-      out.push({ label: "delete decoy", hash: h });
-    })().catch((e) => { out.push({ label: "delete decoy", error: (e as Error).message }); }));
+    try {
+      if (!(await viewAccessKey(rpc, o.bait.accountId, pk))) out.push({ label: "delete decoy", error: "already gone" });
+      else {
+        const h = await o.bait.broadcast(o.bait.accountId, [act.deleteKey(pk)], (x) => onSigned("delete decoy", x));
+        await landed(rpc, h, o.bait.accountId);
+        out.push({ label: "delete decoy", hash: h });
+      }
+    } catch (e) {
+      out.push({ label: "delete decoy", error: (e as Error).message });
+    }
   }
-  await Promise.all(jobs);
   return out;
 }

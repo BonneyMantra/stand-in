@@ -5,11 +5,9 @@ import { Frame, FramePanel, PanelBar } from "@/components/landing/frame";
 import { FOCUS } from "@/components/landing/primitives";
 import { Shimmer, Tag } from "@/components/app/common";
 import { useNearWallet } from "@/components/owner/useNearWallet";
-import { useOwnerTx } from "@/components/owner/useOwnerTx";
 import { WalletControl } from "@/components/owner/WalletControl";
-import { sendOwnerTx } from "@/lib/wallet/connector";
-import { looksMainnet, readGuardian } from "@/lib/wallet/near";
-import { canFreeze, recordHomeTx } from "@/lib/wallet/homeStore";
+import { looksMainnet } from "@/lib/wallet/near";
+import { canFreeze } from "@/lib/wallet/homeStore";
 import { useHome } from "@/lib/tabwatcher/useTabWatcher";
 import { useMyLab, useMyRun } from "@/lib/tabwatcher/useMyLab";
 import { MY_LABELS, MY_STEPS } from "@/lib/tabwatcher/runSteps";
@@ -19,6 +17,7 @@ import { WatcherHeartbeat } from "./WatcherHeartbeat";
 import { MyAccounts } from "./MyAccounts";
 import { ConfirmRun, ReadyLine, RunResult, WalletLine } from "./MyRunBody";
 import { InterruptedRun } from "./InterruptedRun";
+import { useUnfreeze } from "./useUnfreeze";
 import { AlreadyFrozen, ConnectNotice, NoGuardian, NoHome, Problems, RpcFailed, WrongNetwork } from "./MyNotices";
 
 /**
@@ -33,7 +32,7 @@ export default function MyAccountLab() {
   const { disc, pre, guardian, setGuardian, refresh } = useMyLab(owner, home);
   const { state, journal, start, reloadJournal } = useMyRun(home);
   const [confirm, setConfirm] = useState(false);
-  const tx = useOwnerTx(w.wallet, w.accountId, async () => refresh());
+  const uf = useUnfreeze(w.wallet, owner, refresh);
   const running = state.phase === "running";
 
   // A real freeze is in flight: leaving would stop the watcher before it can freeze.
@@ -54,12 +53,7 @@ export default function MyAccountLab() {
   const reached = state.steps.filter((s) => s.status === "ok" || s.status === "skip").length;
 
   const unfreeze = () => {
-    const g = guardian;
-    if (!g) return;
-    void tx.run("unfreeze", (wallet, id) => sendOwnerTx(wallet, id, g, [{ method: "unfreeze", args: {} }]), async () => {
-      const r = await readGuardian(g);
-      return r.kind === "guardian" && !r.state.frozen;
-    }).then((out) => { if (out?.hash && owner) recordHomeTx(owner, { hash: out.hash, label: "lab run: unfreeze (wallet)", at: Date.now() }); });
+    if (guardian) void uf.unfreeze(guardian);
   };
 
   const tag = running ? <Tag tone="decoy">running</Tag> : state.phase === "done" ? <Tag tone="safe">done</Tag> : state.phase === "failed" ? <Tag tone="trip">stopped</Tag> : frozen ? <Tag tone="warn">frozen</Tag> : ready ? <Tag tone="safe">ready</Tag> : <Tag>{owner ? "not ready" : "not connected"}</Tag>;
@@ -86,18 +80,18 @@ export default function MyAccountLab() {
       {pre.status === "error" ? <RpcFailed message={pre.message} onRetry={refresh} /> : null}
       {pre.status === "loading" && !p ? <div className="space-y-2"><Shimmer className="h-4 w-2/3" /><Shimmer className="h-4 w-1/2" /></div> : null}
       {p && !running && state.phase === "idle" && p.problems.length ? <Problems pre={p} onRetry={refresh} /> : null}
-      {p && frozen && !running && state.phase === "idle" && !journal?.steps.length ? <AlreadyFrozen guardian={p.guardian} pre={p} busy={tx.busy} onUnfreeze={unfreeze} /> : null}
+      {p && frozen && !running && state.phase === "idle" && !journal?.steps.length ? <AlreadyFrozen guardian={p.guardian} pre={p} busy={uf.busy} onUnfreeze={unfreeze} /> : null}
       {confirm && p && guardian && ready ? (
         <ConfirmRun guardian={guardian} pre={p} targets={home.guardians.filter((g) => canFreeze(home, g))} onCancel={() => setConfirm(false)} onStart={() => { setConfirm(false); void start(guardian); }} />
       ) : null}
-      {tx.log[0] && state.phase === "idle" && !journal?.steps.length ? <WalletLine entry={tx.log[0]} /> : null}
+      {uf.last && state.phase === "idle" && !journal?.steps.length ? <WalletLine entry={uf.last} /> : null}
       {p && ready && state.phase === "idle" ? <ReadyLine pre={p} /> : null}
       <div className="space-y-3">
         {shownRun === "last" ? <p className="font-mono text-[11px] tracking-[0.14em] text-fg-faint uppercase">Last run on your account · {journal?.finished_at ? new Date(journal.finished_at).toLocaleString() : ""}</p> : null}
         <RunTrace steps={steps} live={running} labels={MY_LABELS} label="Run on my account steps" />
       </div>
-      {(state.phase === "done" || state.phase === "failed" || (journal?.steps.length && (frozen || tx.log.length))) ? (
-        <RunResult state={state.phase === "idle" ? { ...state, guardian: journal?.guardian ?? guardian } : state} pre={p} busy={tx.busy} last={tx.log[0] ?? null} onUnfreeze={unfreeze} canSign={w.status === "connected"} />
+      {(state.phase === "done" || state.phase === "failed" || (journal?.steps.length && (frozen || uf.last))) ? (
+        <RunResult state={state.phase === "idle" ? { ...state, guardian: journal?.guardian ?? guardian } : state} pre={p} busy={uf.busy} last={uf.last} onUnfreeze={unfreeze} canSign={w.status === "connected"} />
       ) : null}
     </div>
   );
