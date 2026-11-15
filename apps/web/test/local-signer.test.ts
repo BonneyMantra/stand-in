@@ -26,6 +26,7 @@ const cases: [string, LocalAction, () => unknown][] = [
     () => near.actions.functionCall("freeze", { reason: "decoy key signed é", decoy_public_key: null, tx_hash: "abc" }, 100_000_000_000_000n, 1n)],
   ["FunctionCall with raw bytes", { type: "FunctionCall", methodName: "raw", args: Uint8Array.of(1, 2, 3), gas: 5n, deposit: 0n }, () => near.actions.functionCall("raw", Uint8Array.of(1, 2, 3), 5n, 0n)],
   ["Transfer", { type: "Transfer", deposit: 200_000_000_000_000_000_000_000n }, () => near.actions.transfer(200_000_000_000_000_000_000_000n)],
+  ["DeleteAccount", { type: "DeleteAccount", beneficiaryId: "deployer.judge.testnet" }, () => near.actions.deleteAccount("deployer.judge.testnet")],
 ];
 
 const tx = (actions: LocalAction[], nonce = 123_456_789_012n): LocalTx => ({ signerId: "deployer.judge.testnet", publicKey: signer.public_key, nonce, receiverId: "g.testnet", blockHash, actions });

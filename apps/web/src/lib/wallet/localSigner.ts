@@ -13,7 +13,9 @@ export type LocalAction =
   | { type: "AddKey"; publicKey: string; permission: "FullAccess" | { receiverId: string; methodNames: string[]; allowance: bigint | null } }
   | { type: "DeleteKey"; publicKey: string }
   | { type: "FunctionCall"; methodName: string; args: Record<string, unknown> | Uint8Array; gas: bigint; deposit: bigint }
-  | { type: "Transfer"; deposit: bigint };
+  | { type: "Transfer"; deposit: bigint }
+  /** Deletes the signer's own account and sends its whole balance to `beneficiaryId` (the lab's throwaway thief returns everything to the bait). */
+  | { type: "DeleteAccount"; beneficiaryId: string };
 
 export interface LocalTx { signerId: string; publicKey: string; nonce: bigint; receiverId: string; blockHash: Uint8Array; actions: LocalAction[] }
 
@@ -39,7 +41,7 @@ class Writer {
   }
 }
 
-/** Action enum order: CreateAccount 0, DeployContract 1, FunctionCall 2, Transfer 3, Stake 4, AddKey 5, DeleteKey 6. */
+/** Action enum order: CreateAccount 0, DeployContract 1, FunctionCall 2, Transfer 3, Stake 4, AddKey 5, DeleteKey 6, DeleteAccount 7. */
 function writeAction(w: Writer, a: LocalAction) {
   switch (a.type) {
     case "FunctionCall": {
@@ -58,6 +60,7 @@ function writeAction(w: Writer, a: LocalAction) {
       return;
     }
     case "DeleteKey": w.u8(6).pubkey(a.publicKey); return;
+    case "DeleteAccount": w.u8(7).str(a.beneficiaryId); return;
   }
 }
 
