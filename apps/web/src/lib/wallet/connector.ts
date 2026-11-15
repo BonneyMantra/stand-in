@@ -60,6 +60,13 @@ export async function sendOwnerTx(wallet: NearWalletBase, ownerId: string, guard
   return readOutcome(await wallet.signAndSendTransaction({ network: NETWORK, signerId: ownerId, ...ownerTx(guardianId, calls, tgas) }));
 }
 
+/** The owner's unfreeze: one owner call. Stable, shared by the owner console and the lab's "Run on my account". */
+export const unfreezeCalls = (): OwnerCall[] => [{ method: "unfreeze", args: {} }];
+
+/** Unfreezes `guardianId` with one transaction signed by `ownerId` (its get_state.owner) in the connected wallet. */
+export const sendUnfreeze = (wallet: NearWalletBase, ownerId: string, guardianId: string): Promise<TxOutcome> =>
+  sendOwnerTx(wallet, ownerId, guardianId, unfreezeCalls());
+
 export async function sendDeployTx(wallet: NearWalletBase, accountId: string, code: Uint8Array, init: GuardianInit, after: OwnerCall[] = []): Promise<TxOutcome> {
   return readOutcome(await wallet.signAndSendTransaction({ network: NETWORK, signerId: accountId, ...deployTx(accountId, code, init, after) }));
 }

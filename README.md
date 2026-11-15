@@ -196,7 +196,7 @@ pnpm standin:claude --home .sandbox/me      # Claude Code plugin into an isolate
 pnpm standin:codex                          # Codex with decoys and hooks
 pnpm standin pay <contract> <method> --args '{"note":"x"}'   # counterparty check first: allow / warn / block
 cd apps/web && pnpm exec vite               # dashboard and landing page on 127.0.0.1:4173
-pnpm test                                   # TypeScript tests (236)
+pnpm test                                   # TypeScript tests (257)
 ```
 
 `adopt --account` needs the account's full-access key in `HOME/.near-credentials/testnet/`, a `.env` or shell history,

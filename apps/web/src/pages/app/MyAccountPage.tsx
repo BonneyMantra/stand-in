@@ -13,6 +13,7 @@ import { GuardiansPanel } from "@/components/account/GuardiansPanel";
 import { DecoysPanel } from "@/components/account/DecoysPanel";
 import { FreezesPanel } from "@/components/account/FreezesPanel";
 import { ActivityPanel } from "@/components/account/ActivityPanel";
+import { TabWatchSlot } from "@/components/account/TabWatchSlot";
 import { useWallet } from "@/components/owner/WalletProvider";
 import { useAccountTools } from "@/components/account/useAccountTools";
 import { useMyAccount } from "@/data/useMyAccount";
@@ -106,7 +107,8 @@ function Body({ t, homeRef, toHome }: { t: ReturnType<typeof useAccountTools>; h
         <div ref={homeRef} className="min-w-0 scroll-mt-16 space-y-4">
           {m.summary && (
             <HomePanel snapshot={s} summary={m.summary} home={m.home} plan={t.plan} eth={m.eth} busy={t.busy} working={t.tools.working} note={t.tools.note}
-              onCreate={() => t.plan && void t.createHome(t.plan)} onAddDecoy={() => void t.tools.addDecoy()} onExport={t.tools.exportHome} onImport={t.tools.importHome} />
+              onCreate={() => t.plan && void t.createHome(t.plan)} onAddDecoy={() => void t.tools.addDecoy()} onExport={t.tools.exportHome} onImport={t.tools.importHome}
+              slot={m.home && m.summary.watcher === "held" && m.summary.bait === "held" ? <TabWatchSlot owner={s.owner} home={m.home} /> : undefined} />
           )}
           {t.log.length > 0 && <ActivityLog entries={t.log} />}
         </div>

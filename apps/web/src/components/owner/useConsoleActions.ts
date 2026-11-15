@@ -4,7 +4,7 @@ import { DEFAULT_INTENTS, type GuardianCode } from "@/lib/wallet/guardianCode";
 import { createAccountTx, readHomeAccount, watcherFor } from "@/lib/wallet/homeAccounts";
 import { commitHomePlan, type HomePlan } from "@/lib/wallet/homePlan";
 import { recordHomeTx, updateHome } from "@/lib/wallet/homeStore";
-import { deployTx, ownerTx, sendOwnerTx, sendTransactions, type OwnerCall, type TxOutcome, type WalletTx } from "@/lib/wallet/connector";
+import { deployTx, ownerTx, sendOwnerTx, sendTransactions, sendUnfreeze, type OwnerCall, type TxOutcome, type WalletTx } from "@/lib/wallet/connector";
 import { accountExists, readGuardian, viewAccessKey } from "@/lib/wallet/near";
 import type { ApproveRequest } from "@/lib/wallet/deeplink";
 import type { NearWallet } from "./useNearWallet";
@@ -140,7 +140,7 @@ export function useConsoleActions(w: NearWallet, tx: Tx, target: string | null, 
   };
 
   const freeze = (reason: string) => void owner("freeze", [{ method: "freeze", args: { reason, decoy_public_key: null, tx_hash: null } }], frozenIs(true)).then(onHomeChanged);
-  const unfreeze = () => void owner("unfreeze", [{ method: "unfreeze", args: {} }], frozenIs(false)).then(onHomeChanged);
+  const unfreeze = () => void tx.run("unfreeze", (wallet, id) => sendUnfreeze(wallet, id, target ?? id), frozenIs(false)).then(onHomeChanged);
   const withdraw = (yocto: bigint) => void owner("withdraw", [{ method: "withdraw", args: { amount: yocto.toString() } }]).then(() => setFactoryKey((k) => k + 1));
   /** Runs one owner call and returns the wallet's outcome even when the contract refused (the panels read it back by hash). */
   const capture = async (label: string, calls: OwnerCall[], tgas?: bigint, landed?: () => Promise<boolean>) => {
