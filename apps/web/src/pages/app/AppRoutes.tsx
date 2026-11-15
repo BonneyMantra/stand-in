@@ -5,6 +5,7 @@ import { StandinProvider } from "@/data/useStandin";
 import { MyAccountProvider } from "@/data/useMyAccount";
 import { WalletProvider } from "@/components/owner/WalletProvider";
 import { AppShell } from "@/components/app/shell/AppShell";
+import { holdIfCancelled } from "@/lib/staleChunk";
 import OverviewPage from "./OverviewPage";
 import TripsPage from "./TripsPage";
 import TripDetailPage from "./TripDetailPage";
@@ -17,7 +18,7 @@ import MyTripsPage from "./MyTripsPage";
 import MyDecoysPage from "./MyDecoysPage";
 
 // The console's panels and wallet requests load only on this route.
-const OwnerPage = lazy(() => import("./OwnerPage"));
+const OwnerPage = lazy(holdIfCancelled(() => import("./OwnerPage")));
 
 /** Old links to a recorded trip (/app/trips/<hash>) now open it under the example. */
 function OldTrip() {

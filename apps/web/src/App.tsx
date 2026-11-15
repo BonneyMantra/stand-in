@@ -3,12 +3,13 @@ import { Route, Routes } from "react-router";
 import LandingPage from "@/pages/landing/LandingPage";
 import NotFoundPage from "@/pages/NotFoundPage";
 import { LoadBoundary } from "@/components/lab/LoadBoundary";
+import { holdIfCancelled } from "@/lib/staleChunk";
 
 // The landing page ships alone: the dashboard (with NEAR Connect), the lab and /verify load when their route opens. A chunk a
 // redeploy removed reloads the page once (lib/staleChunk.ts); a second failure shows the boundary's reload notice.
-const AppRoutes = lazy(() => import("@/pages/app/AppRoutes"));
-const LabPage = lazy(() => import("@/pages/lab/LabPage"));
-const VerifyPage = lazy(() => import("@/pages/verify/VerifyPage"));
+const AppRoutes = lazy(holdIfCancelled(() => import("@/pages/app/AppRoutes")));
+const LabPage = lazy(holdIfCancelled(() => import("@/pages/lab/LabPage")));
+const VerifyPage = lazy(holdIfCancelled(() => import("@/pages/verify/VerifyPage")));
 
 function Loading() {
   return <div className="min-h-dvh bg-ink-950" role="status" aria-label="Loading" />;

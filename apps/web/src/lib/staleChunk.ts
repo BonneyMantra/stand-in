@@ -48,3 +48,11 @@ export function installStaleChunkReload() {
     window.location.reload();
   });
 }
+
+/**
+ * For React.lazy: when the handler above reloads the page it cancels the failed import, which then resolves to nothing.
+ * Waiting on a promise that never settles keeps the Suspense fallback up until the reload, instead of a render error.
+ */
+export function holdIfCancelled<T>(load: () => Promise<T>): () => Promise<T> {
+  return () => load().then((m) => (m === undefined ? new Promise<T>(() => {}) : m));
+}
