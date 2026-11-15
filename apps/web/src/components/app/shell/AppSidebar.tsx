@@ -26,9 +26,12 @@ const LIVE = [
 ] as const;
 
 export function AppSidebar() {
-  const { data } = useStandin();
+  const { data, source } = useStandin();
   const { pathname } = useLocation();
   const { setOpenMobile } = useSidebar();
+  // The owner console works on the visitor's own wallet account; the run's accounts would only mislead there.
+  const owner = pathname.startsWith("/app/owner");
+  const recorded = source !== "live";
   const counts: Record<string, number | undefined> = data
     ? { "/app/trips": data.trips.length, "/app/decoys": data.decoy.keys.length, "/app/sessions": data.sessions.length, "/app/blocklist": data.blocklist.length }
     : {};
@@ -104,9 +107,9 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {data && (
+        {data && !owner && (
           <SidebarGroup>
-            <SidebarGroupLabel className="text-[11px] text-fg-faint">Accounts</SidebarGroupLabel>
+            <SidebarGroupLabel className="text-[11px] text-fg-faint">{recorded ? "Recorded run accounts" : "Accounts"}</SidebarGroupLabel>
             <SidebarGroupContent className="space-y-1 px-2 font-mono text-[11px] text-fg-muted">
               <p className="flex items-center gap-2 truncate"><span className="size-1.5 rounded-full bg-fg-muted" aria-hidden />{data.agent.account_id}</p>
               <p className="flex items-center gap-2 truncate"><span className="size-1.5 rounded-full bg-decoy" aria-hidden />{data.decoy.account_id}</p>
@@ -123,13 +126,13 @@ export function AppSidebar() {
           <span className="inline-flex items-center gap-1.5"><Activity className="size-3" aria-hidden />network</span>
           <span className="rounded border border-decoy/30 bg-decoy/10 px-1.5 py-0.5 font-mono text-decoy">{data?.network ?? "testnet"}</span>
         </div>
-        <AgentCard />
+        {!owner && <AgentCard recorded={recorded} />}
       </SidebarFooter>
     </Sidebar>
   );
 }
 
-function AgentCard() {
+function AgentCard({ recorded }: { recorded: boolean }) {
   const { data } = useStandin();
   if (!data) return <div className="h-[92px] animate-pulse rounded-lg border border-line bg-ink-900" aria-hidden />;
   const frozen = data.agent.frozen;
@@ -137,7 +140,7 @@ function AgentCard() {
   return (
     <div className={cn("rounded-lg border p-3", frozen ? "border-trip/40 bg-trip-soft" : "border-line bg-ink-900")}>
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] text-fg-faint">agent account</span>
+        <span className="text-[11px] text-fg-faint">{recorded ? "recorded run · agent" : "agent account"}</span>
         <span className={cn("inline-flex items-center gap-1.5 font-mono text-[11px]", frozen ? "text-trip" : "text-safe")}>
           {frozen ? <Snowflake className="size-3" aria-hidden /> : <span className="size-1.5 animate-pulse rounded-full bg-safe" aria-hidden />}
           {frozen ? "frozen" : "active"}

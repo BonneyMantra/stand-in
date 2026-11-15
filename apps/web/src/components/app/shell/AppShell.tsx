@@ -70,7 +70,7 @@ function Header() {
             <span className="inline-flex h-6 items-center gap-1.5 rounded-md border border-safe/30 bg-safe-soft px-2 font-mono text-[11px] text-safe">
               <span className="size-1.5 animate-pulse rounded-full bg-safe" aria-hidden />live
             </span>
-            <button type="button" onClick={() => setPreferRecorded(true)} className="inline-flex h-6 items-center gap-1.5 rounded-md border border-line px-2 text-[11px] whitespace-nowrap text-fg-muted hover:text-fg focus-visible:ring-2 focus-visible:ring-ring outline-none">
+            <button type="button" onClick={() => setPreferRecorded(true)} aria-label="Show the recorded run" className="inline-flex h-6 items-center gap-1.5 rounded-md border border-line px-2 text-[11px] whitespace-nowrap text-fg-muted hover:text-fg focus-visible:ring-2 focus-visible:ring-ring outline-none">
               <History className="size-3" aria-hidden /><span className="hidden sm:inline">Recorded run</span>
             </button>
           </>
@@ -95,7 +95,7 @@ function SourcePill() {
       <>
         <span role="status" title={detail} className="inline-flex h-6 items-center gap-1.5 rounded-full border border-line-strong px-2.5 font-mono text-[11px] whitespace-nowrap text-fg-muted">
           <History className="size-3" aria-hidden />
-          <span aria-hidden>recorded<span className="hidden sm:inline"> testnet run</span></span>
+          <span aria-hidden>recorded<span className="hidden sm:inline"> testnet</span> run</span>
           <span className="sr-only">This site has no watcher of its own. {detail}. Run pnpm standin dev up locally for live data.</span>
         </span>
         {when && <span className="hidden font-mono text-[11px] text-fg-faint lg:inline">{when}</span>}
@@ -113,10 +113,9 @@ function SourcePill() {
         )}
       >
         {unreachable ? <span className="size-1.5 rounded-full bg-warn" aria-hidden /> : <History className="size-3" aria-hidden />}
-        <span className="hidden sm:inline">{unreachable ? "Watcher unreachable" : "Live paused"}</span>
-        <span className="sm:hidden" aria-hidden>{unreachable ? "offline" : "paused"}</span>
+        <span aria-hidden>{unreachable ? "watcher offline" : "live paused"}</span>
         <span className="text-fg-faint" aria-hidden>·</span>
-        <span aria-hidden>recorded</span>
+        <span aria-hidden>recorded run</span>
         <span className="sr-only">
           {unreachable ? "The watcher at 127.0.0.1:4317 did not answer. " : "Live watcher paused by you. "}
           {detail}.

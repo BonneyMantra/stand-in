@@ -19,15 +19,19 @@ export const INSTALL = {
   cli: ["pnpm standin adopt --wallet --account you.testnet --home ~"],
 } as const;
 
+/** The hosted owner console, where the owner connects the wallet the wallet route uses. */
+export const OWNER_CONSOLE_URL = "https://stand-in-44e.pages.dev/app/owner";
+
 // Wallet first: the owner key stays in the owner's NEAR wallet; the keystore route is the fallback.
+// Commands match packages/cli/src/bin.ts USAGE (adopt --wallet needs --account and --home).
 export const SETUP_PROMPT = [
   "Install Stand-in (decoy NEAR keys for coding agents) in this project.",
   "Clone https://github.com/BonneyMantra/stand-in and run `pnpm install`.",
   "If you are Claude Code: run `pnpm standin:claude --home .sandbox/me` (this build installs the plugin into an isolated config dir).",
   "If you are Codex: launch through `pnpm standin:codex`.",
-  "Then ask me for my NEAR testnet account id and run `pnpm standin adopt --wallet --account <my account> --home ~`. It prints an owner-console link: give it to me and wait while I approve the one transaction in my own wallet (my owner key never touches this machine).",
-  "When it finishes, tell me which function-call key you now hold, which contract it is scoped to, and where the decoy key was planted.",
-  "If I say I have no wallet, run `pnpm standin adopt --home ~` instead and tell me which account it moved the full-access key out of.",
+  `Wallet route (default): I open ${OWNER_CONSOLE_URL} and connect my NEAR testnet wallet. Ask me for that account id, then run \`pnpm standin adopt --wallet --account <my account> --home ~\`. Give me the owner-console link it prints and wait while I approve the one transaction in my wallet; my owner key never touches this machine.`,
+  "No-wallet route, only if I ask for it: run `pnpm standin adopt --home ~ --account <my account>`; it moves the full-access key out of the files you can read.",
+  "When it finishes, tell me which function-call key you now hold, which contract it is scoped to, and where the decoy key was planted. `pnpm standin <command> --help` lists every option.",
   `Docs: ${REPO_URL}`,
 ].join("\n");
 
