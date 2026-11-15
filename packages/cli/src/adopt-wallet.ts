@@ -1,59 +1,15 @@
 import fs from "node:fs";
-import path from "node:path";
-import { z } from "zod";
 import {
-  appendEvent, credentialsPath, eachEndpoint, generateKey, loadNetworkConfig, makeProvider, plantDecoy, requireAccount,
-  refillPool, saveScopedKey, standinHome, takeDecoy, type NetworkConfig,
+  appendEvent, credentialsPath, eachEndpoint, generateKey, homeAccountIds, homeAccountProblem, loadHomeKey, loadNetworkConfig, makeProvider,
+  plantDecoy, refillPool, requireAccount, saveScopedKey, standinHome, takeDecoy, type NetworkConfig,
 } from "@standin/core";
+import { MIN_GUARDIAN_BALANCE } from "./adopt-guardian.ts";
+import { adoptPendingPath, adoptUrl, loadAdoptPending, saveAdoptPending, validateTestnetAccount, type AdoptPending } from "./adopt-link.ts";
+import { checkFunding, HomeRefusal, liveHomeChain, planHomeAccounts, watcherMismatch, writeHomeConfig, type HomeChain, type HomePlan } from "./home-accounts.ts";
 import { DEFAULT_ALLOWANCE, DEFAULT_DASHBOARD } from "./unfreeze-wallet.ts";
 import { err, out } from "./util.ts";
 
-const KEY_RE = /^ed25519:[1-9A-HJ-NP-Za-km-z]+$/;
-const pendingSchema = z.object({
-  account_id: z.string().min(2),
-  watcher: z.string().min(2),
-  intents: z.string().min(2),
-  public_key: z.string().regex(KEY_RE),
-  secret_key: z.string().regex(KEY_RE),
-  receiver_id: z.string().min(2),
-  method_names: z.array(z.string()),
-  allowance: z.string().regex(/^\d+$/),
-  created_at: z.string(),
-});
-export type AdoptPending = z.infer<typeof pendingSchema>;
-
-export const adoptPendingPath = (home = standinHome()) => path.join(home, "adopt-wallet.pending.json");
-
-export function saveAdoptPending(k: AdoptPending, home = standinHome()): void {
-  fs.mkdirSync(home, { recursive: true });
-  const f = adoptPendingPath(home);
-  fs.writeFileSync(f, JSON.stringify(pendingSchema.parse(k), null, 2), { mode: 0o600 });
-  fs.chmodSync(f, 0o600);
-}
-export function loadAdoptPending(home = standinHome()): AdoptPending | null {
-  try {
-    return pendingSchema.parse(JSON.parse(fs.readFileSync(adoptPendingPath(home), "utf8")));
-  } catch {
-    return null;
-  }
-}
-
-/** Testnet named account only: a.b.testnet; no .near, no 64-hex implicit account. */
-export function validateTestnetAccount(id: string): string | null {
-  if (id.endsWith(".near") || id === "near") return `${id} is a mainnet account; Stand-in runs on testnet only`;
-  if (!/^(?:[a-z\d]+[-_])*[a-z\d]+(?:\.(?:[a-z\d]+[-_])*[a-z\d]+)*\.testnet$/.test(id) || id.length > 64) return `${id} is not a valid testnet named account (expected name.testnet)`;
-  return null;
-}
-
-/** The contract with the dashboard owner console (do not change the parameter names). */
-export function adoptUrl(dashboard: string, k: AdoptPending): string {
-  const e = encodeURIComponent;
-  const q = [
-    ["op", "adopt"], ["account", k.account_id], ["watcher", k.watcher], ["intents", k.intents], ["agent_key", k.public_key],
-    ["receiver", k.receiver_id], ["methods", k.method_names.join(",")], ["allowance", k.allowance],
-  ].map(([a, b]) => `${a}=${e(b!)}`).join("&");
-  return `${dashboard.replace(/\/+$/, "")}/app/owner?${q}`;
-}
+export { adoptPendingPath, adoptUrl, loadAdoptPending, saveAdoptPending, validateTestnetAccount, type AdoptPending } from "./adopt-link.ts";
 
 export interface AdoptKeyView { receiver_id: string; method_names: string[]; allowance: string | null; full_access: boolean }
 export interface GuardianView { owner: string; watcher: string; frozen: boolean; agent_keys: string[] }
@@ -61,6 +17,8 @@ export interface GuardianView { owner: string; watcher: string; frozen: boolean;
 export interface AdoptChain {
   viewKey(account: string, publicKey: string): Promise<AdoptKeyView | null>;
   guardian(account: string): Promise<GuardianView | null>;
+  /** the home accounts (default: live chain) */
+  home?: HomeChain;
 }
 export interface AdoptWalletOpts {
   account: string;
@@ -74,8 +32,8 @@ export interface AdoptWalletOpts {
   now?: () => number;
   pollMs?: number;
   dashboard?: string;
-  /** decoy source, injectable for tests (default: the pre-minted pool) */
-  takeDecoy?: (home: string) => Promise<{ public_key: string; secret_key: string }>;
+  /** decoy source, injectable for tests (default: the home's own pool, minted on its bait account) */
+  takeDecoy?: (home: string, cfg: NetworkConfig) => Promise<{ public_key: string; secret_key: string }>;
 }
 
 function liveChain(cfg: NetworkConfig): AdoptChain {
@@ -105,6 +63,7 @@ function liveChain(cfg: NetworkConfig): AdoptChain {
         throw e;
       }
     },
+    home: liveHomeChain(cfg),
   };
 }
 
@@ -113,22 +72,29 @@ const realSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const resumeCmd = (o: AdoptWalletOpts) => `standin adopt --wallet --account ${o.account}${o.owner ? ` --owner ${o.owner}` : ""} --home ${o.home} --resume`;
 const explorer = (cfg: NetworkConfig, id: string) => `https://${cfg.network === "mainnet" ? "" : cfg.network + "."}nearblocks.io/address/${id}`;
 
-/** Exit codes: 0 protected, 6 timed out (pending kept, resume with --resume), 1 error or refusal. */
+/** The home plan as the pending record describes it (for --resume and for finishing). */
+function planOf(p: AdoptPending): HomePlan {
+  const bait = { role: "bait" as const, account_id: p.bait, public_key: p.bait_key ?? "", exists: !p.bait_key };
+  const watcher = { role: "watcher" as const, account_id: p.watcher, public_key: p.watch_key ?? "", exists: !p.watch_key };
+  return { parent: p.parent, bait, watcher, toCreate: [bait, watcher].filter((a) => !a.exists) };
+}
+
+/** Exit codes: 0 protected, 6 timed out (pending kept, resume with --resume), 1 error or refusal (nothing sent). */
 export async function adoptWallet(o: AdoptWalletOpts): Promise<number> {
   const cfg = loadNetworkConfig();
   const timeout = o.timeoutSec ?? 600;
   if (!Number.isFinite(timeout) || timeout <= 0) { err("--timeout must be a positive number of seconds"); return 1; }
-  // An owner may also be an Ethereum-wallet account (0x + 40 hex) that owns a factory guardian.
   const ownerBad = o.owner && !/^0x[0-9a-f]{40}$/.test(o.owner) ? validateTestnetAccount(o.owner) : null;
   const bad = validateTestnetAccount(o.account) ?? ownerBad;
   if (bad) { err(bad); return 1; }
-  const owner = o.owner ?? o.account;
+  const parent = o.owner ?? o.account;
   if (cfg.network !== "testnet") { err(`config network is ${cfg.network}; adopt --wallet supports testnet only`); return 1; }
-  const watcher = requireAccount(cfg, "watcher");
   const intents = requireAccount(cfg, "intents");
   // A key whose receiver is the guardian account itself could call its owner methods on a self-hosted guardian.
   if (requireAccount(cfg, "project") === o.account) { err(`the agent key's receiver may not be the guardian account ${o.account} itself`); return 1; }
   const home = standinHome();
+  const chain = o.chain ?? liveChain(cfg);
+  const homeChain = chain.home ?? liveHomeChain(cfg);
   let pending: AdoptPending;
   if (o.resume) {
     const p = loadAdoptPending(home);
@@ -136,21 +102,37 @@ export async function adoptWallet(o: AdoptWalletOpts): Promise<number> {
     if (p.account_id !== o.account) { err(`the pending key is for ${p.account_id}, not ${o.account}`); return 1; }
     pending = p;
   } else {
-    const k = generateKey();
-    pending = {
-      account_id: o.account, watcher, intents, public_key: k.public_key, secret_key: k.secret_key,
-      receiver_id: requireAccount(cfg, "project"), method_names: ["record_deploy"],
-      allowance: DEFAULT_ALLOWANCE, created_at: new Date().toISOString(),
-    };
+    // Every check below runs before a link exists: a refusal sends nothing and asks the wallet for nothing.
+    const problem = homeAccountProblem(parent);
+    if (problem) { err(`${problem}. Nothing was sent.`); return 1; }
+    const ids = homeAccountIds(parent);
+    try {
+      const g = await chain.guardian(o.account);
+      if (g && g.watcher !== ids.watcher) throw new HomeRefusal(watcherMismatch(o.account, g.watcher, ids.watcher));
+      const plan = await planHomeAccounts(parent, home, homeChain);
+      const deploys = !g && o.account === parent;
+      await checkFunding(homeChain, plan, deploys ? MIN_GUARDIAN_BALANCE : 0n);
+      const k = generateKey();
+      pending = {
+        account_id: o.account, watcher: ids.watcher, intents, public_key: k.public_key, secret_key: k.secret_key,
+        receiver_id: requireAccount(cfg, "project"), method_names: ["record_deploy"], allowance: DEFAULT_ALLOWANCE, created_at: new Date().toISOString(),
+        parent, bait: ids.bait, bait_key: plan.bait.exists ? undefined : plan.bait.public_key, watch_key: plan.watcher.exists ? undefined : plan.watcher.public_key,
+      };
+    } catch (e) {
+      if (e instanceof HomeRefusal) { err(e.message); return 1; }
+      throw e;
+    }
     saveAdoptPending(pending, home);
   }
+  const plan = planOf(pending);
   const dash = o.dashboard ?? process.env.STANDIN_DASHBOARD_URL ?? DEFAULT_DASHBOARD;
-  out(`Open this link and approve in your NEAR wallet (owner of ${pending.account_id}). One transaction registers the agent key (and deploys the guardian first if the account has none); no owner key leaves your wallet:`);
+  const creates = plan.toCreate.map((a) => `${a.account_id} (${a.role === "bait" ? "bait" : "watcher"}, 0.2 NEAR)`);
+  const many = creates.length ? ` It is one wallet request with ${creates.length + 1} transactions (one approval in wallets that sign batches, such as Meteor and Intear; others ask once per transaction). The new accounts' keys were generated here and stay in ${home}/keys; the link carries public keys only.` : "";
+  out(`Open this link and approve in your NEAR wallet (${parent}): the guardian and the agent key${creates.length ? `, then ${creates.join(" and ")}` : ""}.${many}`);
   out(adoptUrl(dash, pending));
-  out(`new agent key ${pending.public_key}  receiver ${pending.receiver_id}  methods ${pending.method_names.join(",") || "(any)"}  allowance ${pending.allowance} yoctoNEAR  watcher ${pending.watcher}`);
-  out(`waiting up to ${timeout}s for the transaction...`);
+  out(`new agent key ${pending.public_key}  receiver ${pending.receiver_id}  methods ${pending.method_names.join(",") || "(any)"}  allowance ${pending.allowance} yoctoNEAR  watcher ${pending.watcher}  bait ${pending.bait}`);
+  out(`waiting up to ${timeout}s for the transactions...`);
 
-  const chain = o.chain ?? liveChain(cfg);
   const sleep = o.sleep ?? realSleep, now = o.now ?? Date.now;
   const refuse = (outcome: string, msg: string): number => {
     err(msg);
@@ -158,14 +140,21 @@ export async function adoptWallet(o: AdoptWalletOpts): Promise<number> {
     return 1;
   };
   const deadline = now() + timeout * 1000;
+  let said = "";
   for (;;) {
     let v: AdoptKeyView | null = null, g: GuardianView | null = null;
+    const missingAccts: string[] = [];
     try {
       v = await chain.viewKey(pending.account_id, pending.public_key);
       if (v) g = await chain.guardian(pending.account_id);
+      for (const a of plan.toCreate) if (!(await homeChain.fullAccess(a.account_id, a.public_key))) missingAccts.push(a.account_id);
     } catch (e) {
       err(`chain read failed, retrying: ${(e as Error).message}`);
+      if (now() >= deadline) { err(`timed out after ${timeout}s; the pending request is kept. Run \`${resumeCmd(o)}\``); return 6; }
+      await sleep(o.pollMs ?? 3000);
+      continue;
     }
+    let keyDone = false;
     if (v) {
       const want = pending.allowance === "0" ? null : pending.allowance;
       if (v.full_access) return refuse("full_access_refused", `the key ${pending.public_key} exists on ${pending.account_id} as a FULL-ACCESS key; refusing to adopt it`);
@@ -173,41 +162,41 @@ export async function adoptWallet(o: AdoptWalletOpts): Promise<number> {
         return refuse("scope_mismatch", `the key ${pending.public_key} exists on ${pending.account_id} with a different scope than requested (${v.receiver_id} [${v.method_names.join(",")}] allowance ${v.allowance ?? "unlimited"}); refusing to adopt it`);
       }
       if (g) {
-        if (g.owner !== owner) return refuse("wrong_owner", `the guardian on ${pending.account_id} reports owner ${g.owner}, expected ${owner}; refusing to adopt`);
-        if (g.watcher !== pending.watcher) return refuse("wrong_watcher", `the guardian on ${pending.account_id} is watched by ${g.watcher}, not ${pending.watcher}; its freeze would never come from our watcher. Refusing to adopt`);
+        if (g.owner !== parent) return refuse("wrong_owner", `the guardian on ${pending.account_id} reports owner ${g.owner}, expected ${parent}; refusing to adopt`);
+        if (g.watcher !== pending.watcher) return refuse("wrong_watcher", `the guardian on ${pending.account_id} is watched by ${g.watcher}, not ${pending.watcher}; its freeze would never come from this home's watcher. Refusing to adopt`);
         if (g.frozen) err("the guardian is frozen; unfreeze it in your wallet (`standin unfreeze --wallet`), still waiting...");
-        else if (g.agent_keys.includes(pending.public_key)) return finish(cfg, pending, o, home);
+        else keyDone = g.agent_keys.includes(pending.public_key);
       }
     }
+    if (keyDone && !missingAccts.length) return finish(cfg, pending, plan, o, home);
+    // A partly landed batch: say once what is still missing; the same link offers only that part.
+    const state = keyDone ? `agent key registered; still missing on chain: ${missingAccts.join(", ")}` : missingAccts.length < plan.toCreate.length ? `created ${plan.toCreate.filter((a) => !missingAccts.includes(a.account_id)).map((a) => a.account_id).join(", ")}; the guardian part has not landed yet` : "";
+    if (state && state !== said) { out(`${state}. The same link offers only what is missing.`); said = state; }
     if (now() >= deadline) {
-      err(`timed out after ${timeout}s; the pending key is kept. Approve the link above, then run \`${resumeCmd(o)}\``);
+      err(`timed out after ${timeout}s; the pending request is kept${state ? ` (${state})` : ""}. Approve the link above, then run \`${resumeCmd(o)}\``);
       return 6;
     }
     await sleep(o.pollMs ?? 3000);
   }
 }
 
-async function finish(cfg: NetworkConfig, p: AdoptPending, o: AdoptWalletOpts, home: string): Promise<number> {
-  // Decoy first: a failure here keeps the pending key, so `--resume` can finish the job (the chain side is already done).
+async function finish(base: NetworkConfig, p: AdoptPending, plan: HomePlan, o: AdoptWalletOpts, home: string): Promise<number> {
+  // The home config first: from here on every mint, plant and the watcher use this home's own bait and watcher keys.
+  for (const a of [plan.bait, plan.watcher]) {
+    if (!loadHomeKey(home, a.account_id)) return refuse1(`${home}/keys has no key for ${a.account_id}; it was created with a key this home no longer holds. Restore that file, then run \`${resumeCmd(o)}\``);
+  }
+  const cfgFile = writeHomeConfig(home, base, p.account_id, plan);
+  const cfg = loadNetworkConfig(cfgFile);
   const decoy = requireAccount(cfg, "decoy");
-  const take = o.takeDecoy ?? (async (h: string) => { await refillPool(1, cfg, h); return takeDecoy({ cfg, home: h }); });
+  const take = o.takeDecoy ?? (async (h: string, c: NetworkConfig) => { await refillPool(1, c, h); return takeDecoy({ cfg: c, home: h }); });
   let d: { public_key: string; secret_key: string };
   try {
-    d = await take(home);
+    d = await take(home, cfg);
   } catch (e) {
-    const msg = (e as Error).message;
-    const dash = o.dashboard ?? process.env.STANDIN_DASHBOARD_URL ?? DEFAULT_DASHBOARD;
-    // A fresh clone has no .secrets/: decoys are new keys on the shared decoy account, which only its operator can add.
-    if (/no dev key/.test(msg)) err(`the agent key is registered on ${p.account_id}, but no decoy was planted: decoys are new keys on ${decoy}, and this checkout has no key for it (${msg}). The guardian is live: freeze, unfreeze and withdraw from your wallet at ${dash}/app/owner. With that key in STANDIN_SECRETS, finish with \`${resumeCmd(o)}\`.`);
-    else err(`the agent key is registered on ${p.account_id}, but planting the decoy failed: ${msg}. The pending key is kept; finish with \`${resumeCmd(o)}\`.`);
-    return 1;
+    return refuse1(`the agent key is registered on ${p.account_id}, but planting the decoy on ${decoy} failed: ${(e as Error).message}. The pending request is kept; finish with \`${resumeCmd(o)}\`.`);
   }
   const target = credentialsPath(o.home, cfg.network, decoy);
   plantDecoy({ kind: "near-credentials", path: target, decoyAccountId: decoy, key: d, agent: "manual", cwd: o.home, network: cfg.network, home });
-  const raw = cfg.raw as { accounts?: Record<string, unknown> };
-  const config = { ...cfg.raw, accounts: { ...(raw.accounts ?? {}), ...cfg.accounts, agent: p.account_id } };
-  const cfgFile = path.join(home, "config.json");
-  fs.writeFileSync(cfgFile, JSON.stringify(config, null, 2) + "\n");
   saveScopedKey({
     account_id: p.account_id, public_key: p.public_key, secret_key: p.secret_key,
     receiver_id: p.receiver_id, method_names: p.method_names, created_at: new Date().toISOString(),
@@ -216,9 +205,15 @@ async function finish(cfg: NetworkConfig, p: AdoptPending, o: AdoptWalletOpts, h
   appendEvent("tool_call", { tool_name: "standin adopt", outcome: "adopted via wallet", via: "wallet", account_id: p.account_id, agent_key_public: p.public_key }, home);
   out(`${p.account_id} is protected: guardian active, scoped agent key registered, decoy planted at ${target}`);
   out(`guardian: ${explorer(cfg, p.account_id)}`);
+  out(`this home's own accounts: bait ${decoy} (every decoy is a key on it), watcher ${requireAccount(cfg, "watcher")} (freezes the guardian); keys in ${home}/keys`);
   out(`config for this home: ${cfgFile} (agent = ${p.account_id})`);
   out(`start the watcher for it:  standin dev up --home ${o.home}`);
   out(`after a freeze, get the agent a new key from your wallet:  standin unfreeze --wallet --home ${o.home}`);
-  out(`(dev up only checks accounts, tops up the decoy pool and starts the watcher; it never deploys or signs as ${p.account_id}. Add STANDIN_WATCHER_PORT=<port> if :4317 is taken.)`);
+  out(`(dev up checks the accounts, tops up the decoy pool on ${decoy} and starts the watcher; it never deploys or signs as ${p.account_id}. Add STANDIN_WATCHER_PORT=<port> if :4317 is taken.)`);
   return 0;
+}
+
+function refuse1(msg: string): number {
+  err(msg);
+  return 1;
 }

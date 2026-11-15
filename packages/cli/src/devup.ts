@@ -42,6 +42,9 @@ export async function devUp(opts: { noWatcher?: boolean; pool?: number } = {}): 
     }
   }
   out(table(rows, ["role", "account", "balance", "state"]));
+  // A thief's transaction pays its gas from the bait: an empty bait cannot trip anything.
+  const bait = rows.find((r) => r[0] === "decoy");
+  if (bait && /NEAR$/.test(bait[2]!) && parseFloat(bait[2]!) < 0.05) out(`warning: the bait ${bait[1]} holds ${bait[2]}; a stolen decoy key cannot sign without gas from it. Send it some NEAR.`);
 
   const home = standinHome();
   fs.mkdirSync(home, { recursive: true });
