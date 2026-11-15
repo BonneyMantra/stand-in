@@ -334,3 +334,23 @@ fallback), and every testnet wallet in its manifest declares it. Meteor's execut
 executor code; neither was run with a real wallet here, and Meteor still refuses `DeployContract`. Whether Meteor's web
 wallet accepts `AddKey` with full access from an app is not verified. A wallet without the feature is asked once per
 transaction (`sendTransactions` falls back), and the console says so.
+
+## 2026-11-15, 06:20–06:30 IST: a watcher funded to report, one quote for CLI and console
+
+Measured from chain before choosing the amounts (`packages/core/src/funding.ts` cites them): a blocklist report from a
+watcher prepays 300 TGas + a 0.05 NEAR deposit, 0.3509 NEAR up front (the RPC's refusal for a 0.2 NEAR watcher), and cost
+0.0028 NEAR (`FdDiwpR43KB1YQ1v3k2LRJYx5Cf1toFaBdDKHVYkKJSi`: 0.0013 gas burnt, 0.0015 of the deposit kept); a freeze
+prepays 100 TGas and cost 0.0002 (`CjY8N7iVJkCJs3JNnWJztAnK7VoGpZzUpYXF8Dhj3ZYj`). The watcher now gets 0.45 NEAR (0.36
+up front for a report plus room for many freezes and reports); the bait keeps 0.2.
+
+Fresh account `fresh-r.selfserve-w1115.testnet` (3 NEAR from this run's own test account; the faucet was rate-limited),
+empty `STANDIN_SECRETS`, fresh home, live root (deploy `26e84752`, commit `86be44a`). The CLI printed the quote before the
+link and the console showed the same lines before signing: 0.002 already locked, 1.770 guardian storage, 0.150 deploy gas,
+0.200 bait, 0.450 watcher, 0.050 gas, **2.622 NEAR**; 390, 768 and 1440 px without horizontal scroll; console: no messages.
+
+| Step | Tx | Readback |
+|---|---|---|
+| guardian + key, bait, watcher (one request, 3 tx) | `dkikgK3ZTqed3fkEQwiDP2kKYMmYPpevZ64Gf1ZjZW3`, `FM4XRpqBV8JWyGYpfJrFDoLagg1YiFufXaSSZhxccteb`, `DP1MKfrKtYEXUC7ThLLDyTeu3Ep2vFDTro4BeLtuYqTM` | `watch.fresh-r…` holds 0.45 NEAR, `deployer.fresh-r…` 0.2; CLI exit 0 |
+| theft to a fresh thief `thief-r.selfserve-w1115.testnet` (block 277733601) | `6bFPNj3R7EXgcHp5srtgQFwosaMVg347Cqebfdof2AEZ` | signer `deployer.fresh-r…`; `check(thief-r)` was `allow` before |
+| freeze by the home's own watcher (block 277733604, **3 blocks**) | `4VSbiUsP1ucGmhMAExkndVQ5iNpj7ZeZHwmujRWow14k` | signer `watch.fresh-r…`; `frozen: true` |
+| blocklist report by the same watcher | `GW53k3pV6LckhN8TCY84Jy9aiPrNA2wcADJWyC1ZFUKM` | `report` SuccessValue; net cost 0.0028 NEAR; `check(thief-r)` = `block`, attested by OutLayer project `si-ol-25769.testnet/standin-verdict`; the watcher keeps 0.447 NEAR |

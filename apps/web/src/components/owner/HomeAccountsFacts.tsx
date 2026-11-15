@@ -53,7 +53,7 @@ export function HomeAccountsFacts({ signerId, read, deployGuardian, txCount, bat
                 Total <span className="font-mono" data-testid="home-total">{nearShort(q.total, 3)} NEAR</span>; {signerId} holds{" "}
                 <span className="font-mono" data-testid="home-balance">{nearShort(read.signer.amount, 3)} NEAR</span>.
               </p>
-              <p className="text-[11px] text-fg-faint">The same numbers `standin adopt` prints, from one shared module (packages/core/src/funding.ts).</p>
+              <p className="text-[11px] text-fg-faint">The same numbers <code className="font-mono">standin adopt</code> prints, from one shared module (<code className="font-mono">packages/core/src/funding.ts</code>).</p>
               {q.short > 0n && (
                 <div className="space-y-1.5 rounded-md border border-warn/30 bg-warn/10 px-2.5 py-2 text-[11px] text-warn" data-testid="home-shortfall">
                   <p>Short by <span className="font-mono">{nearShort(q.short, 3)} NEAR</span>: nothing is offered for signing until it is covered. Add testnet NEAR from the <ExtLink href={FAUCET_URL}>testnet faucet</ExtLink>.</p>
