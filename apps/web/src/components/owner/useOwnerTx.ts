@@ -5,6 +5,8 @@ import type { TxEntry } from "./ActivityLog";
 
 type Send<T> = (wallet: NearWalletBase, accountId: string) => Promise<T>;
 const LANDED = "Landed on testnet. State read again from chain.";
+// A load-balanced RPC can answer the first read from a node a block or two behind the wallet's; read once more after this.
+const LAG_MS = 3000;
 
 /**
  * The owner console's wallet requests and their log. A missing answer is never read as "nothing was sent": the wallet may
@@ -42,6 +44,7 @@ export function useOwnerTx(wallet: RefObject<NearWalletBase | null>, accountId: 
     } finally {
       setBusy(false);
       await refresh();
+      window.setTimeout(() => void refresh(), LAG_MS);
     }
   }, [wallet, accountId, refresh]);
 
@@ -80,6 +83,7 @@ export function useOwnerTx(wallet: RefObject<NearWalletBase | null>, accountId: 
     }
     setBusy(false);
     await refresh();
+    window.setTimeout(() => void refresh(), LAG_MS);
     return result;
   }, [wallet, accountId, refresh]);
 
