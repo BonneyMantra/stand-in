@@ -2,6 +2,11 @@
 
 **Your agent can read your keys. Make sure they're fake.**
 
+Demo video: https://x.com/BonneyMantra/status/2121751528981823511
+
+Submitted version: tag `hackathon-submission` (b7cdfff). Later commits are post-deadline fixes and the self-serve
+setup from a readiness pass: https://github.com/BonneyMantra/stand-in/compare/hackathon-submission...main
+
 Stand-in keeps the owner's NEAR key out of reach of AI coding agents (Claude Code, Codex): it stays in the owner's
 own wallet, which approves a scoped key for the agent, or the CLI moves it out of the files agents read. It then
 plants unique decoy keys everywhere a key would live: `~/.near-credentials`, `.env` files, the session
