@@ -16,9 +16,13 @@ Open **https://stand-in-44e.pages.dev/lab** and press **Leak a decoy**. On NEAR 
 
 Every step links to its transaction. Recent runs from every visitor are listed under the trace. Limits: one run at a
 time, three per visitor per ten minutes. Implementation: `apps/web/functions/api/lab/`, `packages/lab/`.
+With a guarded account of your own (section after 3), the lab's **Your account** tab runs the same loop on your accounts.
 
 ## 2. Check every claim from chain (1 minute)
-Open **https://stand-in-44e.pages.dev/verify**. Your browser asks public NEAR RPC nodes (testnet and mainnet) about
+Open **https://stand-in-44e.pages.dev/verify**. It starts with **Check any guardian**: name any account (yours is
+pre-filled when your wallet is connected) and your browser reads its code hash against the pinned build, owner, watcher
+(your own `watch.<you>` or not), frozen state, agent and intents keys, and every freeze with its theft and freeze
+transactions. Below it, your browser asks public NEAR RPC nodes (testnet and mainnet) about
 every transaction behind every claim in [`docs/claims.json`](docs/claims.json) and compares status, error text and
 block distances. It also recovers the signer of each NEAR AI Cloud incident report and compares it with the
 enclave's attested signing address. No server of ours is involved.
@@ -49,6 +53,12 @@ Or start from the landing page's **Protect your account**.
 - **My account** (`/app`) then shows your guardians, keys, decoys, trips and freezes from chain, with a next step. Add a
   decoy there, export the keys to a CLI home (`standin dev up --home DIR`), add an intents key or try a Chain Signatures
   request in the console (refused while frozen). The recorded run is the Example (`/app/example`).
+- **Leak a decoy on your own account**: `/lab`, tab **Your account**. The bait key in your browser plants a fresh decoy, a
+  thief key made in the tab spends it, and a watcher running in that tab sees the decoy's nonce move and freezes your
+  guardian with your freeze-only watcher key. Every step links its transaction; the blocks from theft to freeze are read
+  from chain (live, 15 Nov: 3 blocks). Unfreeze is one wallet transaction on the same page. The tab protects only while it
+  is open (it shows the last block it read); the CLI watcher is always-on. The blocklist report needs a full-access (CLI)
+  watcher, and the incident report is CLI only.
 - `standin adopt --wallet --account <id> --home DIR` prints a link: one wallet request gives the agent its scoped key and
   creates your own bait (`deployer.<id>`, 0.2 NEAR) and watcher (`watch.<id>`, 0.45 NEAR: enough to prepay a blocklist
   report), with keys the CLI generated and kept. The CLI and the console show the same quote before signing (about 2.62

@@ -400,3 +400,53 @@ px: no horizontal scroll (scrollWidth = viewport). Browser console: no messages.
 Headless Chrome reached the local test signer only with `--disable-features=Translate,LocalNetworkAccessChecks,
 BlockInsecurePrivateNetworkRequests,PrivateNetworkAccessSendPreflights,PrivateNetworkAccessRespectPreflightResults`: the
 browser tool adds its own `--disable-features=Translate`, which replaced a lone `LocalNetworkAccessChecks` flag.
+
+## 2026-11-15, 11:20–12:15 IST: the lab on your own account, and Check any guardian
+
+Code: `apps/web/src/lib/tabwatcher/` (in-tab watcher, run, journal), `apps/web/src/components/lab/My*.tsx`,
+`WatcherHeartbeat.tsx`, `apps/web/src/lib/verify/guardian.ts`, `apps/web/src/components/verify/Guardian*.tsx`. Commits
+`b0870eb` (landed inside that commit from the shared index), `d8f6f8b`, `a1be57b`; deploys `83062713`, `2e142866`,
+`25ef3d73`. No contract changed. Every row was read back with `tx`, `get_state`, `view_account` from drpc, outside the page.
+
+The in-tab watcher reads the bait's `view_access_key_list` every 0.35 s; a non-admin key whose nonce grew is a theft (the
+CLI watcher's rule, read from key state so a slow tab cannot skip a block), and `EXPERIMENTAL_changes` over the blocks
+between two reads names the transaction. The freeze is signed in the tab by the browser's freeze-only watcher key and sent
+to every RPC endpoint at once. Unit tests: `apps/web/test/tabwatcher-detect.test.ts` (20).
+
+### The live root, a fresh account: `labjudge-1115.selfserve-w1115.testnet`
+Funded from this file's test accounts (2.0 NEAR `DCyunAhzTJZdXqkduRvjaAERymaWYnFj3pxS7V9yh9hH` and 0.85 NEAR
+`ChCpgpNjd6QtzGS7K7mTioKXFc4ZjXWHBDNhkSAoYARd`); scripted wallet in NEAR Connect's picker.
+
+| Step | Tx | Readback |
+|---|---|---|
+| My account → Protect: guardian, bait, watcher in one approval | `7ab6nykd7FNTnwVuH1b8fvtQCHkyQ5xSEPfVGx7hPD5z`, `2Bhpu18y69TEztNX3PkzSKq65qob11L31drDwzZzQAMN`, `HGAGN1GZiEYcYyzpPWfM7a54CBVeoLpwbGS3QKHy7wjM` | home in the browser; `/lab` opened on Your account, watcher live |
+| run 1: plant (bait key, in the tab) | `csY2sDxgKnY4oda7uptgCcHMkSjcWSk9T9ELjkSFQaN` | AddKey on `deployer.labjudge…` |
+| run 1: theft (decoy key → a fresh implicit account), block 277767906 | `AWZgwwhWWQptiSwKob1nutVJVLMYahbCnrzZgxT3VWRx` | Transfer 0.05 NEAR, SuccessValue |
+| run 1: freeze by the tab watcher, block 277767911 (**5 blocks**) | `GZ9G5HPuTPz2aDa8g3eJkbXQXGCQ3wgnN4MEEzc57qEu` | signer `watch.labjudge…`; `frozen: true`; the freeze log had no theft hash (a lagging node answered UNKNOWN_BLOCK; fixed in `d8f6f8b`) |
+| run 1: loot back, decoy deleted | `3FuruVAj2EGjquZuxnjiWZ3Myzv5w5jkry2FWAcgKRts`, `95LRk6WM65rQM5NmZnNkfDpdumGuGAUCd2VcKXJmgZZo` | |
+| Unfreeze from your wallet (on the lab page) | `AsxUvuRDKYeDNr2PQ5T29LHphGqRz6QeiNRs3r2MEwnw` | `frozen: false` |
+| run 2: plant, theft (block 277768279) | `W3eFvEiFD5Ge7FY6GpKGEA4gHjBqYKAQzwWB5ad4jvz`, `Be9TvuSSkAPkg8nG93BuK4YpTNGUMjLmGxDPqcqJ59Vz` | |
+| run 2: freeze, block 277768282 (**3 blocks**) | `ABDNxu3HFPkpAHBGMeGUtPKppZhbrxfoHC77khrhXF9y` | `frozen: true`; freeze log names the decoy and the theft tx |
+| run 2: loot back, decoy deleted; unfreeze (owner console) | `FW83gF5FFHaeWBYnPuiEpmzY7uqWo5SjARFffMbewUG7`, `QtA8J6eKy5VTm5PPV5ULEo3y1EQTHov56fh13mvYmxd`, `3utGdcWrL93ce8b8ZWx9BhGT6pcgkvcsNS9U3RT1D78a` | `frozen: false` |
+
+### Local production build, scripted accounts (`labqa-a.stranger-qa-1115b.testnet`, `labqa-b.selfserve-k1115.testnet`)
+| Step | Tx | Readback |
+|---|---|---|
+| run: theft (block 277764616), freeze (block 277764619, **3 blocks**) | `EQMf8m8dBX2sSmEFDZZg31pn7MB4pkeYeGGNSQgQjjSr`, `GdMXyyGpyGJ4L5BGD71QeoFZ9qDufkzFjttFxjS8QWb5` | the first run took 18 blocks: a hung drpc read waited for its whole timeout; reads are now hedged and the freeze goes to every endpoint |
+| tab closed mid-run (the freeze broadcast held back, page reloaded) | theft `6chvE46VTjoeq7d9jHHWm7JotpApgecyjAUGqgPoVcHL` | the page read from chain: theft landed, guardian NOT frozen, decoy still on the bait, loot with the thief |
+| Freeze now (from that report), then return the loot and delete the decoy | `7Q4iRwuP977d45huzJ97fPwLUfncpMixSQpsQpEM72iX` | `frozen: true`; the report then showed the freeze and nothing left to clean |
+| unfreeze from the wallet, run again in the same tab: freeze in **4 blocks** | `H8At7mEpvDA2c14iGqUBHCLupGejnvPEgerc7w17tUpH`, `9TR8gm4QBcMRPLoejYJwLhzLTYNxrtePUcjZuTvUz1cP` | found and fixed here: a cached "frozen" from the earlier freeze made the watcher skip; it now re-reads chain before skipping |
+
+States seen: not connected; connected without a guardian; guardians watched by another account (a home could never
+freeze them); a guardian without a browser home; a home whose watcher and bait do not exist; bait 0.028 and watcher 0.047
+NEAR (shortfalls, faucet link, Run disabled); already frozen (Unfreeze offered); the confirm step; running; done with the
+read-back; a tab closed mid-run; every RPC host aborted (the watcher shows stalled with its last block, the page shows Try
+again, which recovers); a lazy chunk removed after a deploy (one reload, then a reload notice).
+`/verify`, Check any guardian, live: the connected owner pre-filled (pinned hash matched and re-hashed in the browser,
+self-serve watcher, freeze log with theft and freeze transactions), a factory guardian (factory build), a contract that is
+not a guardian (`si-project-5289.testnet`), an account without a contract, a missing account, every RPC host aborted.
+390, 768 and 1440 px: no horizontal scroll on every state above. Browser console on the live root: no messages.
+
+Not covered: the blocklist report from a full-access (CLI-imported) watcher in the tab (coded as the CLI files it; the
+runs above used browser-made freeze-only keys, which show "available with a CLI watcher"); a real Meteor or Intear wallet
+for the lab's unfreeze (the scripted wallet signed it).
