@@ -18,7 +18,7 @@ export function useDeployPlan(accountId: string | null) {
     setPlan({ status: "loading" });
     try {
       const [code, account] = await Promise.all([loadGuardianCode(), viewAccount(accountId)]);
-      if (n === seq.current) setPlan({ status: "ready", code, account, quote: quoteStorage(account, code.bytes.length) });
+      if (n === seq.current) setPlan({ status: "ready", code, account, quote: quoteStorage(account) });
     } catch (e) {
       if (n === seq.current) setPlan({ status: "error", error: e instanceof Error ? e.message : String(e), mismatch: e instanceof CodeMismatch });
     }

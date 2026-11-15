@@ -1,4 +1,5 @@
 import { rpc, YOCTO_PER_NEAR } from "./near";
+import { guardianStorage, quoteAdopt, shortOf } from "./funding";
 
 /**
  * The guardian build the owner console deploys from the owner's wallet. It is byte-identical to the code on the film's
@@ -15,12 +16,8 @@ export const DEFAULT_WATCHER = "si-watch-5289.testnet";
 export const DEFAULT_INTENTS = "si-intents-5289.testnet";
 export const FAUCET_URL = "https://docs.near.org/tools/faucet";
 
-/** Protocol storage price: 10^19 yoctoNEAR per byte (1 NEAR per 100 kB). */
-export const YOCTO_PER_BYTE = 10n ** 19n;
-/** Guardian state after `new`, its key records and one agent key, rounded up. */
-const STATE_MARGIN_BYTES = 1_000n;
-/** Gas for one deploy transaction (deploy + new + add_agent_key), rounded up. */
-const GAS_RESERVE = YOCTO_PER_NEAR / 20n;
+/** Storage price, guardian storage and deploy gas come from the shared funding module (also used by `standin adopt`). */
+export { YOCTO_PER_BYTE } from "./funding";
 
 const B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 export function base58Encode(bytes: Uint8Array): string {
@@ -66,17 +63,16 @@ export async function viewAccount(accountId: string): Promise<AccountView> {
 export interface StorageQuote {
   /** NEAR locked by the code and guardian state. */
   codeStorage: bigint;
-  /** Balance the account needs in total after the deploy: existing storage + new storage + gas. */
+  /** Balance the account needs in total for the deploy: existing storage + guardian storage + up-front gas + margin. */
   required: bigint;
   balance: bigint;
   shortfall: bigint;
 }
 
-export function quoteStorage(account: AccountView, codeBytes = GUARDIAN_CODE_BYTES): StorageQuote {
-  const codeStorage = (BigInt(codeBytes) + STATE_MARGIN_BYTES) * YOCTO_PER_BYTE;
-  const required = account.storageUsage * YOCTO_PER_BYTE + codeStorage + GAS_RESERVE;
-  const balance = account.amount;
-  return { codeStorage, required, balance, shortfall: balance >= required ? 0n : required - balance };
+/** The deploy alone ("Protect this account"), quoted by the shared funding module. */
+export function quoteStorage(account: AccountView): StorageQuote {
+  const q = quoteAdopt({ storageBytes: account.storageUsage, deployGuardian: true, createBait: false, createWatcher: false });
+  return { codeStorage: guardianStorage(), required: q.total, balance: account.amount, shortfall: shortOf(account.amount, q) };
 }
 
 /** Rounds yoctoNEAR to a short NEAR figure for prose ("1.77"). Exact values stay in the decoded rows. */

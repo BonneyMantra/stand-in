@@ -1,5 +1,6 @@
-import { DEFAULT_WATCHER, YOCTO_PER_BYTE } from "./guardianCode";
+import { DEFAULT_WATCHER } from "./guardianCode";
 import type { AdoptRequest } from "./deeplink";
+import { BAIT_FUND, WATCHER_FUND, quoteAdopt, shortOf, type Quote } from "./funding";
 import { accountExists, isEthAccount, viewAccessKey } from "./near";
 
 /**
@@ -7,7 +8,6 @@ import { accountExists, isEthAccount, viewAccessKey } from "./near";
  * key, and the watcher `watch.<owner>`, which freezes the guardian. `standin adopt --wallet` generates their keys on the
  * user's machine; an adopt link carries only the public keys, and the owner's wallet creates and funds both accounts.
  */
-export const HOME_ACCOUNT_FUND = 200_000_000_000_000_000_000_000n;
 export const WATCH_PREFIX = "watch";
 
 /**
@@ -39,25 +39,25 @@ export async function readHomeAccount(a: HomeAccountReq): Promise<HomeAccountSta
   return { ...a, status: k?.permission === "FullAccess" ? "ready" : "conflict" };
 }
 
-/** Gas for the owner's transactions, with room to spare. */
-export const GAS_MARGIN = 50_000_000_000_000_000_000_000n;
+/** What each new account receives (shared with the CLI). */
+export const fundFor = (role: HomeRole) => (role === "bait" ? BAIT_FUND : WATCHER_FUND);
 
 /**
- * What the signer needs before signing: the guardian deploy's own requirement when the link deploys one (storage + gas),
- * otherwise its current storage plus gas, and 0.2 NEAR for each account still to create.
+ * The quote before signing, from the shared funding module (the CLI prints the same lines): the signer's locked storage,
+ * the guardian when the request deploys one, each account still to create, gas.
  */
-export function fundingFor(signer: { amount: bigint; storageUsage: bigint }, toCreate: number, deployRequired: bigint | null) {
-  const need = (deployRequired ?? signer.storageUsage * YOCTO_PER_BYTE + GAS_MARGIN) + HOME_ACCOUNT_FUND * BigInt(toCreate);
-  return { need, shortfall: need > signer.amount ? need - signer.amount : 0n };
+export function adoptQuote(signer: { amount: bigint; storageUsage: bigint }, creates: HomeRole[], deployGuardian: boolean): Quote & { short: bigint } {
+  const q = quoteAdopt({ storageBytes: signer.storageUsage, deployGuardian, createBait: creates.includes("bait"), createWatcher: creates.includes("watcher") });
+  return { ...q, short: shortOf(signer.amount, q) };
 }
 
-/** One transaction from the owner per account: CreateAccount, Transfer 0.2 NEAR, AddKey (full access, the CLI's key). */
+/** One transaction from the owner per account: CreateAccount, Transfer (its funding), AddKey (full access, the CLI's key). */
 export function createAccountTx(a: HomeAccountReq) {
   return {
     receiverId: a.accountId,
     actions: [
       { type: "CreateAccount" as const },
-      { type: "Transfer" as const, params: { deposit: HOME_ACCOUNT_FUND.toString() } },
+      { type: "Transfer" as const, params: { deposit: fundFor(a.role).toString() } },
       { type: "AddKey" as const, params: { publicKey: a.publicKey, accessKey: { permission: "FullAccess" as const } } },
     ],
   };

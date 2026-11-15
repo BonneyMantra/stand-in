@@ -7,7 +7,8 @@ import { parentOf, unfreezeLinkFor, type AdoptRequest, type DeepLink } from "@/l
 import { explorerTx, isEthAccount, yoctoToNear, type GuardianLookup } from "@/lib/wallet/near";
 import type { GuardianCode } from "@/lib/wallet/guardianCode";
 import { FACTORY } from "@/lib/wallet/factory";
-import { fundingFor, homeAccountsOf, type HomeAccountReq } from "@/lib/wallet/homeAccounts";
+import { adoptQuote, fundFor, homeAccountsOf, type HomeAccountReq } from "@/lib/wallet/homeAccounts";
+import { nearShort } from "@/lib/wallet/guardianCode";
 import { Decoded, Row, type ApproveResult } from "./ApprovePanel";
 import { DeployFacts } from "./DeployFacts";
 import { HomeAccountsFacts } from "./HomeAccountsFacts";
@@ -83,8 +84,8 @@ export function AdoptPanel({ link, accountId, guardian, busy, result, batch, hom
 
   const guardianSteps = guardianDone ? [] : deploy ? ["DeployContract", "new", "add_agent_key"] : ["add_agent_key"];
   const txCount = (guardianDone ? 0 : 1) + creates.length;
-  const deployRequired = deploy && plan.status === "ready" ? plan.quote.required : null;
-  const short = home.status === "ready" && home.signer ? fundingFor(home.signer, creates.length, deployRequired).shortfall > 0n : false;
+  const deployGuardian = deploy && !guardianDone;
+  const short = home.status === "ready" && home.signer ? adoptQuote(home.signer, creates.map((a) => a.role), deployGuardian).short > 0n : false;
   const guardianReady = guardianDone || (deploy ? plan.status === "ready" && plan.quote.shortfall === 0n : !!g);
   const ready = guardianReady && (wanted.length === 0 || home.status === "ready") && !short && txCount > 0;
 
@@ -102,7 +103,7 @@ export function AdoptPanel({ link, accountId, guardian, busy, result, batch, hom
       )}
       {wanted.length > 0 && match && accountId && (
         <div className="border-t border-line">
-          <HomeAccountsFacts signerId={accountId} read={home} deployRequired={guardianDone ? null : deployRequired} txCount={txCount} batch={batch} onReload={() => void reloadHome()} />
+          <HomeAccountsFacts signerId={accountId} read={home} deployGuardian={deployGuardian} txCount={txCount} batch={batch} onReload={() => void reloadHome()} />
         </div>
       )}
       <div className="space-y-3 border-t border-line p-3.5">
@@ -116,7 +117,7 @@ export function AdoptPanel({ link, accountId, guardian, busy, result, batch, hom
           <>
             <ol className="space-y-1 text-xs text-fg-muted" data-testid="adopt-steps">
               {guardianSteps.length > 0 && <li>Transaction to {accountId === req.account ? "your account" : mono(req.account)}: {guardianSteps.map((s, i) => <span key={s} className="ml-1.5 font-mono text-fg">{i + 1}. {s}</span>)}</li>}
-              {creates.map((a) => <li key={a.accountId}>Transaction creating {mono(a.accountId)}: <span className="font-mono text-fg">CreateAccount, Transfer 0.2 NEAR, AddKey</span></li>)}
+              {creates.map((a) => <li key={a.accountId}>Transaction creating {mono(a.accountId)}: <span className="font-mono text-fg">CreateAccount, Transfer {nearShort(fundFor(a.role), 2)} NEAR, AddKey</span></li>)}
             </ol>
             {guardianDone && creates.length > 0 && <p className="text-[11px] text-fg-faint" data-testid="adopt-partial">The agent key already landed; only the missing accounts are offered.</p>}
             {deploy && !guardianDone && (

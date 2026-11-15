@@ -97,7 +97,7 @@ const homeAccounts = (r: { account: string; watcher: string; bait?: string; bait
  *   /app/owner?op=adopt&account=<id>&watcher=<id>&intents=<id>&agent_key=<ed25519:base58>&receiver=<id>&methods=<a,b|empty>&allowance=<yocto>
  *     [&bait=<id>][&bait_key=<ed25519:base58>][&watch_key=<ed25519:base58>]
  * Deploys the guardian on `account` when it has no code, then registers the agent key; on an existing guardian it only adds the key.
- * With bait_key / watch_key it also creates those home accounts (0.2 NEAR each), in the same wallet request.
+ * With bait_key / watch_key it also creates those home accounts (funded per packages/core/src/funding.ts), in the same wallet request.
  */
 export const AdoptRequest = z.object({
   op: z.literal("adopt"),

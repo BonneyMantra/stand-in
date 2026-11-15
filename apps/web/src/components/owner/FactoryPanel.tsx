@@ -4,11 +4,12 @@ import { Button } from "@/components/ui/button";
 import { ExtLink, Panel, Shimmer, Tag } from "@/components/app/common";
 import { cn } from "@/lib/utils";
 import { accountExists, explorerAccount } from "@/lib/wallet/near";
-import { FAUCET_URL, YOCTO_PER_BYTE, nearShort, viewAccount } from "@/lib/wallet/guardianCode";
-import { GAS_MARGIN, ownsWatcher, watcherFor } from "@/lib/wallet/homeAccounts";
+import { FAUCET_URL, nearShort, viewAccount } from "@/lib/wallet/guardianCode";
+import { quoteFactory, shortOf } from "@/lib/wallet/funding";
+import { ownsWatcher, watcherFor } from "@/lib/wallet/homeAccounts";
 import { FACTORY, GuardianName, guardiansOf, requiredDeposit } from "@/lib/wallet/factory";
 
-type Load = { status: "loading" } | { status: "error"; error: string } | { status: "ready"; deposit: bigint; guardians: string[]; spendable: bigint };
+type Load = { status: "loading" } | { status: "error"; error: string } | { status: "ready"; deposit: bigint; guardians: string[]; amount: bigint; storageBytes: bigint };
 
 /**
  * "Create a guarded agent account": the factory makes <name>.guard.si-project-5289.testnet with a guardian whose owner is
@@ -24,8 +25,8 @@ export function FactoryPanel({ ownerId, eth, busy, selected, reloadKey, onCreate
     setLoad({ status: "loading" });
     try {
       const [deposit, guardians, owner] = await Promise.all([requiredDeposit(), guardiansOf(ownerId), viewAccount(ownerId)]);
-      // What the owner can spend: storage (a deployed guardian, for one) stays locked and cannot pay the deposit.
-      setLoad({ status: "ready", deposit, guardians, spendable: owner.amount - owner.storageUsage * YOCTO_PER_BYTE });
+      // The owner's storage (a deployed guardian, for one) stays locked: the quote counts it before the deposit.
+      setLoad({ status: "ready", deposit, guardians, amount: owner.amount, storageBytes: owner.storageUsage });
       // A name that is now one of this owner's guardians was just created: clear it so it is not offered again.
       setName((n) => (n && guardians.includes(`${n}.${FACTORY}`) ? "" : n));
     } catch (e) {
@@ -36,8 +37,9 @@ export function FactoryPanel({ ownerId, eth, busy, selected, reloadKey, onCreate
 
   const parsed = GuardianName.safeParse(name);
   const id = `${name || "name"}.${FACTORY}`;
-  const need = load.status === "ready" ? load.deposit + GAS_MARGIN : 0n;
-  const short = load.status === "ready" && load.spendable < need ? need - load.spendable : 0n;
+  // Shared with the CLI (packages/core/src/funding.ts): locked storage + the factory's required_deposit + up-front gas.
+  const quote = load.status === "ready" ? quoteFactory({ storageBytes: load.storageBytes, deposit: load.deposit }) : null;
+  const short = quote && load.status === "ready" ? shortOf(load.amount, quote) : 0n;
   // Ask the chain whether the account exists before offering to sign: a taken name only costs gas and a refund.
   const [taken, setTaken] = useState<{ id: string; exists: boolean | null } | null>(null);
   useEffect(() => {
@@ -77,8 +79,8 @@ export function FactoryPanel({ ownerId, eth, busy, selected, reloadKey, onCreate
               account: most is locked for the guardian's code and state, about 0.3 NEAR stays withdrawable by you.
               {short > 0n ? (
                 <span className="mt-1.5 block text-warn" data-testid="factory-shortfall">
-                  {ownerId} can spend {nearShort(load.spendable, 3)} NEAR, so it is short by {nearShort(short, 3)} NEAR with gas; nothing is offered
-                  for signing. Add testnet NEAR from the <ExtLink href={FAUCET_URL}>testnet faucet</ExtLink>, then read again.
+                  {ownerId} holds {nearShort(load.amount, 3)} NEAR and this needs {nearShort(quote!.total, 3)} ({quote!.lines.map((l) => `${nearShort(l.yocto, 3)} ${l.label}`).join(" + ")}):
+                  short by {nearShort(short, 3)} NEAR, so nothing is offered for signing. Add testnet NEAR from the <ExtLink href={FAUCET_URL}>testnet faucet</ExtLink>, then read again.
                 </span>
               ) : null}</>
           ) : load.status === "error" ? <span className="text-trip">Could not read the factory: {load.error}</span> : <Shimmer className="h-4 w-48" />}

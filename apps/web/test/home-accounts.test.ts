@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { parseDeepLink } from "../src/lib/wallet/deeplink.ts";
-import { HOME_ACCOUNT_FUND, createAccountTx, fundingFor, homeAccountsOf, watcherFor } from "../src/lib/wallet/homeAccounts.ts";
+import { adoptQuote, createAccountTx, homeAccountsOf, watcherFor } from "../src/lib/wallet/homeAccounts.ts";
+import { REPORT_UPFRONT, WATCHER_FUND, quoteAdopt } from "../src/lib/wallet/funding.ts";
+import { nearShort } from "../src/lib/wallet/guardianCode.ts";
 
 const OWNER = "fresh-owner.testnet";
 const KEY = "ed25519:6E8sCci9badyRkXb3JoRpBj5p8C6Tw41ELDZoiihKEtp";
@@ -41,25 +43,33 @@ describe("adopt link with the home's own accounts (self-serve bait and watcher)"
     expect(parseDeepLink(q(link) + "&bait_key=" + encodeURIComponent(BK)).kind).toBe("invalid");
   });
 
-  it("creates each account in one transaction: CreateAccount, 0.2 NEAR, the CLI's key with full access", () => {
+  it("creates each account in one transaction: CreateAccount, its funding (bait 0.2, watcher 0.45 NEAR), the CLI key with full access", () => {
     expect(createAccountTx({ role: "watcher", accountId: `watch.${OWNER}`, publicKey: WK })).toEqual({
       receiverId: `watch.${OWNER}`,
       actions: [
         { type: "CreateAccount" },
-        { type: "Transfer", params: { deposit: "200000000000000000000000" } },
+        { type: "Transfer", params: { deposit: "450000000000000000000000" } },
         { type: "AddKey", params: { publicKey: WK, accessKey: { permission: "FullAccess" } } },
       ],
     });
+    expect(createAccountTx({ role: "bait", accountId: `deployer.${OWNER}`, publicKey: BK }).actions[1]).toEqual({ type: "Transfer", params: { deposit: "200000000000000000000000" } });
   });
 
-  it("counts the funding before signing: deploy requirement or storage + gas, plus 0.2 NEAR per account", () => {
+  it("quotes from the shared funding module: a fresh account adopting needs 2.622 NEAR, line by line", () => {
     const NEAR = 10n ** 24n;
-    const signer = { amount: 2n * NEAR, storageUsage: 182n };
-    const noDeploy = fundingFor(signer, 2, null);
-    expect(noDeploy.need).toBe(182n * 10n ** 19n + 5n * 10n ** 22n + 2n * HOME_ACCOUNT_FUND);
-    expect(noDeploy.shortfall).toBe(0n);
-    const deploy = fundingFor(signer, 2, 1_822_000_000_000_000_000_000_000n);
-    expect(deploy.shortfall).toBe(1_822_000_000_000_000_000_000_000n + 2n * HOME_ACCOUNT_FUND - 2n * NEAR);
+    const fresh = { amount: 10n * NEAR, storageUsage: 182n };
+    const q = adoptQuote(fresh, ["bait", "watcher"], true);
+    expect(q.lines.map((l) => [l.label, nearShort(l.yocto, 3)])).toEqual([
+      ["already locked", "0.002"], ["guardian storage", "1.770"], ["deploy gas", "0.150"], ["bait account", "0.200"], ["watcher account", "0.450"], ["gas", "0.050"],
+    ]);
+    expect(q.total).toBe(quoteAdopt({ storageBytes: 182n, deployGuardian: true, createBait: true, createWatcher: true }).total);
+    expect(nearShort(q.total, 3)).toBe("2.622");
+    expect(q.short).toBe(0n);
+    expect(adoptQuote({ amount: 2n * NEAR, storageUsage: 182n }, ["bait", "watcher"], true).short).toBe(q.total - 2n * NEAR);
+    // An existing guardian (factory or adopted before): only the accounts still missing, plus gas.
+    expect(nearShort(adoptQuote(fresh, ["watcher"], false).total, 3)).toBe("0.502");
+    // The watcher can prepay a blocklist report: its funding covers REPORT_UPFRONT with room for freezes.
+    expect(WATCHER_FUND > REPORT_UPFRONT).toBe(true);
   });
 
   it("new guardians from the console are watched by the owner's own watch.<owner>; a 0x owner keeps the project's", () => {
