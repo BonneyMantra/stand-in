@@ -22,7 +22,7 @@ from chain at https://stand-in-44e.pages.dev/verify, and see the guide for judge
 
 | Step | What happens | Where |
 |---|---|---|
-| Adopt | The owner's key stays in their own wallet (NEAR Connect); the wallet deploys the guardian, approves a function-call key for the agent, scoped to your contract, and creates your own bait (`deployer.<you>`) and watcher (`watch.<you>`) accounts, 0.2 NEAR each, with keys generated on your machine. Without a wallet, the CLI does the same with the account's key, then moves it out of the agent's reach. | `apps/web` (`/app/owner`), `packages/cli` (`standin adopt --wallet`, `standin adopt`) |
+| Adopt | The owner's key stays in their own wallet (NEAR Connect); the wallet deploys the guardian, approves a function-call key for the agent, scoped to your contract, and creates your own bait (`deployer.<you>`) and watcher (`watch.<you>`) accounts (0.2 and 0.45 NEAR), with keys generated on your machine. Without a wallet, the CLI does the same with the account's key, then moves it out of the agent's reach. | `apps/web` (`/app/owner`), `packages/cli` (`standin adopt --wallet`, `standin adopt`) |
 | Plant | Each agent session gets its own decoy keys, written where agents look for keys. | `integrations/claude-code`, `integrations/codex` |
 | Watch | Claude Code and Codex hooks check every prompt, tool input and tool output for decoys and log each tool call. | `integrations/common` |
 | Trip | A decoy signs a transaction on chain. The watcher sees the decoy account's key in use. | `packages/watcher` |
@@ -103,7 +103,7 @@ From the wallet the owner then freezes, unfreezes and withdraws, each with an ex
 read. The CLI gives the agent its key without touching an owner key:
 - `standin adopt --wallet --account <id> [--owner <id>] --home DIR` prints an `op=adopt` link. One wallet request
   carries the guardian part (deploy + `new` + `add_agent_key`, or `add_agent_key` alone on an existing guardian) and,
-  for each missing home account, `CreateAccount` + `Transfer 0.2 NEAR` + `AddKey`. The CLI then writes the home's
+  for each missing home account, `CreateAccount` + `Transfer` (bait 0.2, watcher 0.45 NEAR) + `AddKey`. The CLI then writes the home's
   config, mints decoys on its own bait and plants one;
 - `standin dev up --home DIR` starts that home's watcher, which signs freezes as `watch.<owner>`;
 - `standin unfreeze --wallet --home DIR` prints an `op=unfreeze` link (and says "nothing to do" for an unfrozen guardian
@@ -118,9 +118,16 @@ project's own film accounts (`config/testnet.json`, `.sandbox/default`) are unch
 
 Refused before anything is signed, each with the fix: a guardian whose watcher is another account (the guardian has no
 method to change its watcher), a sub-account that already exists without this home's key, too little NEAR (guardian
-storage + 0.2 NEAR per new account + gas), and a 0x owner. A partly landed request is picked up where it stopped: the
-console offers only what is missing and `--resume` waits for it. The watcher's 0.2 NEAR pays for freezes; a blocklist
-report needs about 0.36 NEAR up front, so a watcher with less skips the report and says so.
+storage + the new accounts + gas), and a 0x owner. A partly landed request is picked up where it stopped: the
+console offers only what is missing and `--resume` waits for it.
+
+Every amount comes from one module, `packages/core/src/funding.ts`, which the CLI and the owner console both import, so
+both show the same lines before anything is signed. For a fresh account adopting with a new guardian (measured on testnet,
+15 Nov): 0.002 already locked by the account, 1.770 guardian storage (176,033-byte contract + state at 1 NEAR per 100 kB),
+0.150 deploy gas paid up front (unused gas comes back), 0.200 bait, 0.450 watcher, 0.050 gas: **2.622 NEAR**. The
+watcher's 0.45 covers a blocklist report, which prepays about 0.36 NEAR (300 TGas + a 0.05 deposit; a real report cost
+0.0028, tx `FdDiwpR4…`) plus many freezes (0.0002 each). A watcher that has run low still freezes and says in one line why
+it skipped the report; `dev up` warns about it. The factory route quotes the factory's own `required_deposit` plus 100 TGas.
 
 Multi-transaction requests: NEAR Connect passes `signAndSendTransactions` straight to the wallet, and every testnet
 wallet in its manifest declares it. Meteor's and Intear's executors send all transactions in one request with one
@@ -165,11 +172,11 @@ pnpm standin:claude --home .sandbox/me      # Claude Code plugin into an isolate
 pnpm standin:codex                          # Codex with decoys and hooks
 pnpm standin pay <contract> <method> --args '{"note":"x"}'   # counterparty check first: allow / warn / block
 cd apps/web && pnpm exec vite               # dashboard and landing page on 127.0.0.1:4173
-pnpm test                                   # TypeScript tests (181)
+pnpm test                                   # TypeScript tests (182)
 ```
 
 `adopt --account` needs the account's full-access key in `HOME/.near-credentials/testnet/`, a `.env` or shell history,
-and about 2.45 NEAR on the account (about 2 for the guardian, 0.2 each for the bait and the watcher, gas). It creates
+and about 2.62 NEAR on the account (the quote above, printed line by line before anything is signed). It creates
 the bait and the watcher with that key before moving it, writes `HOME/.standin/config.json` naming them, and prints the
 watcher command (`STANDIN_WATCHER_PORT=<port>` if 4317 is taken). No `.secrets/` is needed: a fresh clone works.
 Without `--home`, `dev up` and the other commands use the project's own film accounts, whose keys only we hold. Every other command takes `--home HOME` to use that

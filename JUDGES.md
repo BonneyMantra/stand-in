@@ -44,8 +44,9 @@ Open **https://stand-in-44e.pages.dev/app/owner** and press Connect wallet. NEAR
 - A MetaMask (0x) account, or any account you would rather not deploy on: **Create a guarded agent account** asks the
   factory for a keyless guardian account you own; Freeze, Unfreeze and Withdraw work from your wallet.
 - `standin adopt --wallet --account <id> --home DIR` prints a link: one wallet request gives the agent its scoped key and
-  creates your own bait (`deployer.<id>`) and watcher (`watch.<id>`), 0.2 NEAR each, with keys the CLI generated and
-  kept. `standin dev up --home DIR` then runs your watcher; a stolen decoy is frozen by `watch.<id>`, not by us. No key of
+  creates your own bait (`deployer.<id>`, 0.2 NEAR) and watcher (`watch.<id>`, 0.45 NEAR: enough to prepay a blocklist
+  report), with keys the CLI generated and kept. The CLI and the console show the same quote before signing (about 2.62
+  NEAR for a fresh account, line by line). `standin dev up --home DIR` then runs your watcher; a stolen decoy is frozen by `watch.<id>`, not by us. No key of
   ours is needed, so a fresh clone works. The no-wallet route is `standin adopt --home DIR --account <id>`.
 With Meteor, use the guarded agent account: Meteor refuses contract deployment from apps. A real Meteor Web wallet ran
 create, freeze, unfreeze, the CLI's agent-key link and withdraw; every transaction and the scripted-wallet runs are in
