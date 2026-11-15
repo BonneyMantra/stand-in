@@ -3,7 +3,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import {
-  loadNetworkConfig, makeProvider, poolSize, refillPool, repoRoot, standinHome, ROLES,
+  REPORT_UPFRONT, loadNetworkConfig, makeProvider, poolSize, refillPool, repoRoot, standinHome, ROLES,
 } from "@standin/core";
 import { out, table } from "./util.ts";
 
@@ -45,6 +45,10 @@ export async function devUp(opts: { noWatcher?: boolean; pool?: number } = {}): 
   // A thief's transaction pays its gas from the bait: an empty bait cannot trip anything.
   const bait = rows.find((r) => r[0] === "decoy");
   if (bait && /NEAR$/.test(bait[2]!) && parseFloat(bait[2]!) < 0.05) out(`warning: the bait ${bait[1]} holds ${bait[2]}; a stolen decoy key cannot sign without gas from it. Send it some NEAR.`);
+  // A blocklist report prepays REPORT_UPFRONT (@standin/core funding); below it the watcher still freezes but skips the report.
+  const watch = rows.find((r) => r[0] === "watcher");
+  const upfront = Number(REPORT_UPFRONT / 10n ** 21n) / 1000;
+  if (watch && /NEAR$/.test(watch[2]!) && parseFloat(watch[2]!) < upfront) out(`warning: the watcher ${watch[1]} holds ${watch[2]}; it freezes, but a blocklist report needs about ${upfront.toFixed(2)} NEAR up front (about 0.003 is spent). Send it NEAR to report thieves too.`);
 
   const home = standinHome();
   fs.mkdirSync(home, { recursive: true });

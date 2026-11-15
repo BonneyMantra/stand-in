@@ -1,9 +1,8 @@
 import fs from "node:fs";
 import {
-  appendEvent, credentialsPath, eachEndpoint, generateKey, homeAccountIds, homeAccountProblem, loadHomeKey, loadNetworkConfig, makeProvider,
+  BAIT_FUND, WATCHER_FUND, appendEvent, credentialsPath, eachEndpoint, generateKey, homeAccountIds, homeAccountProblem, loadHomeKey, loadNetworkConfig, makeProvider, near,
   plantDecoy, refillPool, requireAccount, saveScopedKey, standinHome, takeDecoy, type NetworkConfig,
 } from "@standin/core";
-import { MIN_GUARDIAN_BALANCE } from "./adopt-guardian.ts";
 import { adoptPendingPath, adoptUrl, loadAdoptPending, saveAdoptPending, validateTestnetAccount, type AdoptPending } from "./adopt-link.ts";
 import { checkFunding, HomeRefusal, liveHomeChain, planHomeAccounts, watcherMismatch, writeHomeConfig, type HomeChain, type HomePlan } from "./home-accounts.ts";
 import { DEFAULT_ALLOWANCE, DEFAULT_DASHBOARD } from "./unfreeze-wallet.ts";
@@ -96,6 +95,7 @@ export async function adoptWallet(o: AdoptWalletOpts): Promise<number> {
   const chain = o.chain ?? liveChain(cfg);
   const homeChain = chain.home ?? liveHomeChain(cfg);
   let pending: AdoptPending;
+  let quoteSummary = "";
   if (o.resume) {
     const p = loadAdoptPending(home);
     if (!p) { err(`no pending key in ${adoptPendingPath(home)}; run \`standin adopt --wallet --account ${o.account} --home DIR\` first`); return 1; }
@@ -111,7 +111,7 @@ export async function adoptWallet(o: AdoptWalletOpts): Promise<number> {
       if (g && g.watcher !== ids.watcher) throw new HomeRefusal(watcherMismatch(o.account, g.watcher, ids.watcher));
       const plan = await planHomeAccounts(parent, home, homeChain);
       const deploys = !g && o.account === parent;
-      await checkFunding(homeChain, plan, deploys ? MIN_GUARDIAN_BALANCE : 0n);
+      quoteSummary = (await checkFunding(homeChain, plan, deploys)).summary;
       const k = generateKey();
       pending = {
         account_id: o.account, watcher: ids.watcher, intents, public_key: k.public_key, secret_key: k.secret_key,
@@ -126,7 +126,8 @@ export async function adoptWallet(o: AdoptWalletOpts): Promise<number> {
   }
   const plan = planOf(pending);
   const dash = o.dashboard ?? process.env.STANDIN_DASHBOARD_URL ?? DEFAULT_DASHBOARD;
-  const creates = plan.toCreate.map((a) => `${a.account_id} (${a.role === "bait" ? "bait" : "watcher"}, 0.2 NEAR)`);
+  const creates = plan.toCreate.map((a) => `${a.account_id} (${a.role === "bait" ? `bait, ${near(BAIT_FUND)}` : `watcher, ${near(WATCHER_FUND)}`} NEAR)`);
+  if (quoteSummary) out(`Before you sign: ${quoteSummary}\n(The owner console shows the same quote, from the same code: packages/core/src/funding.ts.)`);
   const many = creates.length ? ` It is one wallet request with ${creates.length + 1} transactions (one approval in wallets that sign batches, such as Meteor and Intear; others ask once per transaction). The new accounts' keys were generated here and stay in ${home}/keys; the link carries public keys only.` : "";
   out(`Open this link and approve in your NEAR wallet (${parent}): the guardian and the agent key${creates.length ? `, then ${creates.join(" and ")}` : ""}.${many}`);
   out(adoptUrl(dash, pending));

@@ -2,12 +2,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { Account } from "near-api-js";
-import { actions, eachEndpoint, makeProvider, repoRoot, requireAccount, type NetworkConfig } from "@standin/core";
+import { actions, eachEndpoint, makeProvider, near, quoteAdopt, repoRoot, requireAccount, shortOf, type NetworkConfig } from "@standin/core";
 
 /** Code hash of the audited guardian build (the one on si-agent-5289.testnet), also pinned by the owner console. */
 export const GUARDIAN_CODE_HASH = "7PbHKsE6PhdvypoUrE179X5kPxjqgzfFJr7Z1kRr9ZuE";
-/** Storage for the 176 kB wasm is about 1.76 NEAR; keep a margin for state and gas. */
-export const MIN_GUARDIAN_BALANCE = 2_000_000_000_000_000_000_000_000n;
+
 const EMPTY_HASH = "11111111111111111111111111111111";
 const ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
@@ -50,10 +49,11 @@ export async function ensureGuardian(cfg: NetworkConfig, account: string, owner:
     if (st.owner !== account) throw new Error(`the guardian on ${account} has owner ${st.owner}; this key cannot administer it`);
     return { deployed: false };
   }
+  // The same quote the owner console shows (@standin/core funding): storage already locked + guardian storage + deploy gas.
   const bal = BigInt(acc.amount);
-  if (bal < MIN_GUARDIAN_BALANCE) {
-    const short = Number((MIN_GUARDIAN_BALANCE - bal) / 10n ** 21n) / 1000;
-    throw new Error(`${account} holds ${(Number(bal / 10n ** 21n) / 1000).toFixed(2)} NEAR; the guardian needs about 2 NEAR locked for storage (${short.toFixed(2)} NEAR short). Fund it and run adopt again`);
+  const q = quoteAdopt({ storageBytes: BigInt(acc.storage_usage), deployGuardian: true, createBait: false, createWatcher: false });
+  if (shortOf(bal, q) > 0n) {
+    throw new Error(`${account} holds ${near(bal, 3)} NEAR; the guardian needs ${near(q.total, 3)} (${q.lines.map((l) => `${near(l.yocto, 3)} ${l.label}`).join(", ")}): short by ${near(shortOf(bal, q), 3)} NEAR. Fund it and run adopt again`);
   }
   const file = guardianWasmPath();
   if (!fs.existsSync(file)) throw new Error(`guardian wasm not found at ${file}`);

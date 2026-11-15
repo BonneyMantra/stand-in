@@ -1,8 +1,8 @@
 import fs from "node:fs";
 import { Account, PublicKey } from "near-api-js";
 import {
-  HOME_ACCOUNT_FUND, actions, assertSuccess, eachEndpoint, generateKey, homeAccountIds, homeAccountProblem, homeConfigFile, homeKeysDir,
-  loadHomeKey, saveHomeKey, type HomeRole, type NetworkConfig,
+  BAIT_FUND, WATCHER_FUND, actions, assertSuccess, eachEndpoint, generateKey, homeAccountIds, homeAccountProblem, homeConfigFile, homeKeysDir,
+  loadHomeKey, near, quoteAdopt, saveHomeKey, shortOf, type HomeRole, type NetworkConfig, type Quote,
 } from "@standin/core";
 
 /**
@@ -72,36 +72,36 @@ export async function planHomeAccounts(parent: string, home: string, chain: Home
   return { parent, bait, watcher, toCreate: [bait, watcher].filter((a) => !a.exists) };
 }
 
-/** NEAR an account can spend: its balance minus what its storage locks (1 NEAR per 100 kB). */
-export const spendable = (a: AccountView) => a.amount - a.storage_usage * 10n ** 19n;
-/** Gas for the owner's transactions, with room to spare. */
-export const GAS_MARGIN = 50_000_000_000_000_000_000_000n;
-/** What the parent must be able to spend before signing: guardian storage when it deploys one, 0.2 NEAR per account to create, gas. */
-export const fundingNeed = (plan: HomePlan, guardianStorage: bigint) => guardianStorage + HOME_ACCOUNT_FUND * BigInt(plan.toCreate.length) + GAS_MARGIN;
-export const nearStr = (y: bigint, digits = 3) => (Number(y / 10n ** 18n) / 1e6).toFixed(digits);
+/** The quote for this plan, from @standin/core funding (the owner console quotes from the same function). */
+export const planQuote = (plan: HomePlan, storageBytes: bigint, deployGuardian: boolean): Quote =>
+  quoteAdopt({ storageBytes, deployGuardian, createBait: !plan.bait.exists, createWatcher: !plan.watcher.exists });
 
-/** Refuses, before anything is signed, when `parent` cannot pay for the plan. */
-export async function checkFunding(chain: HomeChain, plan: HomePlan, guardianStorage: bigint): Promise<void> {
-  const need = fundingNeed(plan, guardianStorage);
+/** The quote as lines for a terminal: amount, what it is, why. */
+export const quoteText = (q: Quote) =>
+  [...q.lines.filter((l) => l.yocto > 0n).map((l) => `  ${near(l.yocto, 3).padStart(7)} NEAR  ${l.label}: ${l.why}`), `  ${near(q.total, 3).padStart(7)} NEAR  total the account must hold`].join("\n");
+
+/** Refuses, before anything is signed, when `parent` cannot hold the quote. Returns the quote to show before signing. */
+export async function checkFunding(chain: HomeChain, plan: HomePlan, deployGuardian: boolean): Promise<{ quote: Quote; summary: string }> {
   const acc = await chain.account(plan.parent);
   if (!acc) throw new HomeRefusal(`${plan.parent} does not exist on testnet; create and fund it first`);
-  const have = spendable(acc);
-  if (have < need) {
-    const parts = [guardianStorage ? `${nearStr(guardianStorage, 2)} NEAR guardian storage` : "", plan.toCreate.length ? `${nearStr(HOME_ACCOUNT_FUND, 1)} NEAR for each of ${plan.toCreate.map((a) => a.account_id).join(" and ")}` : "", `${nearStr(GAS_MARGIN, 2)} NEAR gas`].filter(Boolean);
-    throw new HomeRefusal(`${plan.parent} can spend ${nearStr(have)} NEAR; this needs ${nearStr(need)} (${parts.join(", ")}). Short by ${nearStr(need - have)} NEAR: fund ${plan.parent} and run the command again. Nothing was sent.`);
+  const quote = planQuote(plan, acc.storage_usage, deployGuardian);
+  const short = shortOf(acc.amount, quote);
+  if (short > 0n) {
+    throw new HomeRefusal(`${plan.parent} holds ${near(acc.amount, 3)} NEAR and needs ${near(quote.total, 3)}:\n${quoteText(quote)}\nShort by ${near(short, 3)} NEAR: fund ${plan.parent} and run the command again. Nothing was sent.`);
   }
+  return { quote, summary: `${plan.parent} holds ${near(acc.amount, 3)} NEAR; this needs ${near(quote.total, 3)}:\n${quoteText(quote)}` };
 }
 
-/** CreateAccount + Transfer(0.2 NEAR) + AddKey(full access, the home's key): one transaction from the parent per account. */
-export const createActions = (publicKey: string) => [
-  actions.createAccount(), actions.transfer(HOME_ACCOUNT_FUND), actions.addFullAccessKey(PublicKey.from(publicKey)),
+/** CreateAccount + Transfer (the role's funding) + AddKey(full access, the home's key): one transaction from the parent per account. */
+export const createActions = (a: Pick<HomeAccount, "role" | "public_key">) => [
+  actions.createAccount(), actions.transfer(a.role === "bait" ? BAIT_FUND : WATCHER_FUND), actions.addFullAccessKey(PublicKey.from(a.public_key)),
 ];
 
 /** Keystore route: the owner key the CLI already holds creates each missing home account. */
 export async function createHomeAccounts(owner: Account, plan: HomePlan): Promise<{ account_id: string; tx_hash: string }[]> {
   const done: { account_id: string; tx_hash: string }[] = [];
   for (const a of plan.toCreate) {
-    const res: any = await owner.signAndSendTransaction({ receiverId: a.account_id, actions: createActions(a.public_key), waitUntil: "EXECUTED_OPTIMISTIC" });
+    const res: any = await owner.signAndSendTransaction({ receiverId: a.account_id, actions: createActions(a), waitUntil: "EXECUTED_OPTIMISTIC" });
     assertSuccess(res);
     done.push({ account_id: a.account_id, tx_hash: String(res.transaction?.hash ?? res.transaction_outcome?.id) });
   }

@@ -1,5 +1,5 @@
 import {
-  appendEvent, callMethod, findPlanted, loadDevKey, logger, makeAccount, makeProvider, readEvents, requireAccount, rpcRaw,
+  REPORT_UPFRONT, appendEvent, callMethod, findPlanted, loadDevKey, logger, makeAccount, makeProvider, readEvents, requireAccount, rpcRaw,
   type LedgerEvent, type NetworkConfig,
 } from "@standin/core";
 import { FastSender } from "./fastsend.ts";
@@ -237,9 +237,10 @@ export class TripHandler {
     const w = makeAccount(this.cfg, requireAccount(this.cfg, "watcher"), loadDevKey(this.cfg, "watcher").secret_key);
     const deposit = BigInt(process.env.STANDIN_REPORT_DEPOSIT_YOCTO ?? "50000000000000000000000"); // registry min 0.01 NEAR; unused part refunded
     const args = { tx_hash: tx.hash, decoy_account_id: this.decoy, sender_id: this.decoy, admin_public_key: this.adminPk };
-    // A report prepays 300 TGas plus the deposit (about 0.36 NEAR, mostly refunded). A home's own watcher starts with 0.2
-    // NEAR for freezes, so it says once why it skips instead of failing the same transaction twice.
-    const upfront = deposit + 310_000_000_000_000_000_000_000n;
+    // A report prepays 300 TGas plus the deposit (REPORT_UPFRONT in @standin/core funding, measured; about 0.003 NEAR is
+    // actually spent). adopt funds a home's watcher for it; one that has run low says once why it skips, instead of
+    // failing the same transaction twice.
+    const upfront = REPORT_UPFRONT - 50_000_000_000_000_000_000_000n + deposit;
     const acct: any = await makeProvider(this.cfg).viewAccount({ accountId: requireAccount(this.cfg, "watcher") } as any).catch(() => null);
     const spendable = acct ? BigInt(acct.amount) - BigInt(acct.storage_usage) * 10n ** 19n : upfront;
     if (spendable < upfront) {

@@ -9,8 +9,6 @@ import { publicKeyOf, type GeneratedKey } from "./rpc.ts";
  * created and funded by its owner, with keys generated on the user's machine and kept only in <home>/keys.
  */
 
-/** Each home account gets 0.2 NEAR: key storage, freeze and report gas, and (for the bait) something worth stealing. */
-export const HOME_ACCOUNT_FUND = 200_000_000_000_000_000_000_000n;
 /** The bait is named like a deployment key, which is what a thief looks for. The watcher is never planted anywhere. */
 export const BAIT_PREFIX = "deployer";
 export const WATCH_PREFIX = "watch";

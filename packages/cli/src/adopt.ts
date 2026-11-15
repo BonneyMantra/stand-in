@@ -1,11 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
-  appendEvent, callMethod, credentialsPath, explorerTx, generateKey, homeAccountIds, loadNetworkConfig, loadScopedKey, logger, makeAccount,
+  BAIT_FUND, WATCHER_FUND, appendEvent, callMethod, credentialsPath, explorerTx, generateKey, homeAccountIds, loadNetworkConfig, loadScopedKey, logger, makeAccount, near,
   makeProvider, publicKeyOf, readEvents, refillPool, repoConfigFile, requireAccount, saveScopedKey, takeDecoy, type NetworkConfig,
 } from "@standin/core";
 import { validateTestnetAccount } from "./adopt-wallet.ts";
-import { ensureGuardian, MIN_GUARDIAN_BALANCE } from "./adopt-guardian.ts";
+import { ensureGuardian } from "./adopt-guardian.ts";
 import { checkFunding, createHomeAccounts, liveHomeChain, planHomeAccounts, HomeRefusal, watcherMismatch, writeHomeConfig } from "./home-accounts.ts";
 import { storeRealKey, type StoreKind } from "./keystore.ts";
 import { scanHome, type Found } from "./scan.ts";
@@ -139,9 +139,10 @@ async function setUpHomeAccounts(cfg: NetworkConfig, agent: string, owner: Retur
     if (st && typeof st === "object" && "watcher" in st && String(st.watcher) !== ids.watcher) throw new HomeRefusal(watcherMismatch(agent, String(st.watcher), ids.watcher));
   }
   const plan = await planHomeAccounts(agent, ledgerHome, chain);
-  await checkFunding(chain, plan, acc.code_hash === EMPTY ? MIN_GUARDIAN_BALANCE : 0n);
+  const { summary } = await checkFunding(chain, plan, acc.code_hash === EMPTY);
+  out(`Before signing with ${agent}'s key: ${summary}`);
   for (const c of await createHomeAccounts(owner, plan)) {
-    out(`created ${c.account_id} (0.2 NEAR, key in ${ledgerHome}/keys): ${explorerTx(cfg, c.tx_hash)}`);
+    out(`created ${c.account_id} (${near(c.account_id === ids.bait ? BAIT_FUND : WATCHER_FUND)} NEAR, key in ${ledgerHome}/keys): ${explorerTx(cfg, c.tx_hash)}`);
     rows.push(["-", c.account_id, "(new account)", c.account_id === ids.bait ? "bait: every decoy is a key on it" : "watcher: freezes the guardian", `tx ${c.tx_hash}`]);
   }
   const file = writeHomeConfig(ledgerHome, cfg, agent, plan);

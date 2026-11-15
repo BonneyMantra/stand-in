@@ -73,3 +73,15 @@ describe("a home's own accounts", () => {
     expect(poolSize(home)).toBe(2); // the others stay on disk untouched
   });
 });
+
+describe("one quote for the CLI and the owner console (funding.ts)", () => {
+  it("factory: locked storage + the factory's own required_deposit + 100 TGas up front", async () => {
+    const { quoteFactory, shortOf, near, GUARDIAN_CODE_BYTES } = await import("../src/funding.ts");
+    const q = quoteFactory({ storageBytes: 176_544n, deposit: 2_139_240_000_000_000_000_000_000n });
+    expect(q.lines.map((l) => [l.label, near(l.yocto, 3)])).toEqual([["already locked", "1.765"], ["factory deposit", "2.139"], ["gas", "0.100"]]);
+    // fresh-v.stranger-qa-1115a.testnet on 15 Nov: 3.084 NEAR with a guardian deployed, refused before signing
+    expect(near(shortOf(3_084_000_000_000_000_000_000_000n, q), 3)).toBe("0.921");
+    const web = await import("../../../apps/web/src/lib/wallet/guardianCode.ts");
+    expect(BigInt(web.GUARDIAN_CODE_BYTES)).toBe(GUARDIAN_CODE_BYTES);
+  });
+});
