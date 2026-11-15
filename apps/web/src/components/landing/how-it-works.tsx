@@ -10,14 +10,14 @@ const STEPS: Step[] = [
   {
     verb: "Adopt",
     icon: Lock,
-    body: "The owner's key stays in their own wallet, which approves a function-call key for the agent, scoped to one contract. No wallet? The CLI moves the real key out of the agent's reach.",
+    body: "The owner's key stays in their own wallet, which approves a function-call key for the agent, scoped to one contract, and creates the owner's own bait and watcher accounts. No wallet? The CLI does the same, then moves the real key out of the agent's reach.",
     mono: "pnpm standin adopt --wallet",
     tone: "bg-fg-muted",
   },
   {
     verb: "Plant",
     icon: KeyRound,
-    body: "Every place the real key used to be, and every new Claude Code or Codex session, gets its own decoy key. All on one bait account.",
+    body: "Every place the real key used to be, and every new Claude Code or Codex session, gets its own decoy key. All on the owner's own bait account.",
     mono: "1 bait account · 1 key per location",
     tone: "bg-decoy",
   },

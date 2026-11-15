@@ -29,8 +29,8 @@ export const SETUP_PROMPT = [
   "Clone https://github.com/BonneyMantra/stand-in and run `pnpm install`.",
   "If you are Claude Code: run `pnpm standin:claude --home .sandbox/me` (this build installs the plugin into an isolated config dir).",
   "If you are Codex: launch through `pnpm standin:codex`.",
-  `Wallet route (default): I open ${OWNER_CONSOLE_URL} and connect my NEAR testnet wallet. Ask me for that account id, then run \`pnpm standin adopt --wallet --account <my account> --home ~\`. Give me the owner-console link it prints and wait while I approve the one transaction in my wallet; my owner key never touches this machine.`,
-  "No-wallet route, only if I ask for it: run `pnpm standin adopt --home ~ --account <my account>`; it moves the full-access key out of the files you can read.",
+  `Wallet route (default): I open ${OWNER_CONSOLE_URL} and connect my NEAR testnet wallet. Ask me for that account id, then run \`pnpm standin adopt --wallet --account <my account> --home ~\`. Give me the owner-console link it prints and wait while I approve it in my wallet: one request sets up the guardian, your scoped key and my own bait and watcher accounts (0.2 NEAR each); my owner key never touches this machine. Then run \`pnpm standin dev up --home ~\` to start my watcher.`,
+  "No-wallet route, only if I ask for it: run `pnpm standin adopt --home ~ --account <my account>`; it creates the same accounts with that key, then moves the full-access key out of the files you can read.",
   "When it finishes, tell me which function-call key you now hold, which contract it is scoped to, and where the decoy key was planted. `pnpm standin <command> --help` lists every option.",
   `Docs: ${REPO_URL}`,
 ].join("\n");
