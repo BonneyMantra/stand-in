@@ -27,13 +27,14 @@ export function checkAccount(s: StandinState, account: string): Result {
   const own = Object.entries(s.recorded?.accounts ?? {}).find(([, id]) => id === account);
   if (own) reasons.push({ level: "info", text: `This is the run's own ${own[0]} account.` });
   if (s.agent.account_id === account) reasons.push({ level: "warn", text: "Paying the agent account itself." });
-  reasons.push({ level: "info", text: "No blocklist entry." });
-  reasons.push({ level: "info", text: "Account age (< 7 days) and contract-code changes (72 h) are checked by `standin pay` over RPC, not from this page." });
+  reasons.push({ level: "info", text: "No entry in this run's blocklist. The live list is checked on the landing page and by `standin pay`." });
+  reasons.push({ level: "info", text: "Whether the account exists, its age (< 7 days) and contract-code changes (72 h) are checked by `standin pay` over RPC, not from this page." });
   return { account, verdict: reasons.some((r) => r.level === "warn") ? "warn" : "allow", reasons };
 }
 
 const V = {
-  allow: { icon: CircleCheck, cls: "border-safe/30 bg-safe-soft text-safe", label: "allow" },
+  // The page sees only the recorded list; `standin pay` still decides allow or warn (age, code, existence).
+  allow: { icon: CircleCheck, cls: "border-safe/30 bg-safe-soft text-safe", label: "not listed" },
   warn: { icon: TriangleAlert, cls: "border-warn/30 bg-warn/10 text-warn", label: "warn · ask a human" },
   block: { icon: Ban, cls: "border-trip/40 bg-trip-soft text-trip", label: "block" },
 };
