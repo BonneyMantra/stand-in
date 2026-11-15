@@ -162,6 +162,22 @@ describe("TabWatcher: armed before the theft, freezes once, misses nothing acros
     expect(f.freezes.map((x) => x.args.tx_hash)).toEqual(["CRAFTED"]);
   });
 
+  it("a node that has not seen the theft's block yet (UNKNOWN_BLOCK) is asked again, so the freeze still names the theft", async () => {
+    const f = fakeChain();
+    let refusals = 1;
+    const inner = f.rpc.callAt.bind(f.rpc);
+    f.rpc.callAt = async <T,>(method: string, params: unknown, endpoint?: string) => {
+      if (method === "EXPERIMENTAL_changes" && refusals > 0) { refusals--; throw new ChainAnswer("UNKNOWN_BLOCK", "UNKNOWN_BLOCK"); }
+      return inner<T>(method, params, endpoint);
+    };
+    const w = new TabWatcher({ rpc: f.rpc, bait: BAIT, admin: ADMIN, freezer: f.freezer });
+    await w.tick();
+    f.steal("LAGGING_NODE");
+    await w.tick();
+    await settle();
+    expect(f.freezes.map((x) => x.args.tx_hash)).toEqual(["LAGGING_NODE"]);
+  });
+
   it("goes stalled when RPC stops answering, and the first good read after it still catches a theft from the gap", async () => {
     const f = fakeChain();
     let now = 1_000;

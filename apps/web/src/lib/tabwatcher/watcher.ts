@@ -196,20 +196,23 @@ export class TabWatcher {
     return out;
   }
 
+  /**
+   * One block's key changes. A public endpoint balances over several nodes, and one that has not seen the newest block yet
+   * answers UNKNOWN_BLOCK, so that answer is asked again a few times (any endpoint) before the height counts as skipped.
+   */
   private async changesAt(height: number, endpoint: string): Promise<KeyUse[]> {
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 5; attempt++) {
       try {
         const r = await this.o.rpc.callAt<{ changes: RawChange[] }>(
           "EXPERIMENTAL_changes", { changes_type: "all_access_key_changes", account_ids: [this.o.bait], block_id: height }, attempt === 0 ? endpoint : undefined,
         );
         return usesIn(r.result.changes ?? [], height, this.o.admin);
       } catch (e) {
-        if (e instanceof ChainAnswer && e.kind === "UNKNOWN_BLOCK" && attempt === 0) return []; // a skipped height on the node that is ahead of it
-        if (!(e instanceof RpcDown)) return [];
-        await sleep(200);
+        if (e instanceof ChainAnswer && e.kind !== "UNKNOWN_BLOCK") return [];
+        await sleep(e instanceof ChainAnswer ? 100 : 200);
       }
     }
-    return [];
+    return []; // a skipped height (no block was produced at it), or no node answered
   }
 
   private async trip(pk: string, snap: Snapshot, via: Trip["via"], scan: Promise<KeyUse[]>) {

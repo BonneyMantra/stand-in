@@ -20,7 +20,7 @@ export const MY_LABELS: Record<MyStepId, string> = {
   cleanup: "Return the loot, delete the decoy",
 };
 
-export const INCIDENT_CLI = "CLI only. With your own NEARAI_API_KEY, `standin dev up --home DIR` writes a private, attested incident report when your CLI watcher handles a trip. This page never uses the project's NEAR AI key.";
+export const INCIDENT_CLI = "CLI only. With your own NEARAI_API_KEY, standin dev up --home DIR writes a private, attested incident report when your CLI watcher handles a trip. This page never uses the project's NEAR AI key.";
 
 const failureOf = (t: TxView) => firstFailure(t as Parameters<typeof firstFailure>[0]);
 
