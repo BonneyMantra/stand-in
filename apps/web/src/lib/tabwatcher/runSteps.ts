@@ -1,5 +1,5 @@
 import { GuardianState } from "../wallet/near";
-import { firstFailure, sendLocalTx } from "../wallet/localSigner";
+import { firstFailure } from "../wallet/localSigner";
 import { act, KeySigner } from "./sign";
 import { blockHeight, viewAccessKey, viewAccount, viewFunction, waitExecuted, type Rpc, type TxView } from "./rpc";
 import { REGISTRY, REPORT_DEPOSIT } from "./preflight";
@@ -80,33 +80,35 @@ const fmtNear = (y: bigint) => (Number((y * 10_000n) / 10n ** 24n) / 10_000).toF
 export interface CleanStep { label: string; hash?: string; error?: string; detail?: string }
 
 /**
+ * DeleteAccount (localSigner's action) signed by the thief's key, beneficiary the bait. The hash is known before it is sent,
+ * the same bytes go to every endpoint, and the result is judged by reading back (the thief account is gone; what the bait
+ * received), never by the RPC's answer or by every receipt: the gas refund to the account just deleted always fails with
+ * AccountDoesNotExist, and a retried send_tx reports SignerDoesNotExist once the first copy landed (both seen live, 15 Nov).
+ */
+async function returnLoot(rpc: Rpc, bait: string, thief: { account: string; secret: string }, onSigned: (label: string, h: string) => void): Promise<CleanStep> {
+  const [thiefBefore, baitBefore] = await Promise.all([viewAccount(rpc, thief.account), viewAccount(rpc, bait)]).catch(() => [null, null] as const);
+  if (!thiefBefore) return { label: "return loot", error: "the thief account no longer exists" };
+  let hash: string | undefined;
+  let sendError: string | undefined;
+  try {
+    hash = await new KeySigner(rpc, thief.account, thief.secret).broadcast(thief.account, [{ type: "DeleteAccount", beneficiaryId: bait }], (h) => onSigned("return loot", h));
+    await waitExecuted(rpc, hash, thief.account, 60_000);
+  } catch (e) {
+    sendError = (e as Error).message;
+  }
+  const [thiefAfter, baitAfter] = await Promise.all([viewAccount(rpc, thief.account), viewAccount(rpc, bait)]).catch(() => [thiefBefore, null] as const);
+  if (thiefAfter) return { label: "return loot", hash, error: sendError ?? "the thief account still exists" };
+  const got = baitAfter && baitBefore ? baitAfter.amount - baitBefore.amount : null;
+  return { label: "return loot", hash, detail: `the thief account is deleted; the bait received ${got !== null ? fmtNear(got) : "?"} NEAR of the ${fmtNear(thiefBefore.amount)} it held` };
+}
+
+/**
  * The thief deletes its own throwaway account with the bait as beneficiary, so everything it took comes back (read back: the
  * thief account no longer exists, and what the bait received); then the bait's key deletes the used decoy.
  */
 export async function cleanUp(rpc: Rpc, o: { bait: KeySigner; thief: { account: string; secret: string }; decoyPk: string | null; stole: boolean }, onSigned: (label: string, h: string) => void): Promise<CleanStep[]> {
   const out: CleanStep[] = [];
-  if (o.stole) {
-    try {
-      const [thiefBefore, baitBefore] = await Promise.all([viewAccount(rpc, o.thief.account), viewAccount(rpc, o.bait.accountId)]);
-      if (!thiefBefore) {
-        out.push({ label: "return loot", error: "the thief account no longer exists" });
-      } else {
-        const r = await sendLocalTx({ signerId: o.thief.account, secretKey: o.thief.secret, receiverId: o.thief.account, actions: [{ type: "DeleteAccount", beneficiaryId: o.bait.accountId }] });
-        onSigned("return loot", r.hash);
-        // Judged by reading back, not by every receipt: the gas refund to the account just deleted always fails
-        // (AccountDoesNotExist), which a receipt scan reports as the transaction's failure.
-        const [thiefAfter, baitAfter] = await Promise.all([viewAccount(rpc, o.thief.account), viewAccount(rpc, o.bait.accountId)]);
-        const got = baitAfter && baitBefore ? baitAfter.amount - baitBefore.amount : null;
-        if (thiefAfter) {
-          out.push({ label: "return loot", hash: r.hash, error: r.failure ?? "the thief account still exists" });
-        } else {
-          out.push({ label: "return loot", hash: r.hash, detail: `the thief account is deleted; the bait received ${got !== null ? fmtNear(got) : "?"} NEAR of the ${fmtNear(thiefBefore.amount)} it held` });
-        }
-      }
-    } catch (e) {
-      out.push({ label: "return loot", error: (e as Error).message });
-    }
-  }
+  if (o.stole) out.push(await returnLoot(rpc, o.bait.accountId, o.thief, onSigned));
   if (o.decoyPk) {
     const pk = o.decoyPk;
     try {
