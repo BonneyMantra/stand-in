@@ -57,6 +57,9 @@ export function GuardianFacts({ r, freezeTxs, served }: { r: GuardianReport; fre
   const pinned = r.codeHash === GUARDIAN_CODE_HASH;
   const factory = r.codeHash === FACTORY_GUARDIAN_HASH;
   const [wTone, wText] = WATCHER_TAG[r.watcher.kind];
+  const last = s.freeze_log.at(-1);
+  const deletedLast = s.frozen && last ? last.deleted_keys.length : 0;
+  const removedLast = s.frozen && last ? last.intents_keys_removed.length : 0;
   const freezeKeys = (r.watcher.keys ?? []).filter((k) => typeof k.permission === "object" && k.permission.FunctionCall.receiver_id === r.account && k.permission.FunctionCall.method_names.includes("freeze"));
   return (
     <div className="grid gap-3 md:grid-cols-2" data-testid="guardian-facts">
@@ -84,14 +87,14 @@ export function GuardianFacts({ r, freezeTxs, served }: { r: GuardianReport; fre
           <ul className="space-y-1.5">{r.agentKeys.map((a) => (
             <li key={a.key} className="font-mono text-[11.5px] [overflow-wrap:anywhere] text-fg-muted"><span className="text-fg">{pk(a.key)}</span> · <span className={cn(!a.onChain && "text-trip")}>{permText(a.onChain)}</span></li>
           ))}</ul>
-        ) : <p className="text-[12.5px] text-fg-faint">{s.frozen ? "None: the freeze deleted them." : "None registered."}</p>}
+        ) : <p className="text-[12.5px] text-fg-faint">{deletedLast ? `None: the last freeze deleted ${deletedLast}.` : "None registered."}</p>}
       </Card>
       <Card title={`Intents keys · ${s.intents_keys.length}`} right={<Tag tone={s.frozen ? "trip" : "safe"}>{s.frozen ? "sign_evm refused" : "sign_evm allowed"}</Tag>}>
         {r.intents.length ? (
           <ul className="space-y-1.5">{r.intents.map((i) => (
             <li key={i.key} className="font-mono text-[11.5px] text-fg-muted"><span className="text-fg">{pk(i.key)}</span> · has_public_key on {s.intents_contract}: <span className={i.registered ? "text-safe" : "text-trip"}>{i.registered === null ? "unreadable" : String(i.registered)}</span></li>
           ))}</ul>
-        ) : <p className="text-[12.5px] text-fg-faint">{s.frozen ? "None: a freeze removes them from the intents registry." : "None registered."}</p>}
+        ) : <p className="text-[12.5px] text-fg-faint">{removedLast ? `None: the last freeze removed ${removedLast} from the intents registry.` : "None registered."}</p>}
         <p className="mt-2 text-[12px] leading-relaxed text-fg-faint">Chain Signatures: the guardian forwards the owner's <span className="font-mono">sign_evm</span> to {MPC_SIGNER} and refuses it while frozen (its code; the state's frozen flag is {String(s.frozen)}).</p>
       </Card>
       <div className="md:col-span-2">

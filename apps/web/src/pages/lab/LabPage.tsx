@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo } from "react";
+import { Suspense, useMemo } from "react";
 import { useSearchParams } from "react-router";
 import { PageHead, PublicShell } from "@/components/public/PublicShell";
 import { Frame, FramePanel, PanelBar } from "@/components/landing/frame";
@@ -9,9 +9,11 @@ import { foldSteps, type LabConfig } from "@/lib/lab/types";
 import { useLabRun } from "@/lib/lab/useLabRun";
 import { LabModeSwitch, defaultMode, type LabMode } from "@/components/lab/LabModeSwitch";
 import { Shimmer } from "@/components/app/common";
+import { LoadBoundary } from "@/components/lab/LoadBoundary";
+import { lazyWithReload } from "@/lib/lab/lazyPage";
 
 // The own-account run carries the wallet and signing code; it loads only when that tab opens.
-const MyAccountLab = lazy(() => import("@/components/lab/MyAccountLab"));
+const MyAccountLab = lazyWithReload(() => import("@/components/lab/MyAccountLab"));
 
 /** The public lab topic (docs/UPGRADES.md, STANDIN_LAB_NTFY_TOPIC); the API's config wins when it answers. */
 const LAB_TOPIC = "standin-lab-09d9a8";
@@ -76,9 +78,13 @@ function MinePage({ onMode }: { onMode: (m: LabMode) => void }) {
         </p>
       </PageHead>
       <LabModeSwitch mode="mine" onChange={onMode} />
-      <Suspense fallback={<div className="mt-5 space-y-2"><Shimmer className="h-40 w-full" /></div>}>
-        <div className="mt-5"><MyAccountLab /></div>
-      </Suspense>
+      <div className="mt-5">
+        <LoadBoundary what="Run on my account">
+          <Suspense fallback={<div className="space-y-2"><Shimmer className="h-40 w-full" /></div>}>
+            <MyAccountLab />
+          </Suspense>
+        </LoadBoundary>
+      </div>
     </PublicShell>
   );
 }

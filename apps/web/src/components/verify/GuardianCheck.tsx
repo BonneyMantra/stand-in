@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { Suspense, useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useSearchParams } from "react-router";
 import { CircleAlert, Search, ShieldCheck, ShieldOff, ShieldQuestion, Snowflake, UserX, WifiOff, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,10 +8,12 @@ import { explorerAccount } from "@/lib/wallet/near";
 import { ACCOUNT_RE, type CheckResult } from "@/lib/verify/guardian";
 import { useGuardianCheck } from "@/lib/verify/useGuardianCheck";
 import { cn } from "@/lib/utils";
+import { lazyWithReload } from "@/lib/lab/lazyPage";
+import { LoadBoundary } from "@/components/lab/LoadBoundary";
 import { Ext, GuardianFacts } from "./GuardianFacts";
 
 // The wallet session and browser home are read only when this browser has one, so /verify stays light without them.
-const Prefill = lazy(() => import("./VerifyPrefill"));
+const Prefill = lazyWithReload(() => import("./VerifyPrefill"));
 const hasSession = () => {
   try {
     if (localStorage.getItem("selected-wallet")) return true;
@@ -106,7 +108,7 @@ export function GuardianCheck() {
             ))}
           </div>
         ) : null}
-        {hasSession() ? <Suspense fallback={null}><Prefill onList={onPrefill} /></Suspense> : null}
+        {hasSession() ? <LoadBoundary what="Your accounts"><Suspense fallback={null}><Prefill onList={onPrefill} /></Suspense></LoadBoundary> : null}
         <div className="mt-5" aria-live="polite">
           {state.status === "loading" ? (
             <div className="space-y-2" aria-label={`Reading ${state.account}`}><Shimmer className="h-9 w-2/3" /><Shimmer className="h-28 w-full" /></div>
