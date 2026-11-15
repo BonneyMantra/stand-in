@@ -67,6 +67,19 @@ describe("failure text", () => {
     expect(firstFailure({ status: panic })).toBe("only the watcher can freeze");
     expect(firstFailure({ status: { SuccessReceiptId: "x" }, receipts_outcome: [{ outcome: { status: { SuccessValue: "" } } }, { outcome: { status: panic } }] })).toBe("only the watcher can freeze");
   });
+  it("ignores the failed gas refund to an account the transaction deleted, and nothing else", () => {
+    const gone = "thief-1.judge.testnet";
+    const refund = { outcome: { executor_id: gone, status: { Failure: { ActionError: { index: 0, kind: { AccountDoesNotExist: { account_id: gone } } } } } } };
+    const tx = { receiver_id: gone, actions: [{ DeleteAccount: { beneficiary_id: "deployer.judge.testnet" } }] };
+    expect(firstFailure({ status: { SuccessValue: "" }, transaction: tx, receipts_outcome: [{ outcome: { executor_id: gone, status: { SuccessValue: "" } } }, refund] })).toBeUndefined();
+    // the same outcome without the transaction (the lab's regression fixture shape): still a success
+    expect(firstFailure({ status: { SuccessValue: "" }, transaction: {}, receipts_outcome: [{ outcome: { status: { Failure: { ActionError: { kind: { AccountDoesNotExist: {} } } } } } }] })).toBeUndefined();
+    // a transfer to a missing account is a real failure
+    expect(firstFailure({ status: { Failure: { ActionError: { index: 0, kind: { AccountDoesNotExist: { account_id: "nobody.testnet" } } } } } })).toContain("AccountDoesNotExist");
+    // without a DeleteAccount, a failing receipt on another account still counts
+    expect(firstFailure({ status: { SuccessValue: "" }, transaction: { receiver_id: "g.testnet", actions: [{ Transfer: { deposit: "1" } }] }, receipts_outcome: [{ outcome: { executor_id: "x.testnet", status: { Failure: { ActionError: { index: 0, kind: { AccountDoesNotExist: { account_id: "x.testnet" } } } } } } }] })).toContain("AccountDoesNotExist");
+  });
+
   it("reports no failure on success and keeps non-panic failures readable", () => {
     expect(firstFailure({ status: { SuccessValue: "" }, receipts_outcome: [{ outcome: { status: { SuccessValue: "" } } }] })).toBeUndefined();
     expect(firstFailure({ status: { Failure: { ActionError: { index: 0, kind: { LackBalanceForState: { account_id: "a", amount: "5" } } } } } })).toContain("LackBalanceForState");
@@ -80,18 +93,24 @@ describe("sendLocalTx (fetch stubbed, no network)", () => {
 
   // rpc() tries every endpoint when one answers with an error, so an error answer is consumed three times.
   const x3 = <T,>(r: T) => [r, r, r];
-  function chain(opts: { key: unknown; sends: unknown[] }) {
+  const unknownTx = reply(undefined, { name: "HANDLER_ERROR", cause: { name: "UNKNOWN_TRANSACTION" } });
+  /** `sends`: answers to send_tx in order; `found`: what a lookup by hash (method tx) answers (default: unknown). */
+  function chain(opts: { key: unknown; sends: unknown[]; found?: unknown }) {
     const sends = [...opts.sends];
     const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
       const b = JSON.parse(String(init.body));
       if (b.method === "block") return reply({ header: { hash: near.baseEncode(blockHash) } });
       if (b.method === "query") return opts.key === null ? reply(undefined, { cause: { name: "UNKNOWN_ACCESS_KEY" }, message: "access key does not exist" }) : reply(opts.key);
-      return sends.shift() as ReturnType<typeof reply>;
+      if (b.method === "tx") return (opts.found ?? unknownTx) as ReturnType<typeof reply>;
+      const next = sends.shift();
+      if (next instanceof Error) throw next;
+      return next as ReturnType<typeof reply>;
     });
     vi.stubGlobal("fetch", fetchMock);
     return fetchMock;
   }
-  const o = { signerId: "deployer.judge.testnet", secretKey: signer.secret_key, receiverId: "g.testnet", actions: [{ type: "Transfer", deposit: 1n } as LocalAction] };
+  const calls = (f: ReturnType<typeof chain>, method: string) => f.mock.calls.map((c) => JSON.parse(String((c[1] as RequestInit).body))).filter((b) => b.method === method);
+  const o = { signerId: "deployer.judge.testnet", secretKey: signer.secret_key, receiverId: "g.testnet", actions: [{ type: "Transfer", deposit: 1n } as LocalAction], lookup: { tries: 2, waitMs: 1 } };
 
   it("signs with nonce+1 and returns the hash", async () => {
     const f = chain({ key: { nonce: 41, permission: "FullAccess" }, sends: [reply({ status: { SuccessValue: "" }, receipts_outcome: [] })] });
@@ -120,6 +139,38 @@ describe("sendLocalTx (fetch stubbed, no network)", () => {
     const f = chain({ key: { nonce: 1, permission: "FullAccess" }, sends: x3(reply(undefined, { cause: { info: { InvalidNonce: {} } } })).concat(x3(reply(undefined, { cause: { info: { InvalidNonce: {} } } }))) });
     await expect(sendLocalTx(o)).rejects.toThrow(/InvalidNonce/);
     expect(sendBody(f.mock.calls)).toHaveLength(6); // two attempts of three endpoints, never a third attempt
+  });
+
+  it("a lost answer is looked up by hash, never sent again (the transaction had landed)", async () => {
+    const landed = { status: { SuccessValue: "" }, receipts_outcome: [] };
+    const f = chain({ key: { nonce: 7, permission: "FullAccess" }, sends: x3(new TypeError("Failed to fetch")), found: reply(landed) });
+    const r = await sendLocalTx(o);
+    expect(r.failure).toBeUndefined();
+    expect(calls(f, "send_tx").map((b) => b.params.signed_tx_base64).every((b, _i, a) => b === a[0])).toBe(true);
+    expect(calls(f, "block")).toHaveLength(1); // signed once
+    expect(calls(f, "tx")[0].params.tx_hash).toBe(r.hash);
+  });
+
+  it("SignerDoesNotExist after a DeleteAccount that already applied: found by hash, reported as landed", async () => {
+    const del = { ...o, receiverId: o.signerId, actions: [{ type: "DeleteAccount", beneficiaryId: "deployer.judge.testnet" } as LocalAction] };
+    const landed = {
+      status: { SuccessValue: "" }, transaction: { receiver_id: o.signerId, actions: [{ DeleteAccount: { beneficiary_id: "deployer.judge.testnet" } }] },
+      receipts_outcome: [
+        { outcome: { executor_id: o.signerId, status: { SuccessValue: "" } } },
+        { outcome: { executor_id: o.signerId, status: { Failure: { ActionError: { index: 0, kind: { AccountDoesNotExist: { account_id: o.signerId } } } } } } },
+      ],
+    };
+    const f = chain({ key: { nonce: 7, permission: "FullAccess" }, sends: [reply(undefined, { name: "HANDLER_ERROR", cause: { name: "INVALID_TRANSACTION", info: { SignerDoesNotExist: { signer_id: o.signerId } } }, data: "Signer deployer.judge.testnet does not exist" })], found: reply(landed) });
+    const r = await sendLocalTx(del);
+    expect(r.failure).toBeUndefined();
+    expect(calls(f, "block")).toHaveLength(1);
+  });
+
+  it("a lost answer with nothing on chain under its hash: the original error, no second signature", async () => {
+    const f = chain({ key: { nonce: 7, permission: "FullAccess" }, sends: x3(new TypeError("Failed to fetch")) });
+    await expect(sendLocalTx(o)).rejects.toThrow(/Failed to fetch/);
+    expect(calls(f, "block")).toHaveLength(1);
+    expect(calls(f, "tx").length).toBeGreaterThan(0);
   });
 
   it("base58 round trip of the block hash used here", () => {

@@ -94,18 +94,52 @@ function failureText(f: unknown): string {
   return text.replace(/^Smart contract panicked:\s*/, "");
 }
 
-export interface Outcome { status?: unknown; receipts_outcome?: { outcome?: { status?: unknown } }[] }
+export interface Outcome {
+  status?: unknown;
+  receipts_outcome?: { outcome?: { status?: unknown; executor_id?: string } }[];
+  transaction?: { receiver_id?: string; actions?: unknown[] };
+}
 
-/** The first `Failure` in the transaction status or the receipts, or undefined when every step succeeded. */
+/** The account this transaction deleted (a DeleteAccount action on its receiver), if any. */
+function deletedBy(o: Outcome): string | undefined {
+  const acts = o.transaction?.actions ?? [];
+  const deletes = acts.some((a) => (a && typeof a === "object" && "DeleteAccount" in a) || a === "DeleteAccount");
+  return deletes ? o.transaction?.receiver_id : undefined;
+}
+
+/**
+ * The first `Failure` in the transaction status or the receipts, or undefined when every step succeeded. After a
+ * DeleteAccount, NEAR still sends the unused gas back to the deleted account; that refund receipt always fails with
+ * AccountDoesNotExist and is not a failure of the transaction, so it is skipped.
+ */
 export function firstFailure(o: Outcome): string | undefined {
-  const statuses = [o.status, ...(o.receipts_outcome ?? []).map((r) => r.outcome?.status)];
-  for (const s of statuses) if (s && typeof s === "object" && "Failure" in s) return failureText((s as { Failure: unknown }).Failure);
+  if (o.status && typeof o.status === "object" && "Failure" in o.status) return failureText((o.status as { Failure: unknown }).Failure);
+  const gone = deletedBy(o);
+  const succeeded = !!o.status && typeof o.status === "object" && ("SuccessValue" in o.status || "SuccessReceiptId" in o.status);
+  for (const r of o.receipts_outcome ?? []) {
+    const s = r.outcome?.status;
+    if (!(s && typeof s === "object" && "Failure" in s)) continue;
+    const f = (s as { Failure: unknown }).Failure;
+    const text = JSON.stringify(f);
+    // The refund to the deleted account: named by the transaction's DeleteAccount when the outcome carries it, else (an
+    // outcome without the transaction) an AccountDoesNotExist receipt with no executor in a transaction that succeeded.
+    const refund = text.includes("AccountDoesNotExist") && (gone ? r.outcome?.executor_id === gone || text.includes(`"${gone}"`) : succeeded && !r.outcome?.executor_id);
+    if (refund) continue;
+    return failureText(f);
+  }
   return undefined;
 }
 
 const INVALID_NONCE = /InvalidNonce|INVALID_NONCE/;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function signAndBroadcast(o: { signerId: string; secretKey: string; receiverId: string; actions: LocalAction[]; waitUntil: string }): Promise<{ hash: string; outcome: Outcome }> {
+/** How long a lost answer is looked up by hash before it counts as not sent. Tests shorten it. */
+export interface Lookup { tries: number; waitMs: number }
+const LOOKUP: Lookup = { tries: 6, waitMs: 1500 };
+
+interface Signed { hash: string; base64: string }
+
+async function signFresh(o: { signerId: string; secretKey: string; receiverId: string; actions: LocalAction[] }): Promise<Signed> {
   const publicKey = publicKeyOf(o.secretKey);
   const [key, block] = await Promise.all([
     viewAccessKey(o.signerId, publicKey),
@@ -114,20 +148,52 @@ async function signAndBroadcast(o: { signerId: string; secretKey: string; receiv
   if (!key) throw new Error(`${publicKey} is not an access key on ${o.signerId}: the account does not exist yet, or this key was never added to it (or was removed)`);
   const tx: LocalTx = { signerId: o.signerId, publicKey, nonce: BigInt(key.nonce) + 1n, receiverId: o.receiverId, blockHash: base58Decode(block.header.hash), actions: o.actions };
   const { signed, hash } = signTransaction(tx, o.secretKey);
-  const outcome = await rpc<Outcome>("send_tx", { signed_tx_base64: btoa(Array.from(signed, (c) => String.fromCharCode(c)).join("")), wait_until: o.waitUntil });
-  return { hash, outcome };
+  return { hash, base64: btoa(Array.from(signed, (c) => String.fromCharCode(c)).join("")) };
 }
 
-/** Signs with this browser's key and broadcasts; retries once on a stale nonce. A transaction that executes and fails returns `failure`. */
-export async function sendLocalTx(o: { signerId: string; secretKey: string; receiverId: string; actions: LocalAction[]; waitUntil?: "INCLUDED" | "EXECUTED_OPTIMISTIC" | "FINAL" }): Promise<LocalTxResult> {
-  const args = { ...o, waitUntil: o.waitUntil ?? "EXECUTED_OPTIMISTIC" };
-  let r: { hash: string; outcome: Outcome };
-  try {
-    r = await signAndBroadcast(args);
-  } catch (e) {
-    if (!INVALID_NONCE.test(String((e as Error)?.message ?? e))) throw e;
-    r = await signAndBroadcast(args);
+/** The transaction's outcome by hash, or null when the chain does not know it after `lookup.tries` reads. */
+async function findByHash(hash: string, signerId: string, lookup: Lookup): Promise<Outcome | null> {
+  for (let i = 0; i < lookup.tries; i++) {
+    try {
+      const o = await rpc<Outcome>("tx", { tx_hash: hash, sender_account_id: signerId, wait_until: "EXECUTED_OPTIMISTIC" });
+      if (o && (o.status || o.receipts_outcome)) return o;
+    } catch {
+      // not known yet (UNKNOWN_TRANSACTION) or the node is behind: read again
+    }
+    if (i < lookup.tries - 1) await sleep(lookup.waitMs);
   }
-  const failure = firstFailure(r.outcome);
-  return failure === undefined ? { hash: r.hash, outcome: r.outcome } : { hash: r.hash, failure, outcome: r.outcome };
+  return null;
+}
+
+const result = (hash: string, outcome: Outcome): LocalTxResult => {
+  const failure = firstFailure(outcome);
+  return failure === undefined ? { hash, outcome } : { hash, failure, outcome };
+};
+
+/**
+ * Signs with this browser's key and broadcasts. When the answer is lost or refused (a timeout, a duplicate the network
+ * already applied, SignerDoesNotExist after a DeleteAccount that landed), the transaction is looked up by its hash before
+ * anything else: it is never sent twice. Only a stale nonce with nothing on chain under that hash is signed once more.
+ * A transaction that executes and fails returns `failure`.
+ */
+export async function sendLocalTx(o: { signerId: string; secretKey: string; receiverId: string; actions: LocalAction[]; waitUntil?: "INCLUDED" | "EXECUTED_OPTIMISTIC" | "FINAL"; lookup?: Lookup }): Promise<LocalTxResult> {
+  const waitUntil = o.waitUntil ?? "EXECUTED_OPTIMISTIC";
+  const lookup = o.lookup ?? LOOKUP;
+  const send = (t: Signed) => rpc<Outcome>("send_tx", { signed_tx_base64: t.base64, wait_until: waitUntil });
+  let t = await signFresh(o);
+  try {
+    return result(t.hash, await send(t));
+  } catch (e) {
+    const landed = await findByHash(t.hash, o.signerId, lookup);
+    if (landed) return result(t.hash, landed);
+    if (!INVALID_NONCE.test(String((e as Error)?.message ?? e))) throw e;
+  }
+  t = await signFresh(o);
+  try {
+    return result(t.hash, await send(t));
+  } catch (e) {
+    const landed = await findByHash(t.hash, o.signerId, lookup);
+    if (landed) return result(t.hash, landed);
+    throw e;
+  }
 }
