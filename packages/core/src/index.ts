@@ -8,3 +8,4 @@ export * from "./plant.ts";
 export * from "./counterparty.ts";
 export * from "./scoped.ts";
 export * from "./health.ts";
+export * from "./homeacct.ts";

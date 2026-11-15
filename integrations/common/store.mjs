@@ -44,8 +44,12 @@ export function repoDir() {
   try { return JSON.parse(fs.readFileSync(new URL('./repo.json', import.meta.url), 'utf8')).repo; } catch { return ''; }
 }
 
+/** A home adopted by `standin adopt` has its own config.json (its guardian, bait and watcher); otherwise the project's. */
+export const homeConfigFile = () => path.join(home(), 'config.json');
+
 export function accountConfig() {
-  const cfg = readJson(path.join(repoDir(), 'config/testnet.json'), {});
+  const own = readJson(homeConfigFile(), null);
+  const cfg = own ?? readJson(path.join(repoDir(), 'config/testnet.json'), {});
   return {
     network: process.env.STANDIN_NETWORK || cfg.network || 'testnet',
     decoy: process.env.STANDIN_DECOY_ACCOUNT || cfg.accounts?.decoy || 'si-decoy-0.testnet',
@@ -61,7 +65,10 @@ export async function takeKey() {
     for (let attempt = 0; attempt < 4; attempt++) {
       try {
         const core = await import(path.join(repo, 'packages/core/src/pool.ts'));
-        const k = await core.takeDecoy({ home: home() });
+        const conf = await import(path.join(repo, 'packages/core/src/config.ts'));
+        // The home's own config names its own bait, and its keys sit next to it (<home>/keys): mint and plant on that.
+        const cfg = fs.existsSync(homeConfigFile()) ? conf.loadNetworkConfig(homeConfigFile()) : undefined;
+        const k = await core.takeDecoy({ home: home(), cfg });
         return { public_key: k.public_key, secret_key: k.secret_key, source: 'core' };
       } catch (e) { last = e; await new Promise((r) => setTimeout(r, 2500)); } // e.g. admin-key nonce race with the background refill
     }

@@ -19,6 +19,12 @@ export function devKeysDir(): string {
 export function standinHome(): string {
   return process.env.STANDIN_HOME ?? path.join(repoRoot(), ".sandbox", "default", ".standin");
 }
+/** The config `standin adopt` writes for a home: its guardian, its own bait and watcher accounts. */
+export const homeConfigFile = (home = standinHome()) => path.join(home, "config.json");
+/** Keys of a home's own accounts (bait admin, watcher): 0600 files in a 0700 dir, never in the repository. */
+export const homeKeysDir = (home = standinHome()) => path.join(home, "keys");
+/** The project's own testnet config (the film and demo accounts; their keys are in <repo>/.secrets). */
+export const repoConfigFile = () => path.join(repoRoot(), "config", "testnet.json");
 
 const accountRef = z.union([z.string(), z.object({ account_id: z.string() }).passthrough()]);
 const rawConfig = z
@@ -45,10 +51,20 @@ export interface NetworkConfig {
   accounts: Record<Role, string>;
   /** original parsed file, for fields other workers add (contract hashes, tx links...) */
   raw: Record<string, unknown>;
+  /** the file this config was read from */
+  file: string;
+  /** <config dir>/keys when it exists: a home's own account keys, searched before <repo>/.secrets */
+  keysDir?: string;
 }
 
+/**
+ * Resolution: an explicit file, then STANDIN_CONFIG, then the home's own config.json (written by adopt), then the
+ * project's config/testnet.json. A home without config.json (the film's .sandbox/default) keeps the project's accounts.
+ */
 export function loadNetworkConfig(file?: string): NetworkConfig {
-  const p = file ?? process.env.STANDIN_CONFIG ?? path.join(repoRoot(), "config", "testnet.json");
+  const ownHome = homeConfigFile();
+  const p = file ?? process.env.STANDIN_CONFIG ?? (fs.existsSync(ownHome) ? ownHome : repoConfigFile());
+  const keysDir = path.join(path.dirname(p), "keys");
   if (!fs.existsSync(p)) throw new Error(`config not found: ${p} (W1 writes config/testnet.json)`);
   const c = rawConfig.parse(JSON.parse(fs.readFileSync(p, "utf8")));
   const accounts = {} as Record<Role, string>;
@@ -69,6 +85,8 @@ export function loadNetworkConfig(file?: string): NetworkConfig {
     nearblocksUrl: main ? "https://api.nearblocks.io" : "https://api-testnet.nearblocks.io",
     accounts,
     raw: c as Record<string, unknown>,
+    file: p,
+    keysDir: fs.existsSync(keysDir) ? keysDir : undefined,
   };
 }
 export function requireAccount(cfg: NetworkConfig, role: Role): string {

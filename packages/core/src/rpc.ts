@@ -102,20 +102,25 @@ export function loadDevKey(cfg: NetworkConfig, accountOrRole: string): Generated
   const id = (cfg.accounts as Record<string, string>)[accountOrRole] ?? accountOrRole;
   const dir = devKeysDir();
   const names = [id, accountOrRole].flatMap((n) => [`${n}.json`, `${n}.key`]);
-  for (const base of [dir, path.join(dir, "keys"), path.join(dir, cfg.network)]) {
-    for (const n of names) {
-      const f = path.join(base, n);
-      if (!fs.existsSync(f)) continue;
-      const txt = fs.readFileSync(f, "utf8").trim();
-      let secret: string | undefined;
-      if (txt.startsWith("{")) {
-        const j = JSON.parse(txt);
-        secret = j.private_key ?? j.secret_key ?? j.privateKey ?? j.secretKey;
-      } else secret = txt;
-      if (secret?.startsWith("ed25519:")) return { secret_key: secret, public_key: publicKeyOf(secret) };
-    }
+  // A home's own accounts first (cfg.keysDir = <home>/keys, named by account id only), then the project's .secrets.
+  const own = cfg.keysDir ? [`${id}.json`, `${id}.key`].map((n) => path.join(cfg.keysDir!, n)) : [];
+  const shared = [dir, path.join(dir, "keys"), path.join(dir, cfg.network)].flatMap((b) => names.map((n) => path.join(b, n)));
+  for (const f of [...own, ...shared]) {
+    const k = readKeyFile(f);
+    if (k) return k;
   }
-  throw new Error(`no dev key for ${id} in ${dir} (tried ${names.join(", ")})`);
+  throw new Error(`no dev key for ${id} in ${cfg.keysDir ? `${cfg.keysDir} or ` : ""}${dir} (tried ${names.join(", ")})`);
+}
+
+function readKeyFile(f: string): GeneratedKey | null {
+  if (!fs.existsSync(f)) return null;
+  const txt = fs.readFileSync(f, "utf8").trim();
+  let secret: string | undefined;
+  if (txt.startsWith("{")) {
+    const j = JSON.parse(txt);
+    secret = j.private_key ?? j.secret_key ?? j.privateKey ?? j.secretKey;
+  } else secret = txt;
+  return secret?.startsWith("ed25519:") ? { secret_key: secret, public_key: publicKeyOf(secret) } : null;
 }
 
 /** Account handle for one of the 7 roles, signing with its dev key (admin/owner/watcher key). */

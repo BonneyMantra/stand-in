@@ -3,16 +3,28 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
-import { loadNetworkConfig, repoRoot, requireAccount, standinHome, type NetworkConfig } from "./config.ts";
+import { loadNetworkConfig, repoConfigFile, repoRoot, requireAccount, standinHome, type NetworkConfig } from "./config.ts";
 import { actions, assertSuccess, generateKey, loadDevKey, makeAccount, type GeneratedKey } from "./rpc.ts";
 import { logger } from "./logger.ts";
 import { KeyPair } from "near-api-js";
 
 const log = logger("pool");
 const poolSchema = z.object({
-  keys: z.array(z.object({ public_key: z.string(), secret_key: z.string(), minted_at: z.string(), tx_hash: z.string().optional() })),
+  keys: z.array(z.object({
+    public_key: z.string(), secret_key: z.string(), minted_at: z.string(), tx_hash: z.string().optional(),
+    /** the bait account the key was added to (keys minted before this field are the project's decoy account's) */
+    account_id: z.string().optional(),
+  })),
 });
 export type PoolKey = z.infer<typeof poolSchema>["keys"][number];
+
+let legacy: string | undefined;
+/** A pool key is only planted for the bait account it was minted on: a home that switched to its own bait skips older keys. */
+function belongs(k: PoolKey, decoy: string): boolean {
+  if (k.account_id) return k.account_id === decoy;
+  legacy ??= (() => { try { return loadNetworkConfig(repoConfigFile()).accounts.decoy ?? ""; } catch { return ""; } })();
+  return decoy === legacy;
+}
 
 export const DEFAULT_POOL_TARGET = Number(process.env.STANDIN_POOL_SIZE ?? 8);
 
@@ -59,8 +71,10 @@ function writePool(home: string, keys: PoolKey[]) {
   fs.renameSync(tmp, poolFile(home));
 }
 
-export function poolSize(home = standinHome()): number {
-  return readPool(home).length;
+/** Keys ready to plant; with `decoy`, only those minted on that bait account. */
+export function poolSize(home = standinHome(), decoy?: string): number {
+  const keys = readPool(home);
+  return decoy ? keys.filter((k) => belongs(k, decoy)).length : keys.length;
 }
 
 /** Add `count` fresh full-access keys to the decoy account in ONE tx signed by the decoy admin key. */
@@ -76,13 +90,14 @@ export async function mintKeys(cfg: NetworkConfig, count: number): Promise<{ key
   assertSuccess(res.status);
   const tx_hash = String(res.transaction?.hash ?? res.transaction_outcome?.id);
   const minted_at = new Date().toISOString();
-  return { tx_hash, keys: gen.map((k) => ({ ...k, minted_at, tx_hash })) };
+  return { tx_hash, keys: gen.map((k) => ({ ...k, minted_at, tx_hash, account_id: decoy })) };
 }
 
-/** Top the pool up to `target` keys. Safe to call concurrently from many processes. */
+/** Top the pool up to `target` keys for the config's bait account. Safe to call concurrently from many processes. */
 export async function refillPool(target = DEFAULT_POOL_TARGET, cfg = loadNetworkConfig(), home = standinHome()): Promise<number> {
+  const decoy = requireAccount(cfg, "decoy");
   return withLock(poolFile(home) + ".refill", async () => {
-    const have = readPool(home).length;
+    const have = poolSize(home, decoy);
     if (have >= target) return 0;
     const { keys, tx_hash } = await mintKeys(cfg, target - have);
     await withLock(poolFile(home), () => writePool(home, [...readPool(home), ...keys]));
@@ -107,10 +122,13 @@ export function refillInBackground(target = DEFAULT_POOL_TARGET, home = standinH
 export async function takeDecoy(opts: { cfg?: NetworkConfig; home?: string; refill?: boolean } = {}): Promise<PoolKey> {
   const home = opts.home ?? standinHome();
   const cfg = opts.cfg ?? loadNetworkConfig();
+  const decoy = requireAccount(cfg, "decoy");
   const taken = await withLock(poolFile(home), () => {
     const keys = readPool(home);
-    const k = keys.shift();
-    if (k) writePool(home, keys);
+    const i = keys.findIndex((k) => belongs(k, decoy));
+    if (i < 0) return undefined;
+    const [k] = keys.splice(i, 1);
+    writePool(home, keys);
     return k;
   });
   if (opts.refill !== false) refillInBackground(DEFAULT_POOL_TARGET, home);
