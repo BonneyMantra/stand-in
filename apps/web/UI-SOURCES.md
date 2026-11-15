@@ -6,7 +6,7 @@ Where each piece of the Stand-in UI comes from. Visual direction first, then com
 
 - Landing `/`: **Axiom** (near-black, one accent: trip red for CTAs (`--color-cta`) and "See it live →" links, product
   shots bleeding off the right edge, text columns beside shots, no eyebrows or section hairlines, one travelling glint;
-  redesigned 15 Nov against Gabriel's review). Logos: simple-icons 15.22.0 (NEAR, Claude, OpenAI, ntfy), CC0.
+  redesigned 15 Nov against the team's review). Logos: simple-icons 15.22.0 (NEAR, Claude, OpenAI, ntfy), CC0.
 - Dashboard `/app`: the dashboard trio: **Edge Infrastructure Dashboard** (shell and framework),
   **Agent Trace Waterfall** (trip detail), **RAG Analytics** (benchmark numbers).
 
