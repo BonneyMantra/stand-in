@@ -93,15 +93,14 @@ export async function cleanUp(rpc: Rpc, o: { bait: KeySigner; thief: { account: 
       } else {
         const r = await sendLocalTx({ signerId: o.thief.account, secretKey: o.thief.secret, receiverId: o.thief.account, actions: [{ type: "DeleteAccount", beneficiaryId: o.bait.accountId }] });
         onSigned("return loot", r.hash);
-        if (r.failure) {
-          out.push({ label: "return loot", hash: r.hash, error: r.failure });
+        // Judged by reading back, not by every receipt: the gas refund to the account just deleted always fails
+        // (AccountDoesNotExist), which a receipt scan reports as the transaction's failure.
+        const [thiefAfter, baitAfter] = await Promise.all([viewAccount(rpc, o.thief.account), viewAccount(rpc, o.bait.accountId)]);
+        const got = baitAfter && baitBefore ? baitAfter.amount - baitBefore.amount : null;
+        if (thiefAfter) {
+          out.push({ label: "return loot", hash: r.hash, error: r.failure ?? "the thief account still exists" });
         } else {
-          const [thiefAfter, baitAfter] = await Promise.all([viewAccount(rpc, o.thief.account), viewAccount(rpc, o.bait.accountId)]);
-          const got = baitAfter && baitBefore ? baitAfter.amount - baitBefore.amount : null;
-          out.push({
-            label: "return loot", hash: r.hash,
-            detail: `${thiefAfter ? "the thief account still exists" : "the thief account is deleted"}; the bait received ${got !== null ? fmtNear(got) : "?"} NEAR of the ${fmtNear(thiefBefore.amount)} it held`,
-          });
+          out.push({ label: "return loot", hash: r.hash, detail: `the thief account is deleted; the bait received ${got !== null ? fmtNear(got) : "?"} NEAR of the ${fmtNear(thiefBefore.amount)} it held` });
         }
       }
     } catch (e) {
