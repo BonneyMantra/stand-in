@@ -14,7 +14,8 @@ export const CODE_SOURCE = "si-agent-5289.testnet";
 /** config/testnet.json: the Stand-in watcher (may freeze, never unfreeze) and the intents registry. */
 export const DEFAULT_WATCHER = "si-watch-5289.testnet";
 export const DEFAULT_INTENTS = "si-intents-5289.testnet";
-export const FAUCET_URL = "https://docs.near.org/tools/faucet";
+/** NEAR's testnet faucet page (the old docs path /tools/faucet answers 404 since the docs moved it). */
+export const FAUCET_URL = "https://docs.near.org/getting-started/faucet";
 
 /** Storage price, guardian storage and deploy gas come from the shared funding module (also used by `standin adopt`). */
 export { YOCTO_PER_BYTE } from "./funding";
